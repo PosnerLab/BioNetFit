@@ -1,9 +1,0 @@
-.project
-.cproject
-Debug/output
-*.o
-*.d
-*.mk
-Debut/src
-Debug/bngout
-Debug/pOUT
