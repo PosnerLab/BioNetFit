@@ -141,8 +141,8 @@ public:
 		int boostrap = 0;
 		int parallelCount = 2;
 
-		bool usePipes;
-		bool useCluster;
+		bool usePipes = false;
+		bool useCluster = false;
 
 		bool divideByInit = false;
 		int logTransformSimData = 0;
@@ -150,6 +150,9 @@ public:
 		bool standardizeExpData = false;
 
 		int sosCalc = 1;
+		int extraWeight = 0;
+		bool forceDifferentParents = true;
+		int maxRetryDifferentParents = 100;
 
 		int verbosity;
 

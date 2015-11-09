@@ -25,6 +25,8 @@ using namespace std;
 
 int main(int argc, char *argv[]) {
 
+	srand(clock());
+
 	int generation;
 	string action;
 	string configFile;

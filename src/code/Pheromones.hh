@@ -55,6 +55,8 @@ class Swarm;
 #define SEND_RUNNING_PARTICLES -12
 #define SIMULATION_END -13
 #define SIMULATION_FAIL -14
+#define BREED_PARENT -15
+#define INITIATE_BREEDING -16
 #define MESSAGE_END -1000
 
 class Pheromones {

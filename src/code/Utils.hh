@@ -9,7 +9,8 @@
 #define UTILS_HH_
 
 #include <iostream>
-#include <boost/filesystem.hpp>
+#include <map>
+#include <boost/filesystem.hpp>.
 
 #include <sys/stat.h>
 
@@ -20,5 +21,6 @@ int checkIfFileExists(std::string path);
 void split(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " ");
 void outputHelp();
 bool createParticlePipe(const char * path);
+double pickWeighted(double weightSum, std::map<double,double>& weights, int extraWeight);
 
 #endif /* UTILS_HH_ */

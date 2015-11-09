@@ -145,7 +145,7 @@ void Swarm::launchParticle(Particle *p) {
 		int i;
 		string command = exePath_ + " particle " + to_string(p->getID()) + " run " + to_string(currentGeneration_) + " " + configPath_;
 		//if (p->getID() == 1) {
-			command = command + ">> pOUT 2>&1";
+		command = command + ">> pOUT 2>&1";
 		//}
 		command = command + " &";
 		// Create the pipe which will be used to communicate with the particle
@@ -227,10 +227,10 @@ void Swarm::runGeneration () {
 							// Store particle ID in our list of failed particles
 							failedParticles_.insert(stoi(*o));
 
-							// Give the particle a negative fit value
-							allParticles_.at(pID)->fitCalcs[currentGeneration_] = -1;
+							// Give the particle a very large fit value
+							//allParticles_.at(pID)->fitCalcs[currentGeneration_] = 1E10;
 							//currGenFits.push_back(allParticles_.at(pID));
-							allGenFits.insert(pair<double,string>(-1,""));
+							//allGenFits.insert(pair<double,string>(-1,""));
 						}
 						else {
 							// [TAG]
@@ -349,5 +349,80 @@ void Swarm::breedGeneration() {
 		cout << i.first << ": " << i.second << endl;
 	}
 
+	map<double,double> weights; // First element is original fit, second element is subtracted from max
 
+	// Fill in the weight map with fit values
+	double weightSum;
+	for (map<double,string>::iterator f = allGenFits.begin(); f != allGenFits.end(); ++f) {
+		weights.insert(pair<double,double>(f->first,0));
+		weightSum += f->first;
+	}
+
+	double maxWeight = weights.end()->first; // TODO: Is this true??
+
+	// Fill the second element of the weight map with difference between maxWeight and fit value
+	for (map<double,double>::iterator w = weights.begin(); w != weights.end(); ++w) {
+		w->second = maxWeight - w->first;
+	}
+
+	int parentPairs = options_.swarmSize / 2;
+
+	cout << "we have " << parentPairs << " parent pairs" << endl;
+
+	double p1;
+	double p2;
+	smatch match;
+	vector<string> parentVec;
+
+	for (int i = 0; i <= parentPairs; ++i) {
+		// Pick the fit values (particle parents) used in breeding
+		p1 = pickWeighted(weightSum, weights, options_.extraWeight);
+		p2 = pickWeighted(weightSum, weights, options_.extraWeight);
+
+		// If we want different parents used in breeding, make sure that happens
+		int retryCount = 0;
+		while (p1 == p2 && options_.forceDifferentParents) {
+			retryCount++;
+			if (retryCount > options_.maxRetryDifferentParents) {
+				cout << "Tried to many time to select different parents for breeding. Selecting the first two." << endl;
+				map<double,double>::iterator w = weights.begin();
+				p1 = w->first;
+				++w;
+				p2 = w->first;
+
+				break;
+			}
+			p2 = pickWeighted(weightSum, weights, options_.extraWeight);
+		}
+
+		cout << "selected " << p1 << " and " << p2 << endl;
+
+		// We always send the breeding information to the first parent. That particle will then
+		// initiate breeding with its mate
+
+		// Get the string containing gen number, perm number, and param values
+		string parentString1 = allGenFits.at(p1);
+		string parentString2 = allGenFits.at(p2);
+
+		// Split that string into array. We're only interested in the first element which contains
+		// the particle ID/permutation number
+		split(parentString1,parentVec);
+
+		// Extract the particle ID
+		string pID1 = regex_search(parentVec[0], match, regex("gen\d+perm(\d+)"));
+
+		// Clear the parent vector for use with the next parent
+		parentVec.clear();
+
+		// Do same as above, but for the second parent
+		split(parentString2,parentVec);
+		string pID2 = regex_search(parentVec[0], match, regex("gen\d+perm(\d+)"));
+		parentVec.clear();
+
+		// Add second parent to the message
+		swarmComm_->univMessageSender.push_back(pID2);
+		// Send the message to the first parent
+		swarmComm_->sendToSwarm(0, stoi(pID1), BREED_PARENT, false, swarmComm_->univMessageSender);
+		swarmComm_->univMessageSender.clear();
+	}
 }

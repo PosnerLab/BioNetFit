@@ -78,6 +78,27 @@ bool createParticlePipe(const char * path) {
 	}
 }
 
+double pickWeighted(double weightSum, map<double,double> &weights, int extraWeight) {
+	double lowerBound = 0;
+	double upperBound = weightSum;
+
+	uniform_real_distribution<double> unif(lowerBound,upperBound);
+	default_random_engine re;
+
+	double random = unif(re);
+	double chosen = random * ( 1 - (extraWeight / 10 ));
+
+	double currentSum = 0;
+	for (map<double,double>::iterator w = weights.begin(); w != weights.end(); ++w) {
+		currentSum += w->second;
+
+		if (currentSum >= chosen) {
+			return w->first;
+		}
+	}
+	return weights.end()->first;
+}
+
 /*
 void saveParticle(const Particle &p, const char * filename) {
     // make an archive

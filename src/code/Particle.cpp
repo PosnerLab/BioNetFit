@@ -27,7 +27,9 @@ void Particle::setID(int id) {
 }
 
 void Particle::generateParams() {
-	srand(clock());
+	// TODO: See here: http://www.johndcook.com/blog/cpp_TR1_random/
+	// for a possibly better way to generate numbers
+
 	for (map<string,string>::iterator i = model_->freeParams_.begin(); i != model_->freeParams_.end(); ++i) {
 
 		vector<string> values;
@@ -148,6 +150,7 @@ void Particle::doParticle() {
 			swarm_->swarmComm_->sendToSwarm(int(id_), 0, SIMULATION_FAIL, false, swarm_->swarmComm_->univMessageSender);
 		}
 
+		// Wait for message from master telling us who to breed with
 		while (1) {
 
 		}
