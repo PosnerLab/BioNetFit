@@ -409,15 +409,19 @@ void Swarm::breedGeneration() {
 		split(parentString1,parentVec);
 
 		// Extract the particle ID
-		string pID1 = regex_search(parentVec[0], match, regex("gen\d+perm(\d+)"));
+		regex_search(parentVec[0], match, regex("gen\\d+perm(\\d+)"));
+		string pID1 = match[1];
 
 		// Clear the parent vector for use with the next parent
 		parentVec.clear();
 
 		// Do same as above, but for the second parent
 		split(parentString2,parentVec);
-		string pID2 = regex_search(parentVec[0], match, regex("gen\d+perm(\d+)"));
+		regex_search(parentVec[0], match, regex("gen\\d+perm(\\d+)"));
+		string pID2 = match[1];
 		parentVec.clear();
+
+		cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
 
 		// Add second parent to the message
 		swarmComm_->univMessageSender.push_back(pID2);
