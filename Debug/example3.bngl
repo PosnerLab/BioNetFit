@@ -182,16 +182,16 @@ end model
 # actions
 
 # Generate the network
-#generate_network();
+generate_network();
 
 # Simulate for 600 seconds to reach equilibrium
-simulate({method=>"nf",t_start=>0,t_end=>600,n_steps=>1,suffix=>"equil"})
+simulate({method=>"ode",t_start=>0,t_end=>600,n_steps=>1,suffix=>"equil"})
 
 # Set Ligand_isPresent to 1 to enable ligand binding by means of the "func()" function
 setParameter("Ligand_isPresent",1)
 
 # Simulate for 60 seconds. This simulation output is fit to the data in example3.exp
-simulate({method=>"nf",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example3"})
+simulate({method=>"ode",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example3"})
 
 # Simulate for 60 seconds. This simulation output is fit to the data in example3.exp
-simulate({method=>"nf",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example33"})
+simulate({method=>"ode",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example33"})

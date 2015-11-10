@@ -17,6 +17,7 @@
 #include <cmath>
 #include <ctime>
 #include <fstream>
+#include <random>
 #include <boost/filesystem.hpp>
 
 #include <boost/mpi/environment.hpp>
@@ -88,12 +89,20 @@ public:
 	void setStandardizeExpData(bool standardizeExpData) { options_.standardizeExpData = standardizeExpData; }
 	bool getStandardizeExpData() { return options_.standardizeExpData; }
 
-	void setSosCalc(int sosCalc) { options_.sosCalc = sosCalc; }
-	int getSosCalc() { return options_.sosCalc; }
+	void setSosCalc(int objFunc) { options_.objFunc = objFunc; }
+	int getSosCalc() { return options_.objFunc; }
 
-	void setParallelCount(int parallel_count) { options_.parallelCount = parallel_count; }
+	void setSwapRate(float swapRate) { options_.swapRate = swapRate; }
+	void setExtraWeight(int extraWeight) { options_.extraWeight = extraWeight; }
+	void setMaxRetryDifferentParents(int maxRetryDifferentParents) { options_.maxRetryDifferentParents = maxRetryDifferentParents; }
+	void setForceDifferentParents(bool forceDifferentParents) { options_.forceDifferentParents = forceDifferentParents; }
+	void setDeleteOldFiles(bool deleteOldFiles) { options_.deleteOldFiles = deleteOldFiles; }
+	void setParallelCount(int parallelCount) { options_.parallelCount = parallelCount; }
+
 	void setCurrentGen(int gen);
+
 	void setType(std::string type) { type_ = type; }
+
 	std::string getParticleBasePath() { return particleBasePath_; }
 
 	void doSwarm();
@@ -105,6 +114,9 @@ public:
 
 	std::string recvFromParticle(Particle *p);
 	std::unordered_map<int,Particle*> generateInitParticles(int numParticles = -1);
+
+	// Initialize our random number engine
+	std::mt19937 randNumEngine;
 
 	Pheromones *swarmComm_;
 	int currentGeneration_ = 0;
@@ -149,8 +161,11 @@ public:
 		bool standardizeSimData = false;
 		bool standardizeExpData = false;
 
-		int sosCalc = 1;
+		bool deleteOldFiles = true;
+
+		int objFunc = 1;
 		int extraWeight = 0;
+		float swapRate = 0.5;
 		bool forceDifferentParents = true;
 		int maxRetryDifferentParents = 100;
 

@@ -163,7 +163,7 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 						//cout << "p is " << p.first << endl;
 						if(regex_match(line, matches, regex("\\s+\\d+\\s+(\\w+)\\s+(.+)\\s+"))) {
 							if (matches[1] == p.first) {
-								string match = p.first + "\\s+\\.+";
+								string match = p.first + "\\s+.+";
 								string replacement = p.first + " " + to_string(p.second);
 								line = regex_replace(line, regex(match), replacement);
 							}

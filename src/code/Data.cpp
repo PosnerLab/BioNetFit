@@ -20,7 +20,7 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 
 	Data::parseData();
 
-	if ( (swarm_->options_.sosCalc == 4 && isExp)) {
+	if ( (swarm_->options_.objFunc == 4 && isExp)) {
 		//cout << "soscalc is 4" << endl;
 		getColumnAverages();
 	}
@@ -39,7 +39,7 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 
 	if (swarm_->options_.standardizeSimData && !isExp) {
 		cout << "stand sim" << endl;
-		if (swarm_->options_.sosCalc != 4) {
+		if (swarm_->options_.objFunc != 4) {
 			//cout << "gca sim" << endl;
 			getColumnAverages();
 		}
@@ -49,7 +49,7 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 
 	if (swarm_->options_.standardizeExpData && isExp) {
 		cout << "stand exp" << endl;
-		if (swarm_->options_.sosCalc != 4) {
+		if (swarm_->options_.objFunc != 4) {
 			//cout << "gca exp" << endl;
 			getColumnAverages();
 		}

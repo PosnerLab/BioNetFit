@@ -78,16 +78,16 @@ bool createParticlePipe(const char * path) {
 	}
 }
 
-double pickWeighted(double weightSum, map<double,double> &weights, int extraWeight) {
+double pickWeighted(double weightSum, map<double,double> &weights, int extraWeight, mt19937 &randNumEngine) {
 	double lowerBound = 0;
 	double upperBound = weightSum;
 
 	uniform_real_distribution<double> unif(lowerBound,upperBound);
-	default_random_engine re;
 
-	double random = unif(re);
+	double random = unif(randNumEngine);
 	double chosen = random * ( 1 - (extraWeight / 10 ));
 
+	cout << "random: " << random << " chosen: " << chosen << endl;
 	double currentSum = 0;
 	for (map<double,double>::iterator w = weights.begin(); w != weights.end(); ++w) {
 		currentSum += w->second;
@@ -96,7 +96,8 @@ double pickWeighted(double weightSum, map<double,double> &weights, int extraWeig
 			return w->first;
 		}
 	}
-	return weights.end()->first;
+	//cout << "fell off the end" << endl;
+	return weights.rbegin()->first;
 }
 
 /*

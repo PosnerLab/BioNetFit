@@ -55,6 +55,7 @@ void Particle::generateParams() {
 			double max = atof(values[2].c_str());
 
 			float myrand = min + static_cast<double> (rand()) /(static_cast<double> (RAND_MAX/(max-min)));
+
 			pair<string,double> paramPair = make_pair(paramName, myrand);
 			setParam(paramPair);
 		}
@@ -83,17 +84,15 @@ void Particle::doParticle() {
 
 		// First get our path and filename variables set up for use in model generation, sim command, etc
 		string bnglFilename = to_string(id_) + ".bngl";
-		string netFilename = "base.net";
-
 		string path = swarm_->options_.outputDir + "/" + to_string(swarm_->currentGeneration_);
-
 		string bnglFullPath = path + "/" + bnglFilename;
-		string netFullPath = swarm_->options_.outputDir + "/" + netFilename;
 
 		string pipePath;
 
 		if (swarm_->options_.model->getHasGenerateNetwork()){
-			//cout << "has generate network" << endl;
+			string netFilename = "base.net";
+			string netFullPath = swarm_->options_.outputDir + "/" + netFilename;
+
 			swarm_->options_.model->parseNet(netFullPath);
 			model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, true, false, false);
 		}
@@ -151,9 +150,10 @@ void Particle::doParticle() {
 		}
 
 		// Wait for message from master telling us who to breed with
-		while (1) {
-
-		}
+		//while (1) {
+		//	break;
+		//}
+		break;
 	}
 }
 
@@ -161,7 +161,7 @@ void Particle::calculateFit() {
 	bool usingSD = false;
 	bool usingMean = false;
 
-	if (swarm_->options_.sosCalc == 2) {
+	if (swarm_->options_.objFunc == 2) {
 		objFuncPtr = &Particle::objFunc_chiSquare;
 		usingSD = true;
 	}

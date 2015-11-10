@@ -92,12 +92,43 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		s->setUsePipes((atoi(pairs.find("use_pipes")->second.c_str()) == 1) ? true : false );
 	}
 
+	// Tell the swarm if we should delete old files
+	if(pairs.find("delete_old_files") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->setDeleteOldFiles((atoi(pairs.find("delete_old_files")->second.c_str()) == 1) ? true : false );
+	}
+
 	// Tell the swarm if we're using a cluster
 	if(pairs.find("use_cluster") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
 		s->setUseCluster((atoi(pairs.find("use_cluster")->second.c_str()) == 1) ? true : false );
 		s->setParallelCount(s->getSwarmSize());
 	}
+	/*
+	// Update swap rate
+	if(pairs.find("swap_rate") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->setSwapRate(atof(pairs.find("swap_rate")->second.c_str()));
+	}
+
+	// Update extra weight
+	if(pairs.find("extra_weight") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->setExtraWeight(atoi(pairs.find("extra_weight")->second.c_str()));
+	}
+
+	// Whether or not to force difference parents
+	if(pairs.find("force_different_parents") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->setUseCluster((atoi(pairs.find("force_different_parents")->second.c_str()) == 1) ? true : false );
+		s->setParallelCount(s->getSwarmSize());
+	}
+
+	// How many retries when breeding
+	if(pairs.find("max_breeding_retries") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->setMaxRetryDifferentParents(atoi(pairs.find("max_breeding_retries")->second.c_str()));
+	}*/
 
 	// Set output directory
 	if(pairs.find("output_dir") != pairs.end()) {
@@ -188,7 +219,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	vector<Model::action> toDeleteActs;
 
 	for (unordered_map<string,Model::action>::iterator i = s->options_.model->actions.begin(); i != s->options_.model->actions.end();)
-	//for (vector<Model::action>::iterator i = s->options_.model->actions.begin(); i != s->options_.model->actions.end();)
+		//for (vector<Model::action>::iterator i = s->options_.model->actions.begin(); i != s->options_.model->actions.end();)
 	{
 		//if (!i->prefix.empty()) {
 		//	prefixedActions.push_back(i->prefix);

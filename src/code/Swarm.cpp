@@ -22,6 +22,10 @@ Swarm::Swarm(bool isMaster) {
 
 	// Set our communication class
 	swarmComm_ = ph;
+
+	// Seed our random number engine
+	randNumEngine.seed(std::random_device{}());
+	srand (std::random_device{}());
 }
 
 void Swarm::addExp(string path) {
@@ -106,7 +110,10 @@ void Swarm::doSwarm() {
 			runGeneration();
 
 			string currentDirectory = options_.outputDir + "/" + to_string(currentGeneration_);
-			cleanupFiles(currentDirectory.c_str());
+			if (options_.deleteOldFiles) {
+				cleanupFiles(currentDirectory.c_str());
+			}
+
 			breedGeneration();
 		}
 	}
@@ -170,7 +177,7 @@ void Swarm::setCurrentGen(int gen) {
 void Swarm::runGeneration () {
 	// TODO: Implement walltime
 	if(options_.verbosity >= 1) {
-		cout << "Running generation " << currentGeneration_ << " with " << allParticles_.size() << " particles..." << endl;
+		cout << "Running generation " << currentGeneration_ + 1 << " with " << allParticles_.size() << " particles..." << endl;
 	}
 
 	currentGeneration_ += 1;
@@ -265,6 +272,7 @@ void Swarm::runGeneration () {
 							// Then store it
 							allParticles_.at(pID)->fitCalcs[currentGeneration_] = stod(*o);
 							//currGenFits.push_back(allParticles_.at(pID));
+							cout << "saving fit for " << pID << " of " << *o << endl;
 							allGenFits.insert(pair<double,string>(stod(*o),params));
 							//cout << "particle " << pID << " has fit calc of " << *o;
 						}
@@ -353,18 +361,25 @@ void Swarm::breedGeneration() {
 
 	// Fill in the weight map with fit values
 	double weightSum;
+	double maxWeight;
 	for (map<double,string>::iterator f = allGenFits.begin(); f != allGenFits.end(); ++f) {
 		weights.insert(pair<double,double>(f->first,0));
 		weightSum += f->first;
+		cout << "f: " << f->first << endl;
+		maxWeight = f->first;
 	}
 
-	double maxWeight = weights.end()->first; // TODO: Is this true??
+	//double maxWeight = weights.end()->first; // TODO: Is this true??
+	cout << "max: " << maxWeight << endl;
 
 	// Fill the second element of the weight map with difference between maxWeight and fit value
 	for (map<double,double>::iterator w = weights.begin(); w != weights.end(); ++w) {
 		w->second = maxWeight - w->first;
 	}
 
+	for (auto i: weights) {
+		cout << "weight diff: " << i.second << endl;
+	}
 	int parentPairs = options_.swarmSize / 2;
 
 	cout << "we have " << parentPairs << " parent pairs" << endl;
@@ -374,10 +389,12 @@ void Swarm::breedGeneration() {
 	smatch match;
 	vector<string> parentVec;
 
+	cout << "sum: " << weightSum << endl;
+
 	for (int i = 0; i <= parentPairs; ++i) {
 		// Pick the fit values (particle parents) used in breeding
-		p1 = pickWeighted(weightSum, weights, options_.extraWeight);
-		p2 = pickWeighted(weightSum, weights, options_.extraWeight);
+		p1 = pickWeighted(weightSum, weights, options_.extraWeight, randNumEngine);
+		p2 = pickWeighted(weightSum, weights, options_.extraWeight, randNumEngine);
 
 		// If we want different parents used in breeding, make sure that happens
 		int retryCount = 0;
@@ -392,7 +409,7 @@ void Swarm::breedGeneration() {
 
 				break;
 			}
-			p2 = pickWeighted(weightSum, weights, options_.extraWeight);
+			p2 = pickWeighted(weightSum, weights, options_.extraWeight, randNumEngine);
 		}
 
 		cout << "selected " << p1 << " and " << p2 << endl;
@@ -424,9 +441,9 @@ void Swarm::breedGeneration() {
 		cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
 
 		// Add second parent to the message
-		swarmComm_->univMessageSender.push_back(pID2);
+		//swarmComm_->univMessageSender.push_back(pID2);
 		// Send the message to the first parent
-		swarmComm_->sendToSwarm(0, stoi(pID1), BREED_PARENT, false, swarmComm_->univMessageSender);
-		swarmComm_->univMessageSender.clear();
+		//swarmComm_->sendToSwarm(0, stoi(pID1), BREED_PARENT, false, swarmComm_->univMessageSender);
+		//swarmComm_->univMessageSender.clear();
 	}
 }

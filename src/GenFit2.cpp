@@ -105,78 +105,11 @@ int main(int argc, char *argv[]) {
 		Particle *p = s->createParticle(pID);
 		p->setModel(s->getModel());
 		if (generation == 1) {
+			cout << "generating params" << endl;
 			p->generateParams();
 		}
 		p->doParticle();
 	}
 
-	/*int i;
-	char * command = "/home/brandon/projects/nfsim_free/Debug/nfsim_free -xml /home/brandon/projects/nfsim_free/Debug/egfr.xml  >> output";
-	pid_t pid;
-
-	int fd;
-	char * fifo = "/home/brandon/projects/nfsim_free/Debug/egfr_nf.gdat";
-	char buf[MAX_BUF];
-
-	int fifo_status;
-	//if( remove( S ) != 0 )
-	//	perror( "Error deleting file!" );
-
-	cout << "Creating pipe with path: " << fifo << endl;
-
-	unlink(fifo);
-	fifo_status = mkfifo(fifo, 0666);
-
-	if (fifo_status) {
-		cout << "Error: Couldn't create output pipe: " <<endl;
-	}
-
-	pid = fork();
-
-	if (pid < 0)
-	{
-		cout << "Fork Error";
-		return -1;
-	}
-	else if (pid == 0) {
-		cout << "Child " << getpid() << endl;
-		i = system (command);
-	}
-	else
-	{
-		fd = open(fifo, O_RDONLY);
-
-		if (fd < 0) {
-			cout << "couldn't open " << fifo << endl;
-		}
-
-		int len;
-		while( len = read(fd, buf, MAX_BUF)){
-			buf[len] = 0;
-			printf("Buffer recived: %s\n", buf);
-		}
-
-		if (len < 0) {
-		    perror("read error");
-		}
-
-		else {
-		    buf[len] = 0;
-		    printf("Buffer recived: %s\n", buf);
-		}
-
-		close(fd);
-
-		wait(NULL);
-		cout << "Parent " << getpid() << endl;
-		return 0;
-	}
-
-	if (i != 0){
-		cout<<"Return code is "<<i<<endl;
-	}
-
-	unlink(fifo);
-	 */
 	return 0;
 }
