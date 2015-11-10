@@ -34,11 +34,14 @@ void Swarm::addExp(string path) {
 
 	//cout << "inserting EXP?" << endl;
 	this->options_.expFiles.insert(make_pair(basename, new Data(path, this, true)));
+	//cout << "exp inserted" << endl;
 }
 
 void Swarm::setModel(string path) {
 	path = convertToAbsPath(path);
+	//cout << "setting model" << endl;
 	this->options_.model = new Model(path);
+	//cout << "model set" << endl;
 }
 
 void Swarm::setSwarmSize(int size) {
@@ -151,7 +154,7 @@ void Swarm::launchParticle(Particle *p) {
 	else {
 		int i;
 		string command = exePath_ + " particle " + to_string(p->getID()) + " run " + to_string(currentGeneration_) + " " + configPath_;
-		//if (p->getID() == 1) {
+		//if (p->getID() == 10) {
 		command = command + ">> pOUT 2>&1";
 		//}
 		command = command + " &";
@@ -201,7 +204,8 @@ void Swarm::runGeneration () {
 		}
 
 		// Check for any messages from particles
-		usleep(250000);
+		usleep(2500);
+		//cout << "checking messages" << endl;
 		numMessages = swarmComm_->recvMessage(-1, 0, -1, false, messageHolder);
 
 		if (numMessages >= 1) {
@@ -272,7 +276,7 @@ void Swarm::runGeneration () {
 							// Then store it
 							allParticles_.at(pID)->fitCalcs[currentGeneration_] = stod(*o);
 							//currGenFits.push_back(allParticles_.at(pID));
-							cout << "saving fit for " << pID << " of " << *o << endl;
+							//cout << "saving fit for " << pID << " of " << *o << endl;
 							allGenFits.insert(pair<double,string>(stod(*o),params));
 							//cout << "particle " << pID << " has fit calc of " << *o;
 						}
@@ -344,52 +348,51 @@ bool Swarm::sortFits(Particle * a, Particle * b) {
 void Swarm::breedGeneration() {
 	// We let particles do the actual breeding.  The master's role is to generate a breeding pattern and
 	// tell which particles to breed with which
-
-	cout << "fit       perm     ";
+	/*
+	cout << "fit\tperm\t";
 
 	for (auto i: options_.model->freeParams_) {
-		cout << i.first << " ";
+		cout << i.first << "\t";
 	}
 
 	cout << endl;
 
 	for (auto i: allGenFits) {
 		cout << i.first << ": " << i.second << endl;
-	}
+	}*/
 
 	map<double,double> weights; // First element is original fit, second element is subtracted from max
 
 	// Fill in the weight map with fit values
 	double weightSum;
-	double maxWeight;
+	//double maxWeight;
 	for (map<double,string>::iterator f = allGenFits.begin(); f != allGenFits.end(); ++f) {
 		weights.insert(pair<double,double>(f->first,0));
 		weightSum += f->first;
-		cout << "f: " << f->first << endl;
-		maxWeight = f->first;
+		//cout << "f: " << f->first << endl;
 	}
 
-	//double maxWeight = weights.end()->first; // TODO: Is this true??
-	cout << "max: " << maxWeight << endl;
+	double maxWeight = weights.rbegin()->first; // TODO: Is this true??
+	//cout << "max: " << maxWeight << endl;
 
 	// Fill the second element of the weight map with difference between maxWeight and fit value
 	for (map<double,double>::iterator w = weights.begin(); w != weights.end(); ++w) {
 		w->second = maxWeight - w->first;
 	}
-
+	/*
 	for (auto i: weights) {
 		cout << "weight diff: " << i.second << endl;
-	}
+	}*/
 	int parentPairs = options_.swarmSize / 2;
 
-	cout << "we have " << parentPairs << " parent pairs" << endl;
+	//cout << "we have " << parentPairs << " parent pairs" << endl;
 
 	double p1;
 	double p2;
 	smatch match;
 	vector<string> parentVec;
 
-	cout << "sum: " << weightSum << endl;
+	//cout << "sum: " << weightSum << endl;
 
 	for (int i = 0; i <= parentPairs; ++i) {
 		// Pick the fit values (particle parents) used in breeding
@@ -412,7 +415,7 @@ void Swarm::breedGeneration() {
 			p2 = pickWeighted(weightSum, weights, options_.extraWeight, randNumEngine);
 		}
 
-		cout << "selected " << p1 << " and " << p2 << endl;
+		//cout << "selected " << p1 << " and " << p2 << endl;
 
 		// We always send the breeding information to the first parent. That particle will then
 		// initiate breeding with its mate

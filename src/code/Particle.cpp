@@ -136,7 +136,7 @@ void Particle::doParticle() {
 			// Put our simulation params into the message vector
 			for (map<string,double>::iterator i = simParams_.begin(); i != simParams_.end(); ++i){
 				swarm_->swarmComm_->univMessageSender.push_back(to_string(i->second));
-				cout << "adding " << i->first << " of " << i->second << endl;
+				//cout << "adding " << i->first << " of " << i->second << endl;
 			}
 
 			// Tell the swarm master that we're finished
@@ -161,9 +161,19 @@ void Particle::calculateFit() {
 	bool usingSD = false;
 	bool usingMean = false;
 
-	if (swarm_->options_.objFunc == 2) {
+	if (swarm_->options_.objFunc == 1) {
+		objFuncPtr = &Particle::objFunc_sumOfSquares;
+	}
+	else if (swarm_->options_.objFunc == 2) {
 		objFuncPtr = &Particle::objFunc_chiSquare;
 		usingSD = true;
+	}
+	else if (swarm_->options_.objFunc == 3) {
+		objFuncPtr = &Particle::objFunc_divByMeasured;
+	}
+	else if (swarm_->options_.objFunc == 4) {
+		objFuncPtr = &Particle::objFunc_divByMean;
+		usingMean = true;
 	}
 
 	double colSum;
@@ -200,6 +210,7 @@ void Particle::calculateFit() {
 				//cout << "SD: " << SD << endl;
 
 				if (usingSD) {
+					//cout << "using sd" << endl;
 					divisor = e->second->standardDeviations_.at(exp_col->first).at(timepoint->first);
 				}
 
@@ -213,6 +224,22 @@ void Particle::calculateFit() {
 	//cout << "fitcalc: " << totalSum << endl;
 }
 
+// #1
 double Particle::objFunc_chiSquare(double sim, double exp, double stdev) {
-	return pow(((exp - sim)/stdev),2);
+	return pow(((sim - exp)/stdev),2);
+}
+
+// #2
+double Particle::objFunc_sumOfSquares(double sim, double exp, double dummyvar) {
+	return pow((sim - exp),2);
+}
+
+// #3
+double Particle::objFunc_divByMeasured(double sim, double exp, double dummyvar) {
+	return pow(((sim - exp)/sim),2);
+}
+
+// #4
+double Particle::objFunc_divByMean(double sim, double exp, double mean) {
+	return pow(((sim - exp)/mean),2);
 }

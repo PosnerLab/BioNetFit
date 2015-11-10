@@ -105,7 +105,6 @@ int main(int argc, char *argv[]) {
 		Particle *p = s->createParticle(pID);
 		p->setModel(s->getModel());
 		if (generation == 1) {
-			cout << "generating params" << endl;
 			p->generateParams();
 		}
 		p->doParticle();

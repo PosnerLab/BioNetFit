@@ -104,7 +104,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		s->setUseCluster((atoi(pairs.find("use_cluster")->second.c_str()) == 1) ? true : false );
 		s->setParallelCount(s->getSwarmSize());
 	}
-	/*
+
 	// Update swap rate
 	if(pairs.find("swap_rate") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
@@ -128,7 +128,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	if(pairs.find("max_breeding_retries") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
 		s->setMaxRetryDifferentParents(atoi(pairs.find("max_breeding_retries")->second.c_str()));
-	}*/
+	}
 
 	// Set output directory
 	if(pairs.find("output_dir") != pairs.end()) {

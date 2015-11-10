@@ -5,7 +5,7 @@ begin model
 begin parameters
 	# simulation parameters
 	# fraction of a single cell to be considered in a stochastic simulation
-	f 0.0001 # [=] dimensionless, 0<f<=1
+	f 0.1 # [=] dimensionless, 0<f<=1
 	
 	# physical constants
 	# Avogadro constant
@@ -192,6 +192,3 @@ setParameter("Ligand_isPresent",1)
 
 # Simulate for 60 seconds. This simulation output is fit to the data in example3.exp
 simulate({method=>"ode",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example3"})
-
-# Simulate for 60 seconds. This simulation output is fit to the data in example3.exp
-simulate({method=>"ode",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example33"})

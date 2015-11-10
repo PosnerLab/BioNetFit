@@ -55,5 +55,8 @@ private:
 	Swarm * swarm_;
 
 	double objFunc_chiSquare(double sim, double exp, double stdev);
+	double objFunc_sumOfSquares(double sim, double exp, double dummyvar);
+	double objFunc_divByMeasured(double sim, double exp, double dummyvar);
+	double objFunc_divByMean(double sim, double exp, double mean);
 };
 #endif /* PARTICLE_HH_ */

@@ -87,7 +87,7 @@ double pickWeighted(double weightSum, map<double,double> &weights, int extraWeig
 	double random = unif(randNumEngine);
 	double chosen = random * ( 1 - (extraWeight / 10 ));
 
-	cout << "random: " << random << " chosen: " << chosen << endl;
+	//cout << "random: " << random << " chosen: " << chosen << endl;
 	double currentSum = 0;
 	for (map<double,double>::iterator w = weights.begin(); w != weights.end(); ++w) {
 		currentSum += w->second;

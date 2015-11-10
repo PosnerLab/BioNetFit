@@ -120,12 +120,11 @@ void Data::parseData(){
 
 	// TODO: Do we need to store columns that aren't in .exp?  Maybe not.
 	vector<string> columns;
-	split(allLines[0], columns, " ");
+	split(allLines[0], columns, " \t");
 
 	for (vector<string>::iterator l = allLines.begin()+1; l != allLines.end(); ++l) {
 		vector<string> values;
-		// TODO: This split needs to handle all whitespace.  Maybe replace with regex stuff;
-		split(*l, values," ");
+		split(*l, values," \t");
 
 		int i = 1;
 		for(vector<string>::iterator col = columns.begin(); col != columns.end(); ++col) {
