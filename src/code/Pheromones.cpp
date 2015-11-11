@@ -41,7 +41,6 @@ void Pheromones::init(Swarm *s) {
 			segment_ = segment;
 		}
 		else {
-			//std::cout << "here" << std::endl;
 			managed_shared_memory *segment = new managed_shared_memory(open_only, "Swarm");
 			segment_ = segment;
 		}
@@ -110,7 +109,7 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 
 			*vecString_ = std::to_string(GET_RUNNING_PARTICLES).c_str(); // Set tag
 			swarmVec_->push_back(*vecString_); // Push tag
-			*vecString_ = std::to_string(rand() % 4294967295).c_str(); // Set unique ID
+			*vecString_ = std::to_string(rand()).c_str(); // Set unique ID
 			swarmVec_->push_back(*vecString_); // Store unique ID
 			*vecString_ = std::to_string(senderID).c_str(); // Set sender
 			swarmVec_->push_back(*vecString_); // Push sender
@@ -123,7 +122,7 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			// Receive a message from master containing list of running particles
 			std::vector<std::vector<std::string>> messageHolder;
 			recvMessage(0,senderID,SEND_RUNNING_PARTICLES,true,messageHolder);
-			std::cout << "got list of running particles. sending message" << std::endl;
+			//std::cout << "got list of running particles. sending message" << std::endl;
 
 			// [RECEIVER]
 			// 		[TAG]
@@ -145,7 +144,7 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			receivers.push_back(receiverID);
 		}
 
-		unsigned long int messageID = rand() % 4294967295;
+		unsigned long int messageID = rand();
 
 		// Add tag, sender, message size, and message(s) if applicable
 		for(std::vector<int>::iterator r = receivers.begin(); r != receivers.end(); ++r) {
@@ -169,10 +168,14 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 				swarmVec_->push_back(*vecString_);
 			}
 
+			//std::cout << "storing vector in swarm map to receiver: " << *r << " with tag: " << tag << std::endl;
 			// Insert vector to map
 			swarmMap_->insert(std::pair<const int,MyVector_>(*r,*swarmVec_));
+			string tests = lexical_cast<string>(*(swarmMap_->find(*r)->second.begin()));
+			//std::cout << "swarmmap is now: " << swarmMap_->size() << " " <<  tests << std::endl;
 			swarmVec_->clear();
 		}
+		//std::cout << "done sending " << std::endl;
 
 		// Add code to check whether message was seen or not. Only move on once it's gone
 		if (block) {
@@ -186,10 +189,10 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 				else {
 					foundMessage = false;
 				}
-
 			}
 		}
 	}
+	//std::cout << "really done sending " << std::endl;
 }
 
 int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage) {
@@ -199,19 +202,20 @@ int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool b
 	}
 	else {
 		while (1) {
+			//std::cout << "sm size: " << swarmMap_->size() << std::endl;
 			// TODO: Do we really need to iterate here? Can't just look up by map key??
 			// Maybe not.  Think we get a segfault when using map find(). But why?
 			for (MyMap_::iterator s = swarmMap_->begin(); s != swarmMap_->end();) {
-				//std::cout << "maploop" << std::endl;
+				//std::cout << receiverID << "looking at " << s->first << std::endl;
 				if (s->first == receiverID) {
-					//std::cout << "first: " << s->first << std::endl;
+					//std::cout << "first: " << s->first << " second: " << *(s->second.begin()) << std::endl;
 					int currTag;
 					int currSender;
 					for (MyVector_::iterator v = s->second.begin(); v != s->second.end(); ) {
-						//std::cout << "beginning of loop" << std::endl;
-						//std::cout << "v: " << *v << std::endl;
+						//std::cout << receiverID << ": " << *v << std::endl;
+						std::string theString = lexical_cast<std::string>(*v);
 						// TODO: We have to lexical cast to string, THEN convert to int because a lexical cast to int will throw an exception if the input can't be easily converted to an integer.  Is there a more elegant way to do this?
-						if (stoi(lexical_cast<std::string>(*v)) < -10) {
+						if (!theString.empty() && stoi(theString) < -10) {
 							// Set our tag and sender
 							//std::cout << "found a tag" << std::endl;
 							currTag = lexical_cast<int>(*v);
@@ -226,7 +230,7 @@ int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool b
 								//std::cout << "incrementing numMessages" << std::endl;
 							}
 							else {
-								v += (s->second.size());
+								//v += (s->second.size());
 								break;
 							}
 							// If we find a tag (any number less than 10) we need to create a new vector
@@ -240,6 +244,7 @@ int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool b
 						// Erase the element if eraseMessage is true. Otherwise, increment
 						// the iterator
 						if (eraseMessage) {
+							//std::cout << "erasing " << *v << std::endl;
 							v = s->second.erase(v);
 						}
 						else {
@@ -247,17 +252,21 @@ int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool b
 						}
 					}
 					// If are array is empty, we should erase it
-					if (s->second.size() == 0) {
+					/*if (s->second.size() == 0) {
 						//std::cout << "erasing map pair" << std::endl;
 						s = swarmMap_->erase(s);
 					}
 					else {
 						++s;
-					}
+					}*/
+					++s;
+				}
+				else {
+					++s;
 				}
 			}
 			if (block && numMessages < 1) {
-				//std::cout << "not going to break" << std::endl;
+				usleep(2500);
 			}
 			else {
 				//std::cout << "going to break" << std::endl;

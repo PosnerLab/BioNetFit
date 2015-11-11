@@ -162,7 +162,9 @@ void Swarm::launchParticle(Particle *p) {
 		//string path = particleBasePath_ + to_string(p->getID());
 		//createParticlePipe(path.c_str());
 
-		cout << "Running particle with command: " << command << endl;
+		//cout << "Running particle with command: " << command << endl;
+		cout << "Running Particle " << p->getID() << endl;
+
 		i = system(command.c_str());
 		//runningParticles_[p] = "";
 		runningParticles_.insert(p->getID());
@@ -204,7 +206,7 @@ void Swarm::runGeneration () {
 		}
 
 		// Check for any messages from particles
-		usleep(2500);
+		usleep(250);
 		//cout << "checking messages" << endl;
 		numMessages = swarmComm_->recvMessage(-1, 0, -1, false, messageHolder);
 
@@ -324,7 +326,7 @@ void Swarm::cleanupFiles(const char * path) {
 			de = readdir( dp );
 			if (de == NULL) break;
 			//cout << "read " << de->d_name << endl;
-			if (regex_match(string( de->d_name ),regex(".+xml$|.+species$|.+cdat$|.+gdat$|.+net$"))) {
+			if (regex_match(string( de->d_name ),regex(".+xml$|.+species$|.+cdat$|.+gdat$|.+net$|.+BNG_OUT"))) {
 				//cout << "found a file";
 				filesToDel.push_back( string(de->d_name) );
 			}
@@ -394,7 +396,7 @@ void Swarm::breedGeneration() {
 
 	//cout << "sum: " << weightSum << endl;
 
-	for (int i = 0; i <= parentPairs; ++i) {
+	for (int i = 0; i < parentPairs; ++i) {
 		// Pick the fit values (particle parents) used in breeding
 		p1 = pickWeighted(weightSum, weights, options_.extraWeight, randNumEngine);
 		p2 = pickWeighted(weightSum, weights, options_.extraWeight, randNumEngine);
@@ -444,9 +446,28 @@ void Swarm::breedGeneration() {
 		cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
 
 		// Add second parent to the message
-		//swarmComm_->univMessageSender.push_back(pID2);
+		swarmComm_->univMessageSender.push_back(pID2);
 		// Send the message to the first parent
-		//swarmComm_->sendToSwarm(0, stoi(pID1), BREED_PARENT, false, swarmComm_->univMessageSender);
-		//swarmComm_->univMessageSender.clear();
+
+		cout << "sending message to " << stoi(pID1) << endl;
+
+		// Tell parent 1 to initiate breeding
+		swarmComm_->sendToSwarm(0, stoi(pID1), INIT_BREEDING, false, swarmComm_->univMessageSender);
+		swarmComm_->univMessageSender.clear();
+
+		cout << "message sent" << endl;
+	}
+
+	int numFinishedBreeding = 0;
+
+	cout << "waiting for particles to breed" << endl;
+	while(numFinishedBreeding < parentPairs) {
+		int numMessages = swarmComm_->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm_->univMessageReceiver, true);
+		numFinishedBreeding+=numMessages;
+		cout << "numfinished: " << numFinishedBreeding << endl;
+	}
+
+	for (auto p : allParticles_) {
+		swarmComm_->sendToSwarm(0, p.first, NEXT_GENERATION, false, swarmComm_->univMessageSender);
 	}
 }

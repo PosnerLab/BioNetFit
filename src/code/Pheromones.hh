@@ -55,8 +55,11 @@ class Swarm;
 #define SEND_RUNNING_PARTICLES -12
 #define SIMULATION_END -13
 #define SIMULATION_FAIL -14
-#define BREED_PARENT -15
-#define INITIATE_BREEDING -16
+#define INIT_BREEDING -15
+#define DO_BREED -16
+#define RECIPROCATE_BREED -16
+#define DONE_BREEDING -17
+#define NEXT_GENERATION -18
 #define MESSAGE_END -1000
 
 class Pheromones {
@@ -102,12 +105,19 @@ private:
 	typedef boost::interprocess::multimap<int, MyVector_, std::less<int>, ShmemAllocator_>
 	MyMap_;
 
+	CharAllocator *     charallocator;
+	ShmemAllocator_ * alloc_inst;
+	vecAllocator_ * vectorallocator;
+
 	MyShmString *vecString_;
 
 	MyMap_ *swarmMap_;
 	MyVector_ *swarmVec_;
 
 	std::vector<int> runningParticles_;
+
+	void constructMasterObjects(boost::interprocess::managed_shared_memory &segment);
+	void constructSlaveObjects(boost::interprocess::managed_shared_memory &segment);
 
 	void putArrayInSHM(std::vector<std::string> theArray);
 

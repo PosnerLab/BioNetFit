@@ -65,7 +65,13 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	// Update the swarm size
 	if(pairs.find("swarm_size") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setSwarmSize(atoi(pairs.find("swarm_size")->second.c_str()));
+		int swarmSize = atoi(pairs.find("swarm_size")->second.c_str());
+
+		// If the swarm size isn't even, make it even by adding a particle
+		if (swarmSize % 2 != 0) {
+			swarmSize++;
+		}
+		s->setSwarmSize(swarmSize);
 	}
 
 	// Update the swarm type

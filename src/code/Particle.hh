@@ -58,5 +58,8 @@ private:
 	double objFunc_sumOfSquares(double sim, double exp, double dummyvar);
 	double objFunc_divByMeasured(double sim, double exp, double dummyvar);
 	double objFunc_divByMean(double sim, double exp, double mean);
+
+	void initBreedWithParticle(int pID, int swapID);
+	void rcvBreedWithParticle(std::vector<std::string>& params, int reciprocate, int swapID);
 };
 #endif /* PARTICLE_HH_ */
