@@ -24,6 +24,7 @@
 #include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/containers/vector.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
+#include <boost/interprocess/sync/interprocess_mutex.hpp>
 
 #include <boost/lexical_cast.hpp>
 
@@ -60,6 +61,9 @@ class Swarm;
 #define RECIPROCATE_BREED -16
 #define DONE_BREEDING -17
 #define NEXT_GENERATION -18
+#define GET_PARAMS_FROM_PARTICLE -19
+#define FINISHED_WITH_FIT -20
+#define SEND_FINAL_PARAMS_TO_PARTICLE -21
 #define MESSAGE_END -1000
 
 class Pheromones {
@@ -85,7 +89,10 @@ private:
 	boost::mpi::communicator * world_;
 
 	// IPC Stuff
+
+	// Our shared memory object
 	boost::interprocess::managed_shared_memory *segment_;
+
 
 	typedef boost::interprocess::allocator<char, boost::interprocess::managed_shared_memory::segment_manager>
 	CharAllocator;
@@ -116,8 +123,7 @@ private:
 
 	std::vector<int> runningParticles_;
 
-	void constructMasterObjects(boost::interprocess::managed_shared_memory &segment);
-	void constructSlaveObjects(boost::interprocess::managed_shared_memory &segment);
+	boost::interprocess::interprocess_mutex *mutex_;
 
 	void putArrayInSHM(std::vector<std::string> theArray);
 

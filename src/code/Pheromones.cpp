@@ -54,6 +54,8 @@ void Pheromones::init(Swarm *s) {
 			MyShmString *mystring = new MyShmString(charallocator);
 			MyMap_ *mymap = segment_->construct<MyMap_>("SwarmMap")(std::less<int>(),alloc_inst);
 			MyVector_ *myshmvec = segment_->construct<MyVector_>("myvec")(vectorallocator);
+			mutex_ = segment_->construct<interprocess_mutex>("MyMutex")();
+
 			vecString_ = mystring;
 			swarmMap_ = mymap;
 			swarmVec_ = myshmvec;
@@ -62,6 +64,8 @@ void Pheromones::init(Swarm *s) {
 			MyShmString *mystring = new MyShmString(charallocator);
 			MyMap_ *mymap = segment_->find<MyMap_>("SwarmMap").first;
 			MyVector_ *myshmvec = segment_->find<MyVector_>("myvec").first;
+			mutex_ = segment_->find<interprocess_mutex>("MyMutex").first;
+
 			vecString_ = mystring;
 			swarmMap_ = mymap;
 			swarmVec_ = myshmvec;
@@ -100,6 +104,8 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 	}
 	// Using IPC
 	else {
+
+
 		std::vector<int> receivers;
 
 		// Sending to entire swarm
@@ -107,17 +113,21 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			// First we need a list of running particles, so let's construct a request
 			// and get the list from the master
 
-			*vecString_ = std::to_string(GET_RUNNING_PARTICLES).c_str(); // Set tag
-			swarmVec_->push_back(*vecString_); // Push tag
-			*vecString_ = std::to_string(rand()).c_str(); // Set unique ID
-			swarmVec_->push_back(*vecString_); // Store unique ID
-			*vecString_ = std::to_string(senderID).c_str(); // Set sender
-			swarmVec_->push_back(*vecString_); // Push sender
-			*vecString_ = std::to_string(0).c_str(); // Set message size of 0
-			swarmVec_->push_back(*vecString_); // Store message size
+			{
+				scoped_lock<interprocess_mutex> lock(*mutex_);
 
-			swarmMap_->insert(std::pair<const int,MyVector_>(0,*swarmVec_)); // Insert vector to first position (master slot) of map
-			swarmVec_->clear(); // Clear our message vector
+				*vecString_ = std::to_string(GET_RUNNING_PARTICLES).c_str(); // Set tag
+				swarmVec_->push_back(*vecString_); // Push tag
+				*vecString_ = std::to_string(rand()).c_str(); // Set unique ID
+				swarmVec_->push_back(*vecString_); // Store unique ID
+				*vecString_ = std::to_string(senderID).c_str(); // Set sender
+				swarmVec_->push_back(*vecString_); // Push sender
+				*vecString_ = std::to_string(0).c_str(); // Set message size of 0
+				swarmVec_->push_back(*vecString_); // Store message size
+
+				swarmMap_->insert(std::pair<const int,MyVector_>(0,*swarmVec_)); // Insert vector to first position (master slot) of map
+				swarmVec_->clear(); // Clear our message vector
+			}
 
 			// Receive a message from master containing list of running particles
 			std::vector<std::vector<std::string>> messageHolder;
@@ -146,34 +156,38 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 
 		unsigned long int messageID = rand();
 
-		// Add tag, sender, message size, and message(s) if applicable
-		for(std::vector<int>::iterator r = receivers.begin(); r != receivers.end(); ++r) {
-			int numMsgElements = message.size();
+		{
+			scoped_lock<interprocess_mutex> lock(*mutex_);
 
-			*vecString_ = std::to_string(tag).c_str(); // Set tag
-			swarmVec_->push_back(*vecString_); // Store tag
+			// Add tag, sender, message size, and message(s) if applicable
+			for(std::vector<int>::iterator r = receivers.begin(); r != receivers.end(); ++r) {
+				int numMsgElements = message.size();
 
-			*vecString_ = std::to_string(messageID).c_str(); // Set unique ID
-			swarmVec_->push_back(*vecString_); // Store unique ID
+				*vecString_ = std::to_string(tag).c_str(); // Set tag
+				swarmVec_->push_back(*vecString_); // Store tag
 
-			*vecString_ = std::to_string(senderID).c_str(); // Set sender
-			swarmVec_->push_back(*vecString_); // Store sender
+				*vecString_ = std::to_string(messageID).c_str(); // Set unique ID
+				swarmVec_->push_back(*vecString_); // Store unique ID
 
-			*vecString_ = std::to_string(numMsgElements).c_str(); // Set message size
-			swarmVec_->push_back(*vecString_); // Store message size
+				*vecString_ = std::to_string(senderID).c_str(); // Set sender
+				swarmVec_->push_back(*vecString_); // Store sender
 
-			// Insert messages in vector
-			for(std::vector<std::string>::iterator m = message.begin(); m != message.end(); ++m) {
-				*vecString_ = m->c_str();
-				swarmVec_->push_back(*vecString_);
+				*vecString_ = std::to_string(numMsgElements).c_str(); // Set message size
+				swarmVec_->push_back(*vecString_); // Store message size
+
+				// Insert messages in vector
+				for(std::vector<std::string>::iterator m = message.begin(); m != message.end(); ++m) {
+					*vecString_ = m->c_str();
+					swarmVec_->push_back(*vecString_);
+				}
+
+				//std::cout << "storing vector in swarm map to receiver: " << *r << " with tag: " << tag << std::endl;
+				// Insert vector to map
+				swarmMap_->insert(std::pair<const int,MyVector_>(*r,*swarmVec_));
+				string tests = lexical_cast<string>(*(swarmMap_->find(*r)->second.begin()));
+				//std::cout << "swarmmap is now: " << swarmMap_->size() << " " <<  tests << std::endl;
+				swarmVec_->clear();
 			}
-
-			//std::cout << "storing vector in swarm map to receiver: " << *r << " with tag: " << tag << std::endl;
-			// Insert vector to map
-			swarmMap_->insert(std::pair<const int,MyVector_>(*r,*swarmVec_));
-			string tests = lexical_cast<string>(*(swarmMap_->find(*r)->second.begin()));
-			//std::cout << "swarmmap is now: " << swarmMap_->size() << " " <<  tests << std::endl;
-			swarmVec_->clear();
 		}
 		//std::cout << "done sending " << std::endl;
 
@@ -217,7 +231,7 @@ int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool b
 						// TODO: We have to lexical cast to string, THEN convert to int because a lexical cast to int will throw an exception if the input can't be easily converted to an integer.  Is there a more elegant way to do this?
 						if (!theString.empty() && stoi(theString) < -10) {
 							// Set our tag and sender
-							//std::cout << "found a tag" << std::endl;
+
 							currTag = lexical_cast<int>(*v);
 							v+=2;
 							currSender = lexical_cast<int>(*v);
@@ -266,7 +280,8 @@ int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool b
 				}
 			}
 			if (block && numMessages < 1) {
-				usleep(2500);
+				usleep(10000);
+				std::cout << "wait" << std::endl;
 			}
 			else {
 				//std::cout << "going to break" << std::endl;
@@ -276,8 +291,4 @@ int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool b
 		//std::cout << "out of loop?" << std::endl;
 	}
 	return numMessages;
-}
-
-void putArrayInSHM(std::vector<std::string> theArray) {
-
 }

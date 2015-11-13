@@ -191,4 +191,4 @@ simulate({method=>"ode",t_start=>0,t_end=>600,n_steps=>1,suffix=>"equil"})
 setParameter("Ligand_isPresent",1)
 
 # Simulate for 60 seconds. This simulation output is fit to the data in example3.exp
-simulate({method=>"ode",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example3"})
+simulate({method=>"ode",t_start=>0,t_end=>60,sample_times=>[0,5,10,15,20,25,30,35,40,45,50,55,60],prefix=>"example5"})

@@ -110,8 +110,8 @@ void Data::parseData(){
 		dataFile.close();
 	}
 
-	//getline(dataFile,line);
 	string basename = regex_replace(getFilename(dataPath_),regex("_\\d+$"),"");
+
 
 	if(allLines[0].at(0) != '#') {
 		string errMsg = "Error: Your data file (" + dataPath_ + ") doesn't contain (#) as the first value.";
@@ -128,11 +128,13 @@ void Data::parseData(){
 
 		int i = 1;
 		for(vector<string>::iterator col = columns.begin(); col != columns.end(); ++col) {
-			//cout << "col " << *col << endl;
+
+			// Skip column if we encounter a hash, a 'time' column, or a column corresponding to a scan parameter name
 			if (*col == "#" || *col == "time" || *col == swarm_->options_.model->actions.at(basename).scanParam){
 				continue;
 			}
 
+			// If our column name ends in "_SD" we need to store the value in our stdev map
 			if (col->size() > 3 && col->find("_SD") == col->size()-3) {
 				string colWithoutSD = regex_replace(*col,regex("_SD$"),"");
 				//cout << "inserting sd at col " << colWithoutSD << ": " << stof(values[0]) << " " << stof(values[i]) << endl;
@@ -142,6 +144,7 @@ void Data::parseData(){
 				// TODO: Make sure all SD's have values if we're using objfunc 2, lest we div_by_0
 				// TODO: Make sure all normal columns also have SD columns if we're using objfunc 2
 			}
+			// Insert value into data map
 			else {
 				//cout << "inserting val to col " << *col << ": " << values[0] << " " << values[i] << endl;
 				dataOrig_[*col][stod(values[0])] = stod(values[i]);
@@ -150,25 +153,30 @@ void Data::parseData(){
 			i++;
 		}
 	}
+
+	// Always keep dataCurrent_ pointing to the most recent version of the data.
 	dataCurrent_ = &dataOrig_;
 }
 
 void Data::standardizeData() {
+	// This function standardizes our data around a mean of 0
+
 	double mean;
 	double sqtotal;
 	int counter;
 	double stdev;
+
+	// Loop through data map
 	for(map<string,map<double,double> >::iterator c = dataCurrent_->begin(); c != dataCurrent_->end(); ++c) {
 
+		// Grab our mean, which has already been calculated
 		mean = colAverages_[c->first];
 		sqtotal = 0;
 		counter = 0;
 
 		// Skip the column if mean is already 0
 		if (mean == 0) {
-			//cout << "skip" << endl;
 			continue;
-
 		}
 
 		// Here we get the riemann sum squared for use in the stdev calculation
@@ -181,8 +189,10 @@ void Data::standardizeData() {
 			counter++;
 		}
 
+		// Cacualate the standard deviation
 		stdev = pow((sqtotal / (counter - 1)), 0.5);
 
+		// Loop through and set values according to formula: val_new = (val_old - column_mean) / (column_stdev)
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "stand loop" << endl;
 			if (v->second == NAN) {

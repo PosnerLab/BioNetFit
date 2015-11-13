@@ -18,6 +18,7 @@
 #include <ctime>
 #include <fstream>
 #include <random>
+#include <iomanip>
 #include <boost/filesystem.hpp>
 
 #include <boost/mpi/environment.hpp>
@@ -135,7 +136,7 @@ public:
 
 	std::unordered_map<int,Particle*> allParticles_;
 	std::vector<std::vector<std::string>> currGenFits;
-	std::map<double,std::string> allGenFits;
+	std::multimap<double,std::string> allGenFits;
 	//std::vector<std::map<double,std::unordered_map<std::string,double>>> allGenFits; // Vector of map of double/string pairs. Vector used for sorting. Map contains fit value mapped to string of params used to generate that fit value
 
 	bool isMaster_;
@@ -180,6 +181,9 @@ public:
 private:
 	void cleanupFiles(const char * path);
 	bool sortFits(Particle * a, Particle * b);
+	void finishFit();
+	void getAllParticleParams();
+	void outputRunSummary(std::string outputDir);
 };
 
 #endif /* SWARM_HH_ */
