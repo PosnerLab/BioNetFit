@@ -11,5 +11,6 @@
 
 #include "code/Config.hh"
 #include "code/Swarm.hh"
+#include "code/Timer.hh"
 
 #endif /* GENFIT2_HH_ */

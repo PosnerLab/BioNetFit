@@ -78,7 +78,7 @@ bool createParticlePipe(const char * path) {
 	}
 }
 
-double pickWeighted(double weightSum, map<double,double> &weights, int extraWeight, mt19937 &randNumEngine) {
+double pickWeighted(double weightSum, multimap<double,double> &weights, int extraWeight, mt19937 &randNumEngine) {
 	double lowerBound = 0;
 	double upperBound = weightSum;
 
@@ -108,3 +108,17 @@ void saveParticle(const Particle &p, const char * filename) {
     oa << p;
 }
  */
+
+bool isFloat(string number) {
+	istringstream iss(number);
+	float f;
+	iss >> noskipws >> f; // noskipws considers leading whitespace invalid
+	// Check the entire string was consumed and if either failbit or badbit is set
+	return iss.eof() && !iss.fail();
+}
+
+double mutateParam(FreeParam* fp, double paramValue) {
+	float maxChange = paramValue * fp->getMutationFactor();
+
+	return paramValue;
+}

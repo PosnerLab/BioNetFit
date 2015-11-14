@@ -188,35 +188,76 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	// Add any init param generation options
 	for (auto pair : pairs) {
+		// TODO: Implement a map.equalrange to speed this part up
 		if (pair.first == "random_var" || pair.first == "lognormrandom_var" || pair.first == "loguniform_var") {
-			vector<string> values;
-			// TODO: This split only works with spaces. Fails on tabs.
-			split(pair.second,values);
-			string genString = pair.first + " " + values[1] + " " + values[2];
-			if (s->options_.model->freeParams_.count(values[0]) == 0) {
-				cout << "Warning: We found a parameter '" << values[0] << "' in your .conf file, but don't see a matching free parameter specification in your model file. We will ignore this parameter." << endl;
+			vector<string> paramComponents;
+			split(pair.second,paramComponents);
+			//string genString = pair.first + " " + paramComponents[1] + " " + paramComponents[2];
+
+			// Make sure we have three components to work with
+			if (paramComponents.size() == 3) {
+				// Make sure first parameter name exists as a free parameter
+				if (s->options_.model->freeParams_.count(paramComponents[0]) > 0) {
+					// Make sure 2nd and 3rd components are numeric
+					if (isFloat(paramComponents[1]) && isFloat(paramComponents[2])) {
+						s->options_.model->freeParams_.at(paramComponents[0])->setGenerationMethod(pair.first);
+						s->options_.model->freeParams_.at(paramComponents[0])->setParameterName(paramComponents[0]);
+						s->options_.model->freeParams_.at(paramComponents[0])->setGenMin(stof(paramComponents[1]));
+						s->options_.model->freeParams_.at(paramComponents[0])->setGenMax(stof(paramComponents[2]));
+
+						cout << "setting " << paramComponents[0] << " to " << pair.first << ":" << paramComponents[1] << ":" << paramComponents[2] << endl;
+					}
+					else {
+						outputError("Error: Problem parsing your free parameter generation option in your .conf file. The min and/or max values were non-numeric.");
+					}
+				}
+				else {
+					cout << "Warning: We found a parameter '" << paramComponents[0] << "' in your .conf file, but don't see a matching free parameter specification in your model file. We will ignore this parameter." << endl;
+				}
 			}
 			else {
-				s->options_.model->freeParams_[values[0]] = genString;
-				//cout << values[0] << " is " <<  s->options_.modelFile->freeParams_[values[0]] << endl;
+				outputError("Error: Problem parsing your free parameter generation option in your .conf file. Each parameter generation option requires three components: the parameter name, minimum, and maximum.");
 			}
 		}
 	}
 
 	for (auto i : s->options_.model->freeParams_) {
-		if (i.second.empty()) {
-			string errMsg = "Error: We found a free parameter '" + i.first + "' specified in your model file but can't find a matching paremeter generator in your .conf file.";
+		if (!i.second) {
+			string errMsg = "Error: We found a free parameter '" + i.first + "' specified in your model file but can't find a matching parameter generator in your .conf file.";
 			outputError(errMsg);
 		}
 	}
 
 	// Add any .exp files to the swarm
+	std::pair <std::unordered_multimap<string,string>::iterator, std::unordered_multimap<string,string>::iterator> it;
+	it = pairs.equal_range("exp");
+
+	for (unordered_multimap<string,string>::iterator exp = it.first; exp != it.second; ++exp) {
+		s->addExp(exp->second);
+	}
+
+	// Add any .mutation rates to the swarm
+	it = pairs.equal_range("mutate");
+
+	for (unordered_multimap<string,string>::iterator exp = it.first; exp != it.second; ++exp) {
+		cout << "found mutation: " << exp->second << endl;
+		s->addMutate(exp->second);
+		s->options_.hasMutate = true;
+
+		if (regex_search(exp->second, regex("^default\\s"))) {
+			cout << "found default mutation rate. breaking" << endl;
+			break;
+		}
+	}
+
+	/*
 	for (auto pair : pairs) {
 		if (pair.first == "exp") {
 			//cout << "Adding exp file: " << pair.second << endl;
 			s->addExp(pair.second);
 		}
 	}
+	 */
 
 	// Link all model actions with their corresponding data sets (.exp files)
 	// Remove any .exp files that aren't pointed to in the model file

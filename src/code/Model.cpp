@@ -20,6 +20,9 @@ void Model::parseNet(string path) {
 
 	if (modelFile.is_open()) {
 		while (getline(modelFile, line)) {
+			if (line.at(0) == '#') {
+				continue;
+			}
 			string line_with_newline = line + "\n";
 			netContents_.push_back(line_with_newline);
 			//cout << line_with_newline;
@@ -128,7 +131,9 @@ void Model::parseModel() {
 			}
 		}
 		else if (regex_search(i, smatches, regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
-			freeParams_.insert(pair<string,string>(smatches[2],""));
+			//freeParams_.insert(pair<string,string>(smatches[2],""));
+			FreeParam * fp = new FreeParam(smatches[2]);
+			freeParams_.insert(pair<string,FreeParam*>(smatches[2],fp));
 		}
 		else if (regex_search(i, smatches, regex("^generate_network"))) {
 			hasGenerateNetwork_ = true;
@@ -146,6 +151,7 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 		// First output the .bngl file (containing only action commands)
 		outputModelWithParams(params, path, filename, suffix, false, true, false, false, false);
 		filename = regex_replace(filename, regex("bngl$"), "net");
+		// Then output the .net file
 		outputModelWithParams(params, path, filename, "", false, false, false, false, true);
 
 		return;
@@ -161,17 +167,32 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 
 		if (outFile.is_open()) {
 			if (isNetFile) {
+				bool inParameterBlock = true;
+				int numParamsToReplace = params.size();
+				int numReplacedParams = 0;
 				for (string line : netContents_){
-					// Replace free param with generated param
-					for (auto p : params) { // TODO: Is there a faster way to do this than loop through params over and over?
-						//cout << "p is " << p.first << endl;
-						if(regex_match(line, matches, regex("\\s+\\d+\\s+(\\w+)\\s+(.+)\\s+"))) {
-							if (matches[1] == p.first) {
-								string match = p.first + "\\s+.+";
-								string replacement = p.first + " " + to_string(p.second);
-								line = regex_replace(line, regex(match), replacement);
+					if (line == "end parameters" || numReplacedParams == numParamsToReplace) {
+						inParameterBlock = false;
+					}
+					else if (inParameterBlock) {
+						// Replace free param with generated param
+						//double tt = 0;
+						for (auto p : params) { // TODO: Is there a faster way to do this than loop through params over and over?
+							//cout << "p is " << p.first << endl;
+							//Timer tmr;
+							if(regex_match(line, matches, regex("\\s+\\d+\\s+(\\w+)\\s+(.+)\\s+"))) {
+								//double t = tmr.elapsed();
+								//cout << "Match took " << t << " seconds" << endl;
+								//tt += t;
+								if (matches[1] == p.first) {
+									string match = p.first + "\\s+.+";
+									string replacement = p.first + " " + to_string(p.second);
+									line = regex_replace(line, regex(match), replacement);
+									numReplacedParams++;
+								}
 							}
 						}
+						//cout << "matches took " << tt << " seconds" << endl;
 					}
 					//cout << line;
 					outFile << line;

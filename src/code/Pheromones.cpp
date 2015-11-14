@@ -209,19 +209,26 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 	//std::cout << "really done sending " << std::endl;
 }
 
-int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage) {
+int Pheromones::recvMessage(signed int senderID,const int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage) {
 	int numMessages = 0;
 	if (swarm_->options_.useCluster) {
 
 	}
 	else {
 		while (1) {
-			//std::cout << "sm size: " << swarmMap_->size() << std::endl;
-			// TODO: Do we really need to iterate here? Can't just look up by map key??
-			// Maybe not.  Think we get a segfault when using map find(). But why?
-			for (MyMap_::iterator s = swarmMap_->begin(); s != swarmMap_->end();) {
+			if (!swarmMap_->empty()) {
+				//std::cout << "sm size: " << swarmMap_->size() << std::endl;
+				// TODO: Do we really need to iterate here? Can't just look up by map key??
+				// Maybe not.  Think we get a segfault when using map find(). But why?
+				//for (MyMap_::iterator s = swarmMap_->begin(); s != swarmMap_->end();) {
+				//if ( swarmMap_->find(receiverID)) {
+				//{
+				MyMap_::iterator s = swarmMap_->find(receiverID);
 				//std::cout << receiverID << "looking at " << s->first << std::endl;
-				if (s->first == receiverID) {
+				//if (s->first == receiverID) {
+				if (s != swarmMap_->end()) {
+					scoped_lock<interprocess_mutex> lock(*mutex_);
+
 					//std::cout << "first: " << s->first << " second: " << *(s->second.begin()) << std::endl;
 					int currTag;
 					int currSender;
@@ -265,23 +272,23 @@ int Pheromones::recvMessage(signed int senderID, int receiverID, int tag, bool b
 							++v;
 						}
 					}
-					// If are array is empty, we should erase it
-					/*if (s->second.size() == 0) {
+					// If are array is empty, we should remove the int/array pair from the map
+					if (s->second.empty()) {
 						//std::cout << "erasing map pair" << std::endl;
 						s = swarmMap_->erase(s);
 					}
-					else {
-						++s;
-					}*/
-					++s;
+					//else {
+					//	++s;
+					//}
+					//++s;
 				}
-				else {
-					++s;
-				}
+				//else {
+				//	++s;
+				//}
 			}
 			if (block && numMessages < 1) {
 				usleep(10000);
-				std::cout << "wait" << std::endl;
+				//std::cout << "wait" << std::endl;
 			}
 			else {
 				//std::cout << "going to break" << std::endl;

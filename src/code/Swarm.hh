@@ -8,8 +8,6 @@
 #ifndef SWARM_HH_
 #define SWARM_HH_
 
-#include "Swarm.hh"
-
 #include <unordered_map>
 #include <vector>
 #include <iostream>
@@ -20,6 +18,7 @@
 #include <random>
 #include <iomanip>
 #include <boost/filesystem.hpp>
+#include <chrono>
 
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
@@ -31,10 +30,11 @@
 
 //#include "Model.hh"
 class Model;
+class FreeParam;
 
 
 #include "Utils.hh"
-
+#include "Timer.hh"
 class Data;
 #include "Particle.hh"
 #include "Pheromones.hh"
@@ -100,6 +100,8 @@ public:
 	void setDeleteOldFiles(bool deleteOldFiles) { options_.deleteOldFiles = deleteOldFiles; }
 	void setParallelCount(int parallelCount) { options_.parallelCount = parallelCount; }
 
+	void addMutate(std::string mutateString);
+
 	void setCurrentGen(int gen);
 
 	void setType(std::string type) { type_ = type; }
@@ -120,8 +122,7 @@ public:
 	std::mt19937 randNumEngine;
 
 	Pheromones *swarmComm_;
-	int currentGeneration_ = 0;
-	std::string type_;
+	int currentGeneration_ = 0;	std::string type_;
 	//std::unordered_map<Particle*,std::string> runningParticles_;
 
 	std::set<int> runningParticles_;
@@ -135,7 +136,7 @@ public:
 	const char * particleBasePath_ = "";
 
 	std::unordered_map<int,Particle*> allParticles_;
-	std::vector<std::vector<std::string>> currGenFits;
+	//std::vector<std::vector<std::string>> currGenFits;
 	std::multimap<double,std::string> allGenFits;
 	//std::vector<std::map<double,std::unordered_map<std::string,double>>> allGenFits; // Vector of map of double/string pairs. Vector used for sorting. Map contains fit value mapped to string of params used to generate that fit value
 
@@ -168,13 +169,15 @@ public:
 		int extraWeight = 0;
 		float swapRate = 0.5;
 		bool forceDifferentParents = true;
-		int maxRetryDifferentParents = 100;
+		int maxRetryDifferentParents = 2;
 
-		int verbosity;
+		int verbosity = 1;
+
+		bool hasMutate = false;
 
 		std::unordered_map<std::string,Data*> expFiles;
+
 		std::unordered_map<std::string,std::vector<float> > mutationRates;
-		std::unordered_map<std::string,std::vector<std::string> > initParams;
 	};
 	SwarmOpts options_;
 
@@ -184,6 +187,7 @@ private:
 	void finishFit();
 	void getAllParticleParams();
 	void outputRunSummary(std::string outputDir);
+	void killAllParticles(int tag);
 };
 
 #endif /* SWARM_HH_ */

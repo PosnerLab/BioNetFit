@@ -86,8 +86,18 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Regardless of type or action, we need to set up the Swarm
+	Timer tmr;
+
 	Config myconfig(configFile);
+
+	double t = tmr.elapsed();
+	cout << "Adding .conf took " << t << " seconds" << endl;
+
+	tmr.reset();
 	Swarm *s = myconfig.createSwarmFromConfig((type=="master") ? true : false);
+
+	t = tmr.elapsed();
+	cout << "Processing .conf took " << t << " seconds" << endl;
 	s->setType(type);
 	s->setExePath(argv[0]);
 	if (generation) {

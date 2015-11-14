@@ -8,6 +8,7 @@
 #include "Swarm.hh"
 
 using namespace std;
+using namespace std::chrono;
 
 Swarm::Swarm(bool isMaster) {
 
@@ -29,19 +30,29 @@ Swarm::Swarm(bool isMaster) {
 }
 
 void Swarm::addExp(string path) {
+	Timer tmr;
+
 	path = convertToAbsPath(path);
 	string basename = getFilename(path);
 
 	//cout << "inserting EXP?" << endl;
 	this->options_.expFiles.insert(make_pair(basename, new Data(path, this, true)));
 	//cout << "exp inserted" << endl;
+
+	double t = tmr.elapsed();
+	cout << "Adding .exp took " << t << " seconds" << endl;
 }
 
 void Swarm::setModel(string path) {
+	Timer tmr;
+
 	path = convertToAbsPath(path);
 	//cout << "setting model" << endl;
 	this->options_.model = new Model(path);
 	//cout << "model set" << endl;
+
+	double t = tmr.elapsed();
+	cout << "Adding .bngl took " << t << " seconds" << endl;
 }
 
 void Swarm::setSwarmSize(int size) {
@@ -66,6 +77,51 @@ void Swarm::setSwarmMinFit(float minfit) {
 
 bool Swarm::checkSwarmConsistency() {
 	return true;
+}
+
+void Swarm::addMutate(std::string mutateString) {
+	vector<string> mutComponents;
+	split(mutateString, mutComponents);
+
+	// Make sure we have three components to work with
+	if (mutComponents.size() == 3) {
+		cout << "size 3" << endl;
+		// Make sure first parameter name exists as a free parameter
+		if (options_.model->freeParams_.count(mutComponents[0]) > 0 || mutComponents[0] == "default") {
+			cout << "exists" << endl;
+			// Make sure 2nd and 3rd components are numeric
+			if (isFloat(mutComponents[1]) && isFloat(mutComponents[2])) {
+				cout << "isfloat" << endl;
+				if (mutComponents[0] != "default") {
+					cout << "not default" << endl;
+					options_.model->freeParams_.at(mutComponents[0])->setMutationRate(stof(mutComponents[1]));
+					options_.model->freeParams_.at(mutComponents[0])->setMutationFactor(stof(mutComponents[2]));
+					options_.model->freeParams_.at(mutComponents[0])->setHasMutation(true);
+
+					cout << "setting " << mutComponents[0] << " to " << mutComponents[1] << ":" << mutComponents[2] << endl;
+				}
+				else {
+					cout << "default" << endl;
+					for (map<string,FreeParam*>::iterator fp = options_.model->freeParams_.begin(); fp != options_.model->freeParams_.end(); ++fp) {
+						cout << "setting " << mutComponents[0] << " to " << mutComponents[1] << ":" << mutComponents[2] << endl;
+
+						fp->second->setMutationRate(stof(mutComponents[1]));
+						fp->second->setMutationFactor(stof(mutComponents[2]));
+						fp->second->setHasMutation(true);
+					}
+				}
+			}
+			else {
+				outputError("Error: Problem parsing the mutation option in your .conf file. The mutation rate and/or factor are non-numeric.");
+			}
+		}
+		else {
+			cout << "Warning: We found a mutation option '" << mutComponents[0] << "' in your .conf file, but don't see a matching free parameter specification in your model file. We will ignore this mutation factor." << endl;
+		}
+	}
+	else {
+		outputError("Error: Problem parsing a mutation option in your .conf file. Each mutation option requires three components: the parameter name, mutation rate, and mutation factor.");
+	}
 }
 
 void Swarm::doSwarm() {
@@ -135,6 +191,7 @@ Particle * Swarm::createParticle(int pID) {
 }
 
 unordered_map<int,Particle*> Swarm::generateInitParticles(int pID) {
+	Timer tmr;
 
 	unordered_map<int,Particle*> allParticles;
 
@@ -149,6 +206,9 @@ unordered_map<int,Particle*> Swarm::generateInitParticles(int pID) {
 		}
 	}
 	return allParticles;
+
+	double t = tmr.elapsed();
+	cout << "Particle creation took " << t << " seconds" << endl;
 }
 
 void Swarm::launchParticle(Particle *p) {
@@ -157,9 +217,12 @@ void Swarm::launchParticle(Particle *p) {
 
 	}
 	else {
+		//string rm = "rm " + to_string(p->getID());
+		//system(rm.c_str());
 		int i;
 		string command = exePath_ + " particle " + to_string(p->getID()) + " run " + to_string(currentGeneration_) + " " + configPath_;
 		//if (p->getID() == 10) {
+		//command = command + ">> " + to_string(p->getID()) + " 2>&1";
 		command = command + ">> pOUT 2>&1";
 		//}
 		command = command + " &";
@@ -213,7 +276,7 @@ void Swarm::runGeneration () {
 		}
 
 		// Check for any messages from particles
-		usleep(1000);
+		usleep(10000);
 		//cout << "checking messages" << endl;
 		numMessages = swarmComm_->recvMessage(-1, 0, -1, false, messageHolder);
 
@@ -245,7 +308,7 @@ void Swarm::runGeneration () {
 
 					if (stoi(*o) == SIMULATION_FAIL) {
 						o+=2;
-						cout << "Particle " << pID << " failed" << endl;
+						cout << "Particle " << pID << " failed in gen " << currentGeneration_ << endl;
 
 						// Store particle ID in our list of failed particles
 						failedParticles_.insert(stoi(*o));
@@ -355,6 +418,11 @@ bool Swarm::sortFits(Particle * a, Particle * b) {
 
 void Swarm::breedGeneration() {
 
+	milliseconds ms = duration_cast< milliseconds >(
+	    system_clock::now().time_since_epoch()
+	);
+	cout << ms.count() << " creating next gen dir" << endl;
+
 	string createDirCmd = "mkdir " + options_.outputDir + "/" + to_string(currentGeneration_ + 1);
 	system(createDirCmd.c_str());
 
@@ -373,12 +441,12 @@ void Swarm::breedGeneration() {
 		cout << i.first << ": " << i.second << endl;
 	}*/
 
-	map<double,double> weights; // First element is original fit, second element is subtracted from max
+	multimap<double,double> weights; // First element is original fit, second element is subtracted from max
 
 	// Fill in the weight map with fit values
 	double weightSum;
-	//double maxWeight;
-	for (map<double,string>::iterator f = allGenFits.begin(); f != allGenFits.end(); ++f) {
+
+	for (multimap<double,string>::iterator f = allGenFits.begin(); f != allGenFits.end(); ++f) {
 		weights.insert(pair<double,double>(f->first,0));
 		weightSum += f->first;
 		//cout << "f: " << f->first << endl;
@@ -421,11 +489,22 @@ void Swarm::breedGeneration() {
 		while (p1 == p2 && options_.forceDifferentParents) {
 			retryCount++;
 			if (retryCount > options_.maxRetryDifferentParents) {
-				cout << "Tried to many time to select different parents for breeding. Selecting the first two." << endl;
-				map<double,double>::iterator w = weights.begin();
+				if (options_.verbosity >= 3) {
+					cout << "Tried to many time to select different parents for breeding. Selecting the first two." << endl;
+				}
+
+				// Get iterator to the weight map
+				multimap<double,double>::iterator w = weights.begin();
+
+				// The weight map is sorted, so the first element will be the best fit
 				p1 = w->first;
-				++w;
-				p2 = w->first;
+
+				// Increment the map iterator until we find a fit value that isn't ours
+				while (p1 == p2 && w != weights.end()) {
+					++w;
+					p2 = w->first;
+					sleep(1);
+				}
 
 				break;
 			}
@@ -438,6 +517,9 @@ void Swarm::breedGeneration() {
 		// initiate breeding with its mate
 
 		// Get the string containing gen number, perm number, and param values
+		// We're searching a multimap which may contain duplicate fit values,
+		// but it shouldn't matter which we pick because if two runs have the
+		// exact same fit, they should have the same parameters sets as each other
 		string parentString1 = allGenFits.find(p1)->second;
 		string parentString2 = allGenFits.find(p2)->second;
 
@@ -472,12 +554,20 @@ void Swarm::breedGeneration() {
 		swarmComm_->univMessageSender.clear();
 		numCurrBreeding+=2;
 
-		while (numCurrBreeding >= options_.parallelCount && numFinishedBreeding < options_.swarmSize) {
+		// While the current number of breeding particles is greater than twice the parallel count
+		while ( numCurrBreeding >= (options_.parallelCount * 6)) {
+			//cout << "checking for finished" << endl;
 			int numMessages = swarmComm_->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm_->univMessageReceiver, true);
+			//cout << "found " << numMessages << " finished" << endl;
 			numFinishedBreeding+=numMessages;
 			numCurrBreeding-=numMessages;
 		}
 	}
+	while (numFinishedBreeding < options_.swarmSize) {
+		int numMessages = swarmComm_->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm_->univMessageReceiver, true);
+		numFinishedBreeding+=numMessages;
+	}
+	cout << "got them all!" << endl;
 }
 
 void Swarm::finishFit() {
@@ -492,6 +582,7 @@ void Swarm::finishFit() {
 	outputRunSummary(outputDir);
 	//generateBestFitModels(outputDir);
 	//copyBestFitToResults(outputDir);
+	killAllParticles(FIT_FINISHED);
 
 	cout << "Finished fitting. Results can be found in " << options_.outputDir << "/Results" << endl;
 }
@@ -536,5 +627,11 @@ void Swarm::outputRunSummary(string outputDir) {
 	}
 	else {
 		cout << "Warning: couldn't open: " << outputFile << " to write fit summary." << endl;
+	}
+}
+
+void Swarm::killAllParticles(int tag) {
+	for (auto p: allParticles_) {
+		swarmComm_->sendToSwarm(0, p.first, tag, false, swarmComm_->univMessageSender);
 	}
 }

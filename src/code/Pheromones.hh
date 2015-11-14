@@ -64,6 +64,7 @@ class Swarm;
 #define GET_PARAMS_FROM_PARTICLE -19
 #define FINISHED_WITH_FIT -20
 #define SEND_FINAL_PARAMS_TO_PARTICLE -21
+#define FIT_FINISHED -22
 #define MESSAGE_END -1000
 
 class Pheromones {
@@ -73,7 +74,7 @@ public:
 	void init(Swarm *s);
 
 	void sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message);
-	int recvMessage(signed int senderID, int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage = true);
+	int recvMessage(signed int senderID, const int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage = true);
 
 	template<typename T>
 	T recvFromAll(T & messageHolder);

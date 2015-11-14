@@ -21,11 +21,14 @@
 
 #include "Utils.hh"
 #include "Data.hh"
+#include "FreeParam.hh"
+
+class FreeParam;
 
 class Model {
-friend class Config;
-friend class Swarm;
-friend class Particle;
+	friend class Config;
+	friend class Swarm;
+	friend class Particle;
 
 public:
 	Model(std::string path);
@@ -37,17 +40,21 @@ public:
 	bool getHasGenerateNetwork() {return hasGenerateNetwork_;}
 
 	struct action {
-			std::string full;
+		std::string full;
 
-			//double t_start;
-			double t_end;
-			//double o_steps;
+		//double t_start;
+		double t_end;
+		//double o_steps;
 
-			std::string type;
-			std::string scanParam = "";
+		std::string type;
+		std::string scanParam = "";
 
-			Data *dataSet;
-		};
+		Data *dataSet;
+	};
+
+	const std::map<std::string, FreeParam*>& getFreeParams() const {
+		return freeParams_;
+	}
 
 	// Map key contains the action prefix, map value contains the action information
 	std::unordered_map<std::string,action > actions;
@@ -60,7 +67,8 @@ private:
 	std::vector<std::string> netContents_;
 
 	bool hasGenerateNetwork_ = false;
-	std::map<std::string,std::string> freeParams_;
+	//std::map<std::string,std::string> freeParams_;
+	std::map<std::string,FreeParam*> freeParams_;
 };
 
 #endif /* MODEL_HH_ */
