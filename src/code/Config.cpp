@@ -205,7 +205,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 						s->options_.model->freeParams_.at(paramComponents[0])->setGenMin(stof(paramComponents[1]));
 						s->options_.model->freeParams_.at(paramComponents[0])->setGenMax(stof(paramComponents[2]));
 
-						cout << "setting " << paramComponents[0] << " to " << pair.first << ":" << paramComponents[1] << ":" << paramComponents[2] << endl;
+						//cout << "setting " << paramComponents[0] << " to " << pair.first << ":" << paramComponents[1] << ":" << paramComponents[2] << endl;
 					}
 					else {
 						outputError("Error: Problem parsing your free parameter generation option in your .conf file. The min and/or max values were non-numeric.");
@@ -240,7 +240,6 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	it = pairs.equal_range("mutate");
 
 	for (unordered_multimap<string,string>::iterator exp = it.first; exp != it.second; ++exp) {
-		cout << "found mutation: " << exp->second << endl;
 		s->addMutate(exp->second);
 		s->options_.hasMutate = true;
 

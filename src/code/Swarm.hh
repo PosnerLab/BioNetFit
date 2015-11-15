@@ -118,9 +118,6 @@ public:
 	std::string recvFromParticle(Particle *p);
 	std::unordered_map<int,Particle*> generateInitParticles(int numParticles = -1);
 
-	// Initialize our random number engine
-	std::mt19937 randNumEngine;
-
 	Pheromones *swarmComm_;
 	int currentGeneration_ = 0;	std::string type_;
 	//std::unordered_map<Particle*,std::string> runningParticles_;
@@ -181,6 +178,8 @@ public:
 	};
 	SwarmOpts options_;
 
+	std::mt19937 randNumEngine;
+
 private:
 	void cleanupFiles(const char * path);
 	bool sortFits(Particle * a, Particle * b);
@@ -188,6 +187,8 @@ private:
 	void getAllParticleParams();
 	void outputRunSummary(std::string outputDir);
 	void killAllParticles(int tag);
+
+	Timer tmr_;
 };
 
 #endif /* SWARM_HH_ */

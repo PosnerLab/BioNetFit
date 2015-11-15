@@ -61,6 +61,7 @@ private:
 	double objFunc_divByMean(double sim, double exp, double mean);
 
 	void initBreedWithParticle(int pID, int swapID);
-	void rcvBreedWithParticle(std::vector<std::string>& params, int reciprocate, int swapID, int pID);
+	void rcvBreedWithParticle(std::vector<std::string>& params, int reciprocateTo, int swapID, int pID);
+	double mutateParam(FreeParam* fp, double paramValue);
 };
 #endif /* PARTICLE_HH_ */

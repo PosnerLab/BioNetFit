@@ -179,6 +179,7 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 				for(std::vector<std::string>::iterator m = message.begin(); m != message.end(); ++m) {
 					*vecString_ = m->c_str();
 					swarmVec_->push_back(*vecString_);
+					//std::cout << "inserting " << *m << std::endl;
 				}
 
 				//std::cout << "storing vector in swarm map to receiver: " << *r << " with tag: " << tag << std::endl;
@@ -218,20 +219,16 @@ int Pheromones::recvMessage(signed int senderID,const int receiverID, int tag, b
 		while (1) {
 			if (!swarmMap_->empty()) {
 				//std::cout << "sm size: " << swarmMap_->size() << std::endl;
-				// TODO: Do we really need to iterate here? Can't just look up by map key??
-				// Maybe not.  Think we get a segfault when using map find(). But why?
-				//for (MyMap_::iterator s = swarmMap_->begin(); s != swarmMap_->end();) {
-				//if ( swarmMap_->find(receiverID)) {
-				//{
+
 				MyMap_::iterator s = swarmMap_->find(receiverID);
-				//std::cout << receiverID << "looking at " << s->first << std::endl;
-				//if (s->first == receiverID) {
+
 				if (s != swarmMap_->end()) {
 					scoped_lock<interprocess_mutex> lock(*mutex_);
 
 					//std::cout << "first: " << s->first << " second: " << *(s->second.begin()) << std::endl;
 					int currTag;
 					int currSender;
+					// TODO: Currently we can't have negative numbers as part of a message, since they will be confused as tags.  This needs fixed.
 					for (MyVector_::iterator v = s->second.begin(); v != s->second.end(); ) {
 						//std::cout << receiverID << ": " << *v << std::endl;
 						std::string theString = lexical_cast<std::string>(*v);
@@ -260,6 +257,7 @@ int Pheromones::recvMessage(signed int senderID,const int receiverID, int tag, b
 						}
 						//std::cout << messageHolder.size() << " Adding message: " << lexical_cast<std::string>(*v) << std::endl;
 						// Add the item to the message holder
+
 						messageHolder[messageHolder.size() - 1].push_back(lexical_cast<std::string>(*v));
 
 						// Erase the element if eraseMessage is true. Otherwise, increment

@@ -116,9 +116,3 @@ bool isFloat(string number) {
 	// Check the entire string was consumed and if either failbit or badbit is set
 	return iss.eof() && !iss.fail();
 }
-
-double mutateParam(FreeParam* fp, double paramValue) {
-	float maxChange = paramValue * fp->getMutationFactor();
-
-	return paramValue;
-}

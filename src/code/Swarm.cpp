@@ -26,6 +26,7 @@ Swarm::Swarm(bool isMaster) {
 
 	// Seed our random number engine
 	randNumEngine.seed(std::random_device{}());
+	randNumEngine.discard(700000);
 	srand (std::random_device{}());
 }
 
@@ -85,25 +86,21 @@ void Swarm::addMutate(std::string mutateString) {
 
 	// Make sure we have three components to work with
 	if (mutComponents.size() == 3) {
-		cout << "size 3" << endl;
 		// Make sure first parameter name exists as a free parameter
 		if (options_.model->freeParams_.count(mutComponents[0]) > 0 || mutComponents[0] == "default") {
-			cout << "exists" << endl;
 			// Make sure 2nd and 3rd components are numeric
 			if (isFloat(mutComponents[1]) && isFloat(mutComponents[2])) {
-				cout << "isfloat" << endl;
 				if (mutComponents[0] != "default") {
 					cout << "not default" << endl;
 					options_.model->freeParams_.at(mutComponents[0])->setMutationRate(stof(mutComponents[1]));
 					options_.model->freeParams_.at(mutComponents[0])->setMutationFactor(stof(mutComponents[2]));
 					options_.model->freeParams_.at(mutComponents[0])->setHasMutation(true);
 
-					cout << "setting " << mutComponents[0] << " to " << mutComponents[1] << ":" << mutComponents[2] << endl;
+					//cout << "setting " << mutComponents[0] << " to " << mutComponents[1] << ":" << mutComponents[2] << endl;
 				}
 				else {
-					cout << "default" << endl;
 					for (map<string,FreeParam*>::iterator fp = options_.model->freeParams_.begin(); fp != options_.model->freeParams_.end(); ++fp) {
-						cout << "setting " << mutComponents[0] << " to " << mutComponents[1] << ":" << mutComponents[2] << endl;
+						//cout << "setting " << mutComponents[0] << " to " << mutComponents[1] << ":" << mutComponents[2] << endl;
 
 						fp->second->setMutationRate(stof(mutComponents[1]));
 						fp->second->setMutationFactor(stof(mutComponents[2]));
@@ -230,8 +227,9 @@ void Swarm::launchParticle(Particle *p) {
 		//string path = particleBasePath_ + to_string(p->getID());
 		//createParticlePipe(path.c_str());
 
-		//cout << "Running particle with command: " << command << endl;
-		cout << "Running Particle " << p->getID() << endl;
+		if (options_.verbosity >= 3) {
+			cout << "Running Particle " << p->getID() << endl;
+		}
 
 		i = system(command.c_str());
 		//runningParticles_[p] = "";
@@ -417,11 +415,7 @@ bool Swarm::sortFits(Particle * a, Particle * b) {
 }
 
 void Swarm::breedGeneration() {
-
-	milliseconds ms = duration_cast< milliseconds >(
-	    system_clock::now().time_since_epoch()
-	);
-	cout << ms.count() << " creating next gen dir" << endl;
+	//Timer tmr;
 
 	string createDirCmd = "mkdir " + options_.outputDir + "/" + to_string(currentGeneration_ + 1);
 	system(createDirCmd.c_str());
@@ -540,7 +534,7 @@ void Swarm::breedGeneration() {
 		string pID2 = match[1];
 		parentVec.clear();
 
-		cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
+		//cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
 
 		// Add second parent and swapID to the message
 		swarmComm_->univMessageSender.push_back(to_string(swapID));
@@ -554,8 +548,12 @@ void Swarm::breedGeneration() {
 		swarmComm_->univMessageSender.clear();
 		numCurrBreeding+=2;
 
+		//double t = tmr.elapsed();
+		//cout << "BREEDING took " << t << " seconds" << endl;
+		//tmr.reset();
+
 		// While the current number of breeding particles is greater than twice the parallel count
-		while ( numCurrBreeding >= (options_.parallelCount * 6)) {
+		while ( numCurrBreeding >= (options_.parallelCount * 15)) {
 			//cout << "checking for finished" << endl;
 			int numMessages = swarmComm_->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm_->univMessageReceiver, true);
 			//cout << "found " << numMessages << " finished" << endl;
@@ -567,7 +565,7 @@ void Swarm::breedGeneration() {
 		int numMessages = swarmComm_->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm_->univMessageReceiver, true);
 		numFinishedBreeding+=numMessages;
 	}
-	cout << "got them all!" << endl;
+	//cout << "got them all!" << endl;
 }
 
 void Swarm::finishFit() {
@@ -584,7 +582,7 @@ void Swarm::finishFit() {
 	//copyBestFitToResults(outputDir);
 	killAllParticles(FIT_FINISHED);
 
-	cout << "Finished fitting. Results can be found in " << options_.outputDir << "/Results" << endl;
+	cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options_.outputDir << "/Results" << endl;
 }
 
 void Swarm::outputRunSummary(string outputDir) {
