@@ -633,3 +633,81 @@ void Swarm::killAllParticles(int tag) {
 		swarmComm_->sendToSwarm(0, p.first, tag, false, swarmComm_->univMessageSender);
 	}
 }
+
+void Swarm::getClusterInformation() {
+
+	// If user didn't specify cluster platform, let's figure it out ourself
+	if (options_.clusterSoftware.size() == 0) {
+		// Test for slurm
+		if (getOutputFromCommand("which srun").length() > 0) {
+			options_.clusterSoftware = "slurm";
+		}
+		// Test for PBS-type
+		else if (getOutputFromCommand("which qsub").length() > 0) {
+			// Test for Torque/PBS
+			if(getOutputFromCommand("which maui").length() > 0 || getOutputFromCommand("which moab").length() > 0) {
+				options_.clusterSoftware = "torque";
+			}
+			// Test for SGE
+			else if (getOutputFromCommand("which sge_execd").length() > 0 || getOutputFromCommand("which qconf").length() > 0 || getOutputFromCommand("which qmon").length() > 0) {
+				outputError("Error: BioNetFit doesn't support for GridEngine clusters. If you are not running on a GridEngine cluster, specify the cluster platform in the .conf file using the 'cluster_software' option.");
+			}
+		}
+	}
+	else {
+		if (options_.clusterSoftware != "slurm" && options_.clusterSoftware != "torque") {
+			outputError("You specified an unrecognized cluster type in your .conf file. BioNetFit only supports 'torque' or 'slurm' cluster types.");
+		}
+	}
+
+	// If we still don't know the cluster type, let's ask the user.
+	if (options_.clusterSoftware.size() == 0) {
+		string input;
+		string clusterType;
+
+		while (1) {
+			cout << "BioNetFit couldn't determine which type of cluster software you are using. Specify (T) for Torque, or (S) for Slurm" << endl;
+			getline(cin, input);
+			stringstream(input) >> clusterType;
+
+			if (clusterType == "S" || clusterType == "s") {
+				options_.clusterSoftware = "slurm";
+			}
+			else if (clusterType == "T" || clusterType == "t") {
+				options_.clusterSoftware = "torque";
+			}
+		}
+	}
+}
+
+string Swarm::generateSlurmCommand(string cmd) {
+	string command;
+
+	// srun submits the job to the cluster
+	command += "srun";
+
+	// Add the job name
+	command += " -J " + options_.jobName;
+
+	// Only need one CPU per particle
+	command += " -c 1";
+
+	// Specify the cluster account if needed
+	if (!options_.clusterAccount.empty()) {
+		command += " -A " + options_.clusterAccount;
+	}
+
+	if (!options_.clusterQueue.empty()) {
+		command += " -p	" + options_.clusterQueue;
+	}
+
+	// Specify output directory if needed
+	if (options_.saveClusterOutput) {
+		command += " -o " + options_.jobOutputDir + options_.jobName + "_cluster_output";
+	}
+	else {
+		command += " -o /dev/null";
+	}
+
+	command+= " " + cmd;
+}

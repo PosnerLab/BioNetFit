@@ -116,3 +116,20 @@ bool isFloat(string number) {
 	// Check the entire string was consumed and if either failbit or badbit is set
 	return iss.eof() && !iss.fail();
 }
+
+std::string getOutputFromCommand(string cmd) {
+
+	std::shared_ptr<FILE> pipe(popen(cmd.c_str(), "r"), pclose);
+
+	if (!pipe) return "ERROR";
+
+	char buffer[128];
+	std::string result = "";
+
+	while (!feof(pipe.get())) {
+		if (fgets(buffer, 128, pipe.get()) != NULL)
+			result += buffer;
+	}
+
+	return result;
+}

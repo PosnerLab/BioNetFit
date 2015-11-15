@@ -12,6 +12,7 @@
 #include <map>
 #include <random>
 #include <sstream>
+#include <string>
 
 #include <boost/filesystem.hpp>
 #include <sys/stat.h>
@@ -28,5 +29,6 @@ bool createParticlePipe(const char * path);
 double pickWeighted(double weightSum, std::multimap<double,double>& weights, int extraWeight, std::mt19937 &randNumEngine);
 bool isFloat(std::string number);
 double mutateParam(FreeParam* fp, double paramValue);
+std::string getOutputFromCommand(std::string cmd);
 
 #endif /* UTILS_HH_ */

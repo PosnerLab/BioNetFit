@@ -5,7 +5,7 @@
 #include <stdlib.h>
 using namespace std;
 
-#include "log.hh"
+//#include "log.hh"
 
 Parser::Parser(string name, string parentDebugInfo) {
 	debugInfo = parentDebugInfo + ", " + name;
@@ -44,7 +44,7 @@ Parser::Parser(string configFile, char** envp) {
 			split(line, name, value, '=');
 
 			if (value == "(") {
-				logDebug(cout << "   config: new group '" << name << "'" << endl);
+				//logDebug(cout << "   config: new group '" << name << "'" << endl);
 				Parser* newGroup = new Parser(name, debugInfo);
 				groupStack.front()->groups[name] = newGroup;
 				groupStack.push_front(newGroup);
@@ -53,12 +53,12 @@ Parser::Parser(string configFile, char** envp) {
 					(*i)->symbolExpand(value);
 				}
 				envSymbolExpand(value);
-				logDebug(cout << "   config: name = '" << name << "', value = '" << value << "'" << endl);
+				//logDebug(cout << "   config: name = '" << name << "', value = '" << value << "'" << endl);
 				groupStack.front()->add(name, value);
 			}
 		}
 		if ( (line.length() > 0) && (line[0] != '#') && (line.find(')') != string::npos) ) {
-			logDebug(cout << "   end of group" << endl);
+			//logDebug(cout << "   end of group" << endl);
 			groupStack.pop_front();
 		}
 	}
@@ -140,7 +140,7 @@ void Parser::symbolExpand(map<string, string>& symbols, string& s) {
 string Parser::pString(string name) {
 	map<string, string>::iterator i = symbols.find(name);
 	if (i == symbols.end()) {
-		logError(cout << "access of missing property '" << name << "' (" << debugInfo << ")" << endl);
+		//logError(cout << "access of missing property '" << name << "' (" << debugInfo << ")" << endl);
 		exit(4);
 	}
 	return i->second;

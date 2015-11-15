@@ -99,7 +99,7 @@ public:
 	void setForceDifferentParents(bool forceDifferentParents) { options_.forceDifferentParents = forceDifferentParents; }
 	void setDeleteOldFiles(bool deleteOldFiles) { options_.deleteOldFiles = deleteOldFiles; }
 	void setParallelCount(int parallelCount) { options_.parallelCount = parallelCount; }
-
+	void setJobName(std::string jobName) { options_.jobName = jobName; }
 	void addMutate(std::string mutateString);
 
 	void setCurrentGen(int gen);
@@ -117,6 +117,9 @@ public:
 
 	std::string recvFromParticle(Particle *p);
 	std::unordered_map<int,Particle*> generateInitParticles(int numParticles = -1);
+
+	void getClusterInformation();
+	std::string generateSlurmCommand(std::string cmd);
 
 	Pheromones *swarmComm_;
 	int currentGeneration_ = 0;	std::string type_;
@@ -140,41 +143,48 @@ public:
 	bool isMaster_;
 
 	struct SwarmOpts {
-		std::string swarmType; // genetic or swarm
-		std::string outputDir; // Directory to use for output
-		bool synchronicity; // 1 for synchronous
+		std::string jobName;	// name of the job
+		std::string swarmType;	// genetic or swarm
+		std::string outputDir;	// root directory to use for output
+		std::string jobOutputDir;// outputDir + jobName
 
-		Model * model; // the model file
+		bool synchronicity;		// 1 for synchronous
 
-		int maxGenerations = 10;
-		int swarmSize = 10;
-		int minFit = 0;
-		int boostrap = 0;
-		int parallelCount = 2;
+		Model * model; 			// the model file
 
-		bool usePipes = false;
-		bool useCluster = false;
+		int maxGenerations = 10;// maximum number of generations
+		int swarmSize = 10;		// how many particles in the swarm
+		float minFit = 0;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
+		float maxFit = 0;		// we stop fitting if we reach this value // TODO: Implement this
+		int boostrap = 0;		// how many times to bootstrap
+		int parallelCount = 2;	// how many particles to run in parallel
 
-		bool divideByInit = false;
-		int logTransformSimData = 0;
-		bool standardizeSimData = false;
-		bool standardizeExpData = false;
+		bool usePipes = false;	// whether or not to use pipes to gather simulation output
+		bool useCluster = false;// whether or not we are running on a cluster
 
-		bool deleteOldFiles = true;
+		bool divideByInit = false;// whether or not to divide simulation outputs by the value at t=0
+		int logTransformSimData = 0;// whether or not to log transform simulation data. this value acts as the base.
+		bool standardizeSimData = false;// whether or not to standardize simulation data
+		bool standardizeExpData = false;// whether or not to standardize experimental data
 
-		int objFunc = 1;
-		int extraWeight = 0;
-		float swapRate = 0.5;
-		bool forceDifferentParents = true;
-		int maxRetryDifferentParents = 2;
+		bool deleteOldFiles = true; // whether or not to delete unneeded files during the fitting run
 
-		int verbosity = 1;
+		int objFunc = 1;		// which objective function to use
+		int extraWeight = 0;	// how much extra weight to add while breeding in genetic algorithm
+		float swapRate = 0.5;	// the rate at which to swap parent parameters during breeding
+		bool forceDifferentParents = true;// whether or not to force difference parents when breeding
+		int maxRetryDifferentParents = 100;// how many times to attempt selection of different parents if forceDifferentParents is true
 
-		bool hasMutate = false;
+		int verbosity = 1;		// terminal output verbosity
 
-		std::unordered_map<std::string,Data*> expFiles;
+		bool hasMutate = false; // whether or not we should be mutating parameters during breeding in genetic algorithm
 
-		std::unordered_map<std::string,std::vector<float> > mutationRates;
+		std::string clusterSoftware;// which cluster software to use
+		std::string clusterAccount;	// user account to specify in cluster submission commands // TODO: Parse
+		bool saveClusterOutput;		// whether or not to save output during a cluster fit // TODO: Parse
+		std::string clusterQueue;	// The cluster queue to submit to // TODO: Parse
+
+		std::unordered_map<std::string,Data*> expFiles; // experimental data file
 	};
 	SwarmOpts options_;
 

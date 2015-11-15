@@ -24,6 +24,8 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	s->setConfigPath(configPath_);
 
+	// TODO: We really should be assigning iterators inside the conditional
+	// statements to avoid the extra map find() each time we find a match
 	if (confFile.is_open()) {
 		while (getline(confFile, line)) {
 			name = "";
@@ -106,9 +108,13 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	// Tell the swarm if we're using a cluster
 	if(pairs.find("use_cluster") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		if(pairs.find("cluster_software") != pairs.end()) {
+			s->options_.clusterSoftware = pairs.find("cluster_software")->second;
+		}
+
 		s->setUseCluster((atoi(pairs.find("use_cluster")->second.c_str()) == 1) ? true : false );
-		s->setParallelCount(s->getSwarmSize());
+		//s->setParallelCount(s->getSwarmSize());
+		s->getClusterInformation();
 	}
 
 	// Update swap rate
@@ -141,6 +147,15 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
 		s->setOutputDir(convertToAbsPath(pairs.find("output_dir")->second));
 	}
+
+	// Set job name
+	if(pairs.find("job_name") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->setJobName(pairs.find("job_name")->second);
+	}
+
+	// Set the job output directory
+	s->options_.jobOutputDir = s->options_.outputDir + "/" + s->options_.jobName + "/";
 
 	// Set verbosity
 	if(pairs.find("verbosity") != pairs.end()) {
@@ -244,7 +259,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		s->options_.hasMutate = true;
 
 		if (regex_search(exp->second, regex("^default\\s"))) {
-			cout << "found default mutation rate. breaking" << endl;
+			//cout << "found default mutation rate. breaking" << endl;
 			break;
 		}
 	}
@@ -298,6 +313,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		s->options_.expFiles.erase(getFilename(i->getPath()));
 		delete i;
 	}
+
 	/*
 	for (auto i : s->options_.expFiles){
 		cout << "Exp: " << i.second->getPath() << endl;

@@ -128,7 +128,10 @@ void Particle::doParticle() {
 			command += " &";
 		}
 
-		cout << "Running model with command: " << command << endl;
+		if (swarm_->options_.verbosity >= 3) {
+			cout << "Running model with command: " << command << endl;
+		}
+
 		// Run simulation command
 		int ret = system(command.c_str());
 
@@ -139,9 +142,7 @@ void Particle::doParticle() {
 			// Save our simulation outputs to data objects
 			for (std::unordered_map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
 				dataPath = path + "/" + i->first + "_" + to_string(id_) + ".gdat";
-				//dataFiles_.insert(make_pair(i->first, new Data(dataPath, swarm_, false)));
 				dataFiles_[i->first] = new Data(dataPath, swarm_, false);
-				//cout << "loaded data for " << dataPath << endl;
 			}
 
 			// Calculate our fit
@@ -149,11 +150,10 @@ void Particle::doParticle() {
 
 			// Put our fit calc into the message vector
 			swarm_->swarmComm_->univMessageSender.push_back(to_string(fitCalcs.at(swarm_->currentGeneration_)));
-			//cout << id_ << " adding calc of: " << fitCalcs.at(swarm_->currentGeneration_) << endl;
+
 			// Put our simulation params into the message vector
 			for (map<string,double>::iterator i = simParams_.begin(); i != simParams_.end(); ++i){
 				swarm_->swarmComm_->univMessageSender.push_back(to_string(i->second));
-				//cout << "adding " << i->first << " of " << i->second << endl;
 			}
 
 			// Tell the swarm master that we're finished
@@ -163,18 +163,22 @@ void Particle::doParticle() {
 			swarm_->swarmComm_->univMessageSender.clear();
 		}
 		else {
+			// If our return code is not 0, tell the master that the simulation failed
 			swarm_->swarmComm_->sendToSwarm(int(id_), 0, SIMULATION_FAIL, false, swarm_->swarmComm_->univMessageSender);
 		}
 
 		// Wait for message from master telling us who to breed with
 		bool doContinue = false;
 
+		// swapTracker holds swapIDs and pIDs to keep track of who is breeding with who,
+		// and which swaps are completed
 		unordered_map<int,int> swapTracker;
+
+		// Holds messages from master or other particles
 		std::vector<std::vector<std::string>> messageReceiver;
-		//cout << id_ << " waiting for instructions from master" << endl;
 
 		while (!doContinue) {
-			// TODO: Find out why breeding takes so long and fix it!!
+			// Retreive any messages
 			swarm_->swarmComm_->recvMessage(-1, id_, -1, true, messageReceiver, true);
 
 			// First loop through individual messages
@@ -211,7 +215,7 @@ void Particle::doParticle() {
 
 				// Receive new params from parents
 				else if (tag == SEND_FINAL_PARAMS_TO_PARTICLE) {
-					Timer tmr;
+					//Timer tmr;
 					// Jump to the first parameter value
 					o+=4;
 
@@ -221,10 +225,12 @@ void Particle::doParticle() {
 						o++;
 					}
 
+					// Construct our filenames
 					bnglFilename = to_string(id_) + ".bngl";
 					path = swarm_->options_.outputDir + "/" + to_string(swarm_->currentGeneration_ + 1);
 					bnglFullPath = path + "/" + bnglFilename;
 
+					// And generate our models
 					if (swarm_->options_.model->getHasGenerateNetwork()){
 						// If we're using ODE solver, output .net and .bngl
 						model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, true, false, false);
@@ -235,23 +241,23 @@ void Particle::doParticle() {
 					}
 
 					// Tell the master we have our new params and are ready for the next generation
-					//cout << id_ << " telling master I'm finished " << endl;
 					swarm_->swarmComm_->sendToSwarm(id_, 0, DONE_BREEDING, false, swarm_->swarmComm_->univMessageSender);
 
-					double t = tmr.elapsed();
-					cout << "SEND_FINAL_PARAMS took " << t << " seconds" << endl;
+					//double t = tmr.elapsed();
+					//cout << "SEND_FINAL_PARAMS took " << t << " seconds" << endl;
 				}
 				// We need to breed. Tag is equal to swap id.
 				else if (tag < -1000) {
-					Timer tmr;
+					//Timer tmr;
 
+					// Store our swapID
 					int swapID = tag;
 
 					// Jump to the sender
 					o+=2;
 					int reciprocateTo = stoi(*o);
 
-					// Jump to the parameter list
+					// Jump to the parameter list and construct a parameter vector
 					o+=2;
 					vector<string> params;
 
@@ -294,20 +300,25 @@ void Particle::doParticle() {
 						rcvBreedWithParticle(params, reciprocateTo, swapID, pID);
 					}
 					//cout << id_ << " is done breeding" << endl;
-					double t = tmr.elapsed();
-					cout << "RECEIVE_BREED took " << t << " seconds" << endl;
-					//cout << id_ << " received from " << reciprocateTo << endl;
+					//double t = tmr.elapsed();
+					//cout << "RECEIVE_BREED took " << t << " seconds" << endl;
 				}
 				else if (tag == NEXT_GENERATION) {
+					// We can begin next generation now
 					doContinue = true;
 				}
 				else if (tag == FIT_FINISHED) {
+					// Fit is finished. Quit.
 					return;
 				}
 			}
+			// Always reset message vectors
 			messageReceiver.clear();
 		}
+		// Reset the swapTracker so it is ready for the next generation
 		swapTracker.clear();
+
+		// Next generation
 		swarm_->currentGeneration_++;
 	}
 }
@@ -316,6 +327,9 @@ void Particle::calculateFit() {
 	bool usingSD = false;
 	bool usingMean = false;
 
+	// Construct pointers to the relevant fitting function.
+	// This lets us avoid a switch/case or excess conditionals
+	// within the calculation loop
 	if (swarm_->options_.objFunc == 1) {
 		objFuncPtr = &Particle::objFunc_sumOfSquares;
 	}

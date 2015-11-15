@@ -177,7 +177,7 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 					else if (inParameterBlock) {
 						// Replace free param with generated param
 						//double tt = 0;
-						for (auto p : params) { // TODO: Is there a faster way to do this than loop through params over and over?
+						for (auto p : params) { // TODO: Is there a faster way to do this than loop through params over and over? It's still too slow.
 							//cout << "p is " << p.first << endl;
 							//Timer tmr;
 							if(regex_match(line, matches, regex("\\s+\\d+\\s+(\\w+)\\s+(.+)\\s+"))) {
