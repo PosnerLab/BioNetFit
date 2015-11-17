@@ -14,6 +14,8 @@ Model::Model(string path) {
 	parseModel();
 }
 
+Model::Model() {}
+
 void Model::parseNet(string path) {
 	string line;
 	ifstream modelFile(path);

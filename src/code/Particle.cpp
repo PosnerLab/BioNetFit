@@ -91,22 +91,21 @@ void Particle::generateParams() {
 void Particle::doParticle() {
 
 	while(1) {
-
 		// First get our path and filename variables set up for use in model generation, sim command, etc
 		string bnglFilename = to_string(id_) + ".bngl";
-		string path = swarm_->options_.outputDir + "/" + to_string(swarm_->currentGeneration_);
+		string path = swarm_->options.outputDir + "/" + to_string(swarm_->currentGeneration);
 		string bnglFullPath = path + "/" + bnglFilename;
 
 		string pipePath;
 
 		// Only need to generate files if we're in the first generation. In subsequent generations
 		// the model generation is handled by beeding parents
-		if (swarm_->currentGeneration_ == 1) {
-			if (swarm_->options_.model->getHasGenerateNetwork()){
+		if (swarm_->currentGeneration == 1) {
+			if (swarm_->options.model->getHasGenerateNetwork()){
 				string netFilename = "base.net";
-				string netFullPath = swarm_->options_.outputDir + "/" + netFilename;
+				string netFullPath = swarm_->options.outputDir + "/" + netFilename;
 
-				swarm_->options_.model->parseNet(netFullPath);
+				swarm_->options.model->parseNet(netFullPath);
 				model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, true, false, false);
 			}
 			else {
@@ -115,7 +114,7 @@ void Particle::doParticle() {
 		}
 
 		// Generate .gdat pipes if we're using pipes
-		if (swarm_->options_.usePipes) {
+		if (swarm_->options.usePipes) {
 			for (std::unordered_map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
 				pipePath = path + "/" + i->first + "_" + to_string(id_) + ".gdat";
 				createParticlePipe(pipePath.c_str());
@@ -124,11 +123,11 @@ void Particle::doParticle() {
 
 		// Construct our simulation command
 		string command = "/home/brandon/projects/GenFit/Simulators/BNG2.pl --outdir " + path + " " + bnglFullPath + ">> " + path + "/" + to_string(id_) + ".BNG_OUT 2>&1";
-		if (swarm_->options_.usePipes) {
+		if (swarm_->options.usePipes) {
 			command += " &";
 		}
 
-		if (swarm_->options_.verbosity >= 3) {
+		if (swarm_->options.verbosity >= 3) {
 			cout << "Running model with command: " << command << endl;
 		}
 
@@ -149,24 +148,25 @@ void Particle::doParticle() {
 			calculateFit();
 
 			// Put our fit calc into the message vector
-			swarm_->swarmComm_->univMessageSender.push_back(to_string(fitCalcs.at(swarm_->currentGeneration_)));
+			swarm_->swarmComm->univMessageSender.push_back(to_string(fitCalcs.at(swarm_->currentGeneration)));
 
 			// Put our simulation params into the message vector
 			for (map<string,double>::iterator i = simParams_.begin(); i != simParams_.end(); ++i){
-				swarm_->swarmComm_->univMessageSender.push_back(to_string(i->second));
+				swarm_->swarmComm->univMessageSender.push_back(to_string(i->second));
 			}
 
 			// Tell the swarm master that we're finished
-			swarm_->swarmComm_->sendToSwarm(int(id_), 0, SIMULATION_END, false, swarm_->swarmComm_->univMessageSender);
+			swarm_->swarmComm->sendToSwarm(int(id_), 0, SIMULATION_END, false, swarm_->swarmComm->univMessageSender);
 
 			// Reset the message vector
-			swarm_->swarmComm_->univMessageSender.clear();
+			swarm_->swarmComm->univMessageSender.clear();
 		}
 		else {
 			// If our return code is not 0, tell the master that the simulation failed
-			swarm_->swarmComm_->sendToSwarm(int(id_), 0, SIMULATION_FAIL, false, swarm_->swarmComm_->univMessageSender);
+			swarm_->swarmComm->sendToSwarm(int(id_), 0, SIMULATION_FAIL, false, swarm_->swarmComm->univMessageSender);
 		}
 
+		// TODO: Breeding is still too slow. Need to speed things up here.
 		// Wait for message from master telling us who to breed with
 		bool doContinue = false;
 
@@ -174,64 +174,67 @@ void Particle::doParticle() {
 		// and which swaps are completed
 		unordered_map<int,int> swapTracker;
 
-		// Holds messages from master or other particles
-		std::vector<std::vector<std::string>> messageReceiver;
+		// Holds iterator ranges when finding items in the message holder
+		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
 
 		while (!doContinue) {
 			// Retreive any messages
-			swarm_->swarmComm_->recvMessage(-1, id_, -1, true, messageReceiver, true);
+			int numCheckedMessages = 0;
+			int numMessages = swarm_->swarmComm->recvMessage(-1, id_, -1, true, swarm_->swarmComm->univMessageReceiver, true);
 
-			// First loop through individual messages
-			for (std::vector<std::vector<std::string>>::iterator m = messageReceiver.begin(); m != messageReceiver.end(); ++m) {
-
-				std::vector<std::string>::iterator o = (*m).begin();
-				int tag = stoi(*o);
-
-				//cout << id_ << " found tag: " << tag << endl;
-				if (tag == INIT_BREEDING) {
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(INIT_BREEDING);
+			if (smhRange.first != smhRange.second) {
+				for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 					Timer tmr;
 
-					// Jump to the swapID
-					o+=4;
-
 					// Convert the swapID to a unique negative number less than 1000
-					int swapID = stoi(*o);
+					int swapID = stoi(sm->second.message[0]);
 					swapID = (swapID * -1) - 1000;
+					cout << id_ << " init loop " << swapID << endl;
 
-					// Jump to particle with which to breed
-					o+=1;
+					// Store the particle with which to breed
+					int pID = stoi(sm->second.message[1]);
 
 					// Store our swap id so we know which swap we're working within
-					swapTracker[swapID] = stoi(*o);
+					swapTracker[swapID] = pID;
 
 					//cout << id_ << " init breeding with " << *o << ". SwapID: " << swapID << endl;
 
 					// Initiate breeding with that particle
-					initBreedWithParticle(stoi(*o), swapID);
+					initBreedWithParticle(pID, swapID);
 
 					double t = tmr.elapsed();
-					cout << "INIT_BREEDING took " << t << " seconds" << endl;
+					cout << id_ << " INIT_BREEDING took " << t << " seconds" << endl;
+
+					++numCheckedMessages;
 				}
+			}
 
-				// Receive new params from parents
-				else if (tag == SEND_FINAL_PARAMS_TO_PARTICLE) {
+			if (numCheckedMessages >= numMessages) {
+				swarm_->swarmComm->univMessageReceiver.clear();
+				continue;
+			}
+
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(SEND_FINAL_PARAMS_TO_PARTICLE);
+			if (smhRange.first != smhRange.second) {
+				cout << id_ << "found final " << endl;
+				for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 					//Timer tmr;
-					// Jump to the first parameter value
-					o+=4;
 
-					for (std::map<std::string,double>::iterator p = simParams_.begin(); p != simParams_.end(); ++p) {
+					int messageIndex = 0;
+					for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 						//cout << id_ << " updating parameter " << p->first << " to " << *o << endl;
-						p->second = stod(*o);
-						o++;
+						p->second = stod(sm->second.message[messageIndex]);
+						++messageIndex;
 					}
 
 					// Construct our filenames
 					bnglFilename = to_string(id_) + ".bngl";
-					path = swarm_->options_.outputDir + "/" + to_string(swarm_->currentGeneration_ + 1);
+					path = swarm_->options.outputDir + "/" + to_string(swarm_->currentGeneration + 1);
 					bnglFullPath = path + "/" + bnglFilename;
 
 					// And generate our models
-					if (swarm_->options_.model->getHasGenerateNetwork()){
+					if (swarm_->options.model->getHasGenerateNetwork()){
 						// If we're using ODE solver, output .net and .bngl
 						model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, true, false, false);
 					}
@@ -241,30 +244,36 @@ void Particle::doParticle() {
 					}
 
 					// Tell the master we have our new params and are ready for the next generation
-					swarm_->swarmComm_->sendToSwarm(id_, 0, DONE_BREEDING, false, swarm_->swarmComm_->univMessageSender);
+					cout << id_ << " telling master we're finished " << endl;
+					swarm_->swarmComm->sendToSwarm(id_, 0, DONE_BREEDING, false, swarm_->swarmComm->univMessageSender);
 
 					//double t = tmr.elapsed();
 					//cout << "SEND_FINAL_PARAMS took " << t << " seconds" << endl;
+					++numCheckedMessages;
 				}
-				// We need to breed. Tag is equal to swap id.
-				else if (tag < -1000) {
+			}
+
+			if (numCheckedMessages >= numMessages) {
+				swarm_->swarmComm->univMessageReceiver.clear();
+				continue;
+			}
+
+			// TODO: maybe we should search for all tags within this loop, rather then using equal_ranges
+			for (Pheromones::swarmMsgHolderIt sm = swarm_->swarmComm->univMessageReceiver.begin(); sm != swarm_->swarmComm->univMessageReceiver.end(); ++sm) {
+				if (sm->first < -1000) {
 					//Timer tmr;
 
 					// Store our swapID
-					int swapID = tag;
+					int swapID = sm->first;
 
-					// Jump to the sender
-					o+=2;
-					int reciprocateTo = stoi(*o);
+					// Store the sender
+					int reciprocateTo = sm->second.sender;
 
-					// Jump to the parameter list and construct a parameter vector
-					o+=2;
 					vector<string> params;
 
 					// Store the parameters
-					while (o != (*m).end()) {
-						params.push_back(*o);
-						++o;
+					for (auto p = sm->second.message.begin(); p != sm->second.message.end(); ++p) {
+						params.push_back(*p);
 					}
 
 					int pID;
@@ -302,24 +311,174 @@ void Particle::doParticle() {
 					//cout << id_ << " is done breeding" << endl;
 					//double t = tmr.elapsed();
 					//cout << "RECEIVE_BREED took " << t << " seconds" << endl;
-				}
-				else if (tag == NEXT_GENERATION) {
-					// We can begin next generation now
-					doContinue = true;
-				}
-				else if (tag == FIT_FINISHED) {
-					// Fit is finished. Quit.
-					return;
+					++numCheckedMessages;
 				}
 			}
-			// Always reset message vectors
-			messageReceiver.clear();
+
+			if (numCheckedMessages >= numMessages) {
+				swarm_->swarmComm->univMessageReceiver.clear();
+				continue;
+			}
+
+			if (swarm_->swarmComm->univMessageReceiver.find(FIT_FINISHED) != swarm_->swarmComm->univMessageReceiver.end()) {
+				//cout << id_ << " exiting " << endl;
+				return;
+			}
+
+			if (swarm_->swarmComm->univMessageReceiver.find(NEXT_GENERATION) != swarm_->swarmComm->univMessageReceiver.end()) {
+				doContinue = true;
+			}
+
+			swarm_->swarmComm->univMessageReceiver.clear();
+
+			/*
+				// First loop through individual messages
+				for (std::vector<std::vector<std::string>>::iterator m = messageReceiver.begin(); m != messageReceiver.end(); ++m) {
+
+					std::vector<std::string>::iterator o = (*m).begin();
+					int tag = stoi(*o);
+
+					//cout << id_ << " found tag: " << tag << endl;
+					if (tag == INIT_BREEDING) {
+						Timer tmr;
+
+						// Jump to the swapID
+						o+=4;
+
+						// Convert the swapID to a unique negative number less than 1000
+						int swapID = stoi(*o);
+						swapID = (swapID * -1) - 1000;
+
+						// Jump to particle with which to breed
+						o+=1;
+
+						// Store our swap id so we know which swap we're working within
+						swapTracker[swapID] = stoi(*o);
+
+						//cout << id_ << " init breeding with " << *o << ". SwapID: " << swapID << endl;
+
+						// Initiate breeding with that particle
+						initBreedWithParticle(stoi(*o), swapID);
+
+						double t = tmr.elapsed();
+						cout << "INIT_BREEDING took " << t << " seconds" << endl;
+					}
+
+					// Receive new params from parents
+					else if (tag == SEND_FINAL_PARAMS_TO_PARTICLE) {
+						//Timer tmr;
+						// Jump to the first parameter value
+						o+=4;
+
+						for (std::map<std::string,double>::iterator p = simParams_.begin(); p != simParams_.end(); ++p) {
+							//cout << id_ << " updating parameter " << p->first << " to " << *o << endl;
+							p->second = stod(*o);
+							o++;
+						}
+
+						// Construct our filenames
+						bnglFilename = to_string(id_) + ".bngl";
+						path = swarm_->options.outputDir + "/" + to_string(swarm_->currentGeneration + 1);
+						bnglFullPath = path + "/" + bnglFilename;
+
+						// And generate our models
+						if (swarm_->options.model->getHasGenerateNetwork()){
+							// If we're using ODE solver, output .net and .bngl
+							model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, true, false, false);
+						}
+						else {
+							// If we're using network free simulation, output .bngl
+							model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, false, false, false);
+						}
+
+						// Tell the master we have our new params and are ready for the next generation
+						swarm_->swarmComm->sendToSwarm(id_, 0, DONE_BREEDING, false, swarm_->swarmComm->univMessageSender);
+
+						//double t = tmr.elapsed();
+						//cout << "SEND_FINAL_PARAMS took " << t << " seconds" << endl;
+					}
+					// We need to breed. Tag is equal to swap id.
+					else if (tag < -1000) {
+						//Timer tmr;
+
+						// Store our swapID
+						int swapID = tag;
+
+						// Jump to the sender
+						o+=2;
+						int reciprocateTo = stoi(*o);
+
+						// Jump to the parameter list and construct a parameter vector
+						o+=2;
+						vector<string> params;
+
+						// Store the parameters
+						while (o != (*m).end()) {
+							params.push_back(*o);
+							++o;
+						}
+
+						int pID;
+						// If we find our swapID in the swap tracker, it must mean that
+						// we are receiving params from parent #2
+
+						if (swapTracker.find(swapID) != swapTracker.end() && swapTracker.at(swapID) != id_) {
+							//cout << id_ << " found " << swapTracker[swapID] << " at " << swapID << endl;
+							//cout <<  id_ << " being given swapped parameters in swapID " << swapID << ". Receiving from the reciprocator: "<< reciprocateTo << endl;
+							// Convert swapID to pID. pID is the "child" who receives the final parameter set
+							pID = (swapID * - 1) - 1000;
+
+							// Parse the received particles and integrate them with our own
+							rcvBreedWithParticle(params, 0, swapID, pID);
+
+						}
+						// If we don't find our swapID in the swap tracker, it must mean that
+						// we are receiving params from parent #1
+						else {
+							// If we are here and find our swapID in the tracker, it means we are breeding
+							// with ourself. We must leave an entry in the swapTracker but change it from
+							// our pID to ensure that we can receive from ourself
+							if (swapTracker.find(swapID) != swapTracker.end()) {
+								//cout << id_ << " found " << swapTracker[swapID] << " at " << swapID << ", changing to 0" <<  endl;
+								swapTracker[swapID] = 0;
+							}
+
+							//cout << id_  << " being given swapped parameters in swapID " << swapID << ". Receiving from the initiator: "<< reciprocateTo << endl;
+							// Convert swapID to pID. pID is the "child" who receives the final parameter set
+							pID = (swapID * - 1) - 999;
+
+							// Parse the received particles and integrate them with our own
+							rcvBreedWithParticle(params, reciprocateTo, swapID, pID);
+						}
+						//cout << id_ << " is done breeding" << endl;
+						//double t = tmr.elapsed();
+						//cout << "RECEIVE_BREED took " << t << " seconds" << endl;
+					}
+					else if (tag == NEXT_GENERATION) {
+						// We can begin next generation now
+						doContinue = true;
+					}
+					else if (tag == FIT_FINISHED) {
+						// Fit is finished. Quit.
+						return;
+					}
+				}
+				// Always reset message vectors
+				messageReceiver.clear();
+			}
+
+				// Reset the swapTracker so it is ready for the next generation
+				swapTracker.clear();
+
+				// Next generation
+				swarm_->currentGeneration++;
+			}*/
 		}
 		// Reset the swapTracker so it is ready for the next generation
 		swapTracker.clear();
 
 		// Next generation
-		swarm_->currentGeneration_++;
+		swarm_->currentGeneration++;
 	}
 }
 
@@ -330,17 +489,17 @@ void Particle::calculateFit() {
 	// Construct pointers to the relevant fitting function.
 	// This lets us avoid a switch/case or excess conditionals
 	// within the calculation loop
-	if (swarm_->options_.objFunc == 1) {
+	if (swarm_->options.objFunc == 1) {
 		objFuncPtr = &Particle::objFunc_sumOfSquares;
 	}
-	else if (swarm_->options_.objFunc == 2) {
+	else if (swarm_->options.objFunc == 2) {
 		objFuncPtr = &Particle::objFunc_chiSquare;
 		usingSD = true;
 	}
-	else if (swarm_->options_.objFunc == 3) {
+	else if (swarm_->options.objFunc == 3) {
 		objFuncPtr = &Particle::objFunc_divByMeasured;
 	}
-	else if (swarm_->options_.objFunc == 4) {
+	else if (swarm_->options.objFunc == 4) {
 		objFuncPtr = &Particle::objFunc_divByMean;
 		usingMean = true;
 	}
@@ -351,18 +510,18 @@ void Particle::calculateFit() {
 	double divisor = 0;
 
 	// Loop through .exp files. Iterator points to string/dataset pair
-	for (std::unordered_map<std::string,Data*>::iterator e = swarm_->options_.expFiles.begin(); e != swarm_->options_.expFiles.end(); ++e) {
+	for (std::unordered_map<std::string,Data*>::iterator e = swarm_->options.expFiles.begin(); e != swarm_->options.expFiles.end(); ++e) {
 		// Loop through .exp columns. Iterator points to column/map pair
 		//cout << "exp loop " << e->first << endl;
 		setSum = 0;
-		//cout << "first: " << e->second->dataCurrent_->begin()->first << endl;
-		//cout << "second " <<  e->second->dataCurrent_->begin()->second.begin()->first << endl;
-		//cout << " third " << e->second->dataCurrent_->begin()->second.begin()->second << endl;
-		for (std::map<std::string,std::map<double,double> >::iterator exp_col = e->second->dataCurrent_->begin(); exp_col != e->second->dataCurrent_->end(); ++exp_col) {
+		//cout << "first: " << e->second->dataCurrent->begin()->first << endl;
+		//cout << "second " <<  e->second->dataCurrent->begin()->second.begin()->first << endl;
+		//cout << " third " << e->second->dataCurrent->begin()->second.begin()->second << endl;
+		for (std::map<std::string,std::map<double,double> >::iterator exp_col = e->second->dataCurrent->begin(); exp_col != e->second->dataCurrent->end(); ++exp_col) {
 			// Loop through timepoints of column.  Iterator points to a timepoint/value pair
 
 			if (usingMean) {
-				divisor = e->second->colAverages_.at(exp_col->first);
+				divisor = e->second->colAverages.at(exp_col->first);
 			}
 
 			//cout << "col loop " << exp_col->first << endl;
@@ -373,23 +532,23 @@ void Particle::calculateFit() {
 
 				//float exp = timepoint->second;
 				//cout << "exp: " << exp << endl;
-				//float sim = dataFiles_.at(e->first)->dataCurrent_->at(exp_col->first).at(timepoint->first);
+				//float sim = dataFiles_.at(e->first)->dataCurrent->at(exp_col->first).at(timepoint->first);
 				//cout << "sim: " << sim << endl;
-				//float SD = e->second->standardDeviations_.at(exp_col->first).at(timepoint->first);
+				//float SD = e->second->standardDeviations.at(exp_col->first).at(timepoint->first);
 				//cout << "SD: " << SD << endl;
 
 				if (usingSD) {
 					//cout << "using sd" << endl;
-					divisor = e->second->standardDeviations_.at(exp_col->first).at(timepoint->first);
+					divisor = e->second->standardDeviations.at(exp_col->first).at(timepoint->first);
 				}
 
-				colSum += (this->*objFuncPtr)(dataFiles_.at(e->first)->dataCurrent_->at(exp_col->first).at(timepoint->first), timepoint->second, divisor);
+				colSum += (this->*objFuncPtr)(dataFiles_.at(e->first)->dataCurrent->at(exp_col->first).at(timepoint->first), timepoint->second, divisor);
 			}
 			setSum += colSum;
 		}
 		totalSum += setSum;
 	}
-	fitCalcs[swarm_->currentGeneration_] = pow(totalSum,0.5);
+	fitCalcs[swarm_->currentGeneration] = pow(totalSum,0.5);
 	//cout << id_ << " fitcalc: " << totalSum << endl;
 }
 
@@ -419,18 +578,18 @@ void Particle::initBreedWithParticle(int pID, int swapID) {
 
 	for (auto p : simParams_) {
 		// Swap
-		if (unif(swarm_->randNumEngine) < (swarm_->options_.swapRate * 100) ) {
-			swarm_->swarmComm_->univMessageSender.push_back(to_string(p.second));
+		if (unif(swarm_->randNumEngine) < (swarm_->options.swapRate * 100) ) {
+			swarm_->swarmComm->univMessageSender.push_back(to_string(p.second));
 		}
 		// Don't swap
 		else {
-			swarm_->swarmComm_->univMessageSender.push_back("");
+			swarm_->swarmComm->univMessageSender.push_back("");
 		}
 	}
 
 	// Send message to parent 2 containing our param list
-	swarm_->swarmComm_->sendToSwarm(id_, pID, swapID, false, swarm_->swarmComm_->univMessageSender);
-	swarm_->swarmComm_->univMessageSender.clear();
+	swarm_->swarmComm->sendToSwarm(id_, pID, swapID, false, swarm_->swarmComm->univMessageSender);
+	swarm_->swarmComm->univMessageSender.clear();
 
 	//double t = tmr.elapsed();
 	//cout << "Init took " << t << " seconds" << endl;
@@ -450,7 +609,7 @@ void Particle::rcvBreedWithParticle(vector<string>& params, int reciprocateTo, i
 			// If the parameter value is empty, we are not swapping that value. We give
 			// parent #1 back an empty string, and give the child our value.
 			if (params[pi] == "") {
-				swarm_->swarmComm_->univMessageSender.push_back("");
+				swarm_->swarmComm->univMessageSender.push_back("");
 				messageToChild.push_back(to_string(p.second));
 
 				string vm = "DIDN'T SWAP " + to_string(p.second);
@@ -459,12 +618,12 @@ void Particle::rcvBreedWithParticle(vector<string>& params, int reciprocateTo, i
 			// If the parameter is NOT empty, we are swapping. We give parent #1 our value
 			// and give the child the (possible mutated) value from parent #2.
 			else {
-				swarm_->swarmComm_->univMessageSender.push_back(to_string(p.second));
+				swarm_->swarmComm->univMessageSender.push_back(to_string(p.second));
 
 				double mutParam = stod(params[pi]);
 
-				if (swarm_->options_.hasMutate && swarm_->options_.model->getFreeParams().at(p.first)->isHasMutation()) {
-					mutParam = mutateParam(swarm_->options_.model->freeParams_.at(p.first), mutParam);
+				if (swarm_->options.hasMutate && swarm_->options.model->getfreeParams_().at(p.first)->isHasMutation()) {
+					mutParam = mutateParam(swarm_->options.model->freeParams_.at(p.first), mutParam);
 				}
 				messageToChild.push_back(to_string(mutParam));
 				string vm = "SWAPPED " + to_string(mutParam);
@@ -472,9 +631,9 @@ void Particle::rcvBreedWithParticle(vector<string>& params, int reciprocateTo, i
 			++pi;
 		}
 
-		swarm_->swarmComm_->sendToSwarm(id_, reciprocateTo, swapID, false, swarm_->swarmComm_->univMessageSender);
-		swarm_->swarmComm_->univMessageSender.clear();
-		swarm_->swarmComm_->sendToSwarm(id_, pID, SEND_FINAL_PARAMS_TO_PARTICLE, false, messageToChild);
+		swarm_->swarmComm->sendToSwarm(id_, reciprocateTo, swapID, false, swarm_->swarmComm->univMessageSender);
+		swarm_->swarmComm->univMessageSender.clear();
+		swarm_->swarmComm->sendToSwarm(id_, pID, SEND_FINAL_PARAMS_TO_PARTICLE, false, messageToChild);
 	}
 	// If we aren't reciprocating, that means we're parent #1 and are receiving
 	// parameter values from the reciprocator (parent #2). Create a message to
@@ -487,26 +646,26 @@ void Particle::rcvBreedWithParticle(vector<string>& params, int reciprocateTo, i
 			// If the parameter is empty, we are keeping our parameter value. We
 			// give that value to the child.
 			if (params[pi] == "") {
-				swarm_->swarmComm_->univMessageSender.push_back(to_string(p.second));
+				swarm_->swarmComm->univMessageSender.push_back(to_string(p.second));
 			}
 
 			// If the parameter is NOT empty, we are give the child the (possibly
 			// mutated) value from parent #1.
 			else {
 				double finalParam = stod(params[pi]);
-				if (swarm_->options_.hasMutate && swarm_->options_.model->getFreeParams().at(p.first)->isHasMutation()) {
-					finalParam = mutateParam(swarm_->options_.model->freeParams_.at(p.first), finalParam);
+				if (swarm_->options.hasMutate && swarm_->options.model->getfreeParams_().at(p.first)->isHasMutation()) {
+					finalParam = mutateParam(swarm_->options.model->freeParams_.at(p.first), finalParam);
 				}
 
-				swarm_->swarmComm_->univMessageSender.push_back(to_string(finalParam));
+				swarm_->swarmComm->univMessageSender.push_back(to_string(finalParam));
 			}
 			++pi;
 		}
 
 		// Send the new parameter set to the child indicated by swapID
 		//cout << id_ << " sending final param set to particle " << pID << endl;
-		swarm_->swarmComm_->sendToSwarm(id_, pID, SEND_FINAL_PARAMS_TO_PARTICLE, false, swarm_->swarmComm_->univMessageSender);
-		swarm_->swarmComm_->univMessageSender.clear();
+		swarm_->swarmComm->sendToSwarm(id_, pID, SEND_FINAL_PARAMS_TO_PARTICLE, false, swarm_->swarmComm->univMessageSender);
+		swarm_->swarmComm->univMessageSender.clear();
 	}
 	//double t = tmr.elapsed();
 	//cout << "Rcv took " << t << " seconds" << endl;

@@ -24,6 +24,8 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	s->setConfigPath(configPath_);
 
+	//TODO: Why are we using atoi with c_str when we could go straight to stoi?
+
 	// TODO: We really should be assigning iterators inside the conditional
 	// statements to avoid the extra map find() each time we find a match
 	if (confFile.is_open()) {
@@ -108,13 +110,15 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	// Tell the swarm if we're using a cluster
 	if(pairs.find("use_cluster") != pairs.end()) {
-		if(pairs.find("cluster_software") != pairs.end()) {
-			s->options_.clusterSoftware = pairs.find("cluster_software")->second;
-		}
+		if (stoi(pairs.find("use_cluster")->second)) {
+			if(pairs.find("cluster_software") != pairs.end()) {
+				s->options.clusterSoftware = pairs.find("cluster_software")->second;
+			}
 
-		s->setUseCluster((atoi(pairs.find("use_cluster")->second.c_str()) == 1) ? true : false );
-		//s->setParallelCount(s->getSwarmSize());
-		s->getClusterInformation();
+			s->setUseCluster((atoi(pairs.find("use_cluster")->second.c_str()) == 1) ? true : false );
+			//s->setParallelCount(s->getSwarmSize());
+			s->getClusterInformation();
+		}
 	}
 
 	// Update swap rate
@@ -155,15 +159,39 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	}
 
 	// Set the job output directory
-	s->options_.jobOutputDir = s->options_.outputDir + "/" + s->options_.jobName + "/";
+	s->options.jobOutputDir = s->options.outputDir + "/" + s->options.jobName + "/";
 
 	// Set verbosity
 	if(pairs.find("verbosity") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
 		s->setVerbosity(atoi(pairs.find("verbosity")->second.c_str()));
 	}
-	else {
-		s->setVerbosity(1);
+
+	// Set fit value that will cause fit to end
+	if(pairs.find("min_fit") != pairs.end()) {
+			//cout << "Adding model file: " << pairs.find("model")->second << endl;
+			s->options.minFit = stod(pairs.find("min_fit")->second));
+	}
+
+	// Set the maximum fit value to consider in breeding
+	// TODO: Implement this
+	if(pairs.find("max_fit") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->options.maxFit = (stod(pairs.find("max_fit")->second));
+	}
+
+	// Set maximum number of simulations in an asynchronous genetic fit
+	if(pairs.find("maxNumSimulations") != pairs.end()) {
+		s->options.maxNumSimulations = stol(pairs.find("max_num_simulations")->second);
+	}
+
+	// Set maximum fitting time
+	// TODO: Implement this in synchronous genetic fitting
+	if(pairs.find("max_fit_time") != pairs.end()) {
+		vector<string> timeElements;
+		split(pairs.find("max_fit_time")->second, timeElements, ":");
+		long timeInSeconds = (stol(timeElements[0]) * 3600) + (stol(timeElements[1]) * 60) + stol(timeElements[2]);
+		s->options.maxFit = timeInSeconds;
 	}
 
 	// Update the maximimum number of parallel threads (non-cluster only)
@@ -212,13 +240,13 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 			// Make sure we have three components to work with
 			if (paramComponents.size() == 3) {
 				// Make sure first parameter name exists as a free parameter
-				if (s->options_.model->freeParams_.count(paramComponents[0]) > 0) {
+				if (s->options.model->freeParams_.count(paramComponents[0]) > 0) {
 					// Make sure 2nd and 3rd components are numeric
 					if (isFloat(paramComponents[1]) && isFloat(paramComponents[2])) {
-						s->options_.model->freeParams_.at(paramComponents[0])->setGenerationMethod(pair.first);
-						s->options_.model->freeParams_.at(paramComponents[0])->setParameterName(paramComponents[0]);
-						s->options_.model->freeParams_.at(paramComponents[0])->setGenMin(stof(paramComponents[1]));
-						s->options_.model->freeParams_.at(paramComponents[0])->setGenMax(stof(paramComponents[2]));
+						s->options.model->freeParams_.at(paramComponents[0])->setGenerationMethod(pair.first);
+						s->options.model->freeParams_.at(paramComponents[0])->setParameterName(paramComponents[0]);
+						s->options.model->freeParams_.at(paramComponents[0])->setGenMin(stof(paramComponents[1]));
+						s->options.model->freeParams_.at(paramComponents[0])->setGenMax(stof(paramComponents[2]));
 
 						//cout << "setting " << paramComponents[0] << " to " << pair.first << ":" << paramComponents[1] << ":" << paramComponents[2] << endl;
 					}
@@ -236,7 +264,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		}
 	}
 
-	for (auto i : s->options_.model->freeParams_) {
+	for (auto i : s->options.model->freeParams_) {
 		if (!i.second) {
 			string errMsg = "Error: We found a free parameter '" + i.first + "' specified in your model file but can't find a matching parameter generator in your .conf file.";
 			outputError(errMsg);
@@ -256,7 +284,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	for (unordered_multimap<string,string>::iterator exp = it.first; exp != it.second; ++exp) {
 		s->addMutate(exp->second);
-		s->options_.hasMutate = true;
+		s->options.hasMutate = true;
 
 		if (regex_search(exp->second, regex("^default\\s"))) {
 			//cout << "found default mutation rate. breaking" << endl;
@@ -279,51 +307,55 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	vector<string> prefixedActions;
 	vector<Model::action> toDeleteActs;
 
-	for (unordered_map<string,Model::action>::iterator i = s->options_.model->actions.begin(); i != s->options_.model->actions.end();)
-		//for (vector<Model::action>::iterator i = s->options_.model->actions.begin(); i != s->options_.model->actions.end();)
+	for (unordered_map<string,Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
+		//for (vector<Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
 	{
 		//if (!i->prefix.empty()) {
 		//	prefixedActions.push_back(i->prefix);
 		//}
 		prefixedActions.push_back(i->first);
 
-		if (s->options_.expFiles.count(i->first) == 1) {
+		if (s->options.expFiles.count(i->first) == 1) {
 			if (s->getVerbosity() >=3 ) {
-				cout << "Linking action " << i->first << " with exp file: " << s->options_.expFiles[i->first]->getPath() << endl;
+				cout << "Linking action " << i->first << " with exp file: " << s->options.expFiles[i->first]->getPath() << endl;
 			}
-			i->second.dataSet = s->options_.expFiles[i->first];
+			i->second.dataSet = s->options.expFiles[i->first];
 			++i;
 		}
 		else { // Have a prefix but no .exp file
 			cout << "Warning: The model file specifies an action with the prefix '" << i->first << "' but there isn't a matching .exp file specified in your .conf file. We will ignore this action command." << endl;
-			i = s->options_.model->actions.erase(i);
+			i = s->options.model->actions.erase(i);
 		}
 	}
 
 	vector<Data*> toDeleteExp;
-	for (auto &i : s->options_.expFiles){ // Have .exp but no prefix
+	for (auto &i : s->options.expFiles){ // Have .exp but no prefix
 		if(std::find(prefixedActions.begin(), prefixedActions.end(), i.first) == prefixedActions.end() ) {
 			cout << "Warning: The .conf file specifies an .exp file '" << i.first << "' but there isn't a matching action command in your model file specified with the prefix=> argument." << endl;
-			toDeleteExp.push_back(s->options_.expFiles[i.first]);
+			toDeleteExp.push_back(s->options.expFiles[i.first]);
 		}
 	}
+
+	// TODO: We could probably delete in the loop
 	// Delete the unmatched Exp objects
 	for (auto i : toDeleteExp) {
 		//cout << "Deleting object" << endl;
-		s->options_.expFiles.erase(getFilename(i->getPath()));
+		s->options.expFiles.erase(getFilename(i->getPath()));
 		delete i;
 	}
 
+	// TODO: Make sure we have either min fit, max time, or max sims when doing an asynchronous fit
+
 	/*
-	for (auto i : s->options_.expFiles){
+	for (auto i : s->options.expFiles){
 		cout << "Exp: " << i.second->getPath() << endl;
 	}
 
-	for (auto i : s->options_.modelFile->actions_){
+	for (auto i : s->options.modelFile->actions_){
 		cout << "Prefix: " << i.prefix << endl;
 	}
 
-	for (auto i : s->options_.modelFile->actions_){
+	for (auto i : s->options.modelFile->actions_){
 		cout << "DataSets: " << i.dataSet->getPath() << endl;
 	}
 	 */

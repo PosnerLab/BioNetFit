@@ -16,6 +16,8 @@
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/map.hpp>
+#include <boost/serialization/unordered_map.hpp>
+#include <boost/serialization/set.hpp>
 
 //#include <boost/interprocess/shared_memory_object.hpp>
 //#include <boost/interprocess/mapped_region.hpp>
@@ -73,14 +75,25 @@ public:
 
 	void init(Swarm *s);
 
-	void sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message);
-	int recvMessage(signed int senderID, const int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage = true);
+	struct swarmMessage {
+		std::string tag;
 
-	template<typename T>
-	T recvFromAll(T & messageHolder);
+		int id;
+		int sender;
+
+		std::vector<std::string> message;
+	};
+
+	typedef std::unordered_multimap<int, swarmMessage> swarmMsgHolder;
+	typedef swarmMsgHolder::iterator swarmMsgHolderIt;
+
+	void sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message);
+	//int recvMessage(signed int senderID, const int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage = true);
+	int recvMessage(signed int senderID, const int receiverID, int tag, bool block, swarmMsgHolder &messageHolder, bool eraseMessage = true);
 
 	std::vector<std::string> univMessageSender;
-	std::vector<std::vector<std::string>> univMessageReceiver;
+	//std::vector<std::vector<std::string>> univMessageReceiver;
+	swarmMsgHolder univMessageReceiver;
 
 private:
 	Swarm *swarm_;

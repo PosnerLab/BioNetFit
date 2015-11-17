@@ -45,7 +45,7 @@ all: GenFit2
 GenFit2: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	mpic++ -L/usr/lib/ -L/usr/lib/x86_64-linux-gnu/ -o "GenFit2" $(OBJS) $(USER_OBJS) $(LIBS)
+	mpic++ -L/home/brandon/projects/GenFit2/lib/ -o "GenFit2" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

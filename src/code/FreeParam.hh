@@ -10,9 +10,12 @@
 
 #include <string>
 
+#include "Swarm.hh"
+
 class FreeParam {
 public:
 	FreeParam(std::string parameterName);
+	FreeParam();
 
 	const std::string& getGenerationMethod() const {
 		return generationMethod_;
@@ -71,13 +74,28 @@ public:
 	}
 
 private:
+	friend class boost::serialization::access;
+
 	std::string parameterName_;
 	std::string generationMethod_;
 	float mutationRate_;
 	float mutationFactor_;
 	float genMin_;
 	float genMax_;
-	bool hasMutation_ = false;
+	bool hasMutation_;
+
+	template<typename Archive>
+	void serialize(Archive& ar, const unsigned version) {
+		//std::cout << " serializing fp" << std::endl;
+
+		ar & parameterName_;
+		ar & generationMethod_;
+		ar & mutationRate_;
+		ar & mutationFactor_;
+		ar & genMin_;
+		ar & genMax_;
+		ar & hasMutation_;
+	}
 };
 
 #endif /* CODE_FREEPARAM_HH_ */

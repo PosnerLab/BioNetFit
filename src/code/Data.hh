@@ -16,13 +16,15 @@
 #include "Utils.hh"
 #include "Swarm.hh"
 
-#define NAN 123456789
+#define NaN 123456789
 
 class Swarm;
 class Data {
 
 public:
 	Data(std::string path, Swarm * swarm, bool isExp);
+	Data();
+
 	void parseData();
 	std::string getPath();
 
@@ -31,12 +33,14 @@ public:
 	void getColumnAverages();
 	void logTransformData();
 
-	std::map<std::string,std::map<double,double> > * dataCurrent_; // This points to the most recently modified version of the data
-	std::map<std::string,std::map<double,double> > standardDeviations_;
-	std::map<std::string,double> colAverages_;
+	std::map<std::string,std::map<double,double> > * dataCurrent; // This points to the most recently modified version of the data
+	std::map<std::string,std::map<double,double> > standardDeviations;
+	std::map<std::string,double> colAverages;
 
 private:
-	std::string dataPath_;
+	friend class boost::serialization::access;
+
+	std::string dataPath;
 
 	std::map<std::string,std::map<double,double> > dataOrig_;
 	std::map<std::string,std::map<double,double> > dataStandardized_;
@@ -45,6 +49,23 @@ private:
 
 	Swarm * swarm_;
 	bool isExp_;
+
+	template<typename Archive>
+	void serialize(Archive& ar, const unsigned version) {
+		std::cout << "serializing data" << std::endl;
+
+		ar & standardDeviations;
+		ar & colAverages;
+		ar & dataPath;
+		ar & dataOrig_;
+		ar & dataStandardized_;
+		ar & dataLogTransformed_;
+		ar & dataDividedByInit_;
+
+		ar & swarm_;
+		ar & isExp_;
+		ar & dataCurrent;
+	}
 };
 
 #endif /* DATA_HH_ */

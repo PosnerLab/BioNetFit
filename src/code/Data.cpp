@@ -16,51 +16,53 @@ using namespace std;
 Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	swarm_ = swarm;
 	isExp_ = isExp;
-	dataPath_ = convertToAbsPath(path);
+	dataPath = convertToAbsPath(path);
 
 	Data::parseData();
 
-	if ( (swarm_->options_.objFunc == 4 && isExp)) {
+	if ( (swarm_->options.objFunc == 4 && isExp)) {
 		//cout << "soscalc is 4" << endl;
 		getColumnAverages();
 	}
 
-	if (swarm_->options_.divideByInit && !isExp) {
+	if (swarm_->options.divideByInit && !isExp) {
 		//cout << "div by init" << endl;
 		divideByInit();
-		dataCurrent_ = &dataDividedByInit_;
+		dataCurrent = &dataDividedByInit_;
 	}
 
-	if (swarm_->options_.logTransformSimData > 0 && !isExp) {
+	if (swarm_->options.logTransformSimData > 0 && !isExp) {
 		//cout << "logsim" << endl;
 		logTransformData();
-		dataCurrent_ = &dataLogTransformed_;
+		dataCurrent = &dataLogTransformed_;
 	}
 
-	if (swarm_->options_.standardizeSimData && !isExp) {
+	if (swarm_->options.standardizeSimData && !isExp) {
 		cout << "stand sim" << endl;
-		if (swarm_->options_.objFunc != 4) {
+		if (swarm_->options.objFunc != 4) {
 			//cout << "gca sim" << endl;
 			getColumnAverages();
 		}
 		standardizeData();
-		dataCurrent_ = &dataStandardized_;
+		dataCurrent = &dataStandardized_;
 	}
 
-	if (swarm_->options_.standardizeExpData && isExp) {
+	if (swarm_->options.standardizeExpData && isExp) {
 		cout << "stand exp" << endl;
-		if (swarm_->options_.objFunc != 4) {
+		if (swarm_->options.objFunc != 4) {
 			//cout << "gca exp" << endl;
 			getColumnAverages();
 		}
 		standardizeData();
-		dataCurrent_ = &dataStandardized_;
+		dataCurrent = &dataStandardized_;
 	}
 }
 
+Data::Data() {}
+
 std::string Data::getPath() {
-	if (!dataPath_.empty())
-		return dataPath_;
+	if (!dataPath.empty())
+		return dataPath;
 	else
 		return "empty";
 }
@@ -68,17 +70,17 @@ std::string Data::getPath() {
 void Data::parseData(){
 	vector<string> allLines;
 
-	if (swarm_->options_.usePipes){
+	if (swarm_->options.usePipes){
 		char buf[5120];
 		string line;
-		int fd = open(dataPath_.c_str(), O_RDONLY);
+		int fd = open(dataPath.c_str(), O_RDONLY);
 
 		if (fd < 0) {
-			cout << "couldn't open " << dataPath_ << endl;
+			cout << "couldn't open " << dataPath << endl;
 		}
 
 		int len;
-		while( len = read(fd, buf, 5120 )){
+		while( (len = read(fd, buf, 5120) )){
 			buf[len] = 0;
 			line = string(buf);
 			//cout << line << "!";
@@ -93,7 +95,7 @@ void Data::parseData(){
 	}
 	else {
 
-		ifstream dataFile(dataPath_);
+		ifstream dataFile(dataPath);
 
 		std::string line;
 		std::string errMsg;
@@ -104,17 +106,17 @@ void Data::parseData(){
 			}
 		}
 		else {
-			errMsg = "Error: Couldn't open data file " + dataPath_ + " for parsing.";
+			errMsg = "Error: Couldn't open data file " + dataPath + " for parsing.";
 			outputError(errMsg);
 		}
 		dataFile.close();
 	}
 
-	string basename = regex_replace(getFilename(dataPath_),regex("_\\d+$"),"");
+	string basename = regex_replace(getFilename(dataPath),regex("_\\d+$"),"");
 
 
 	if(allLines[0].at(0) != '#') {
-		string errMsg = "Error: Your data file (" + dataPath_ + ") doesn't contain (#) as the first value.";
+		string errMsg = "Error: Your data file (" + dataPath + ") doesn't contain (#) as the first value.";
 		outputError(errMsg);
 	}
 
@@ -130,7 +132,7 @@ void Data::parseData(){
 		for(vector<string>::iterator col = columns.begin(); col != columns.end(); ++col) {
 
 			// Skip column if we encounter a hash, a 'time' column, or a column corresponding to a scan parameter name
-			if (*col == "#" || *col == "time" || *col == swarm_->options_.model->actions.at(basename).scanParam){
+			if (*col == "#" || *col == "time" || *col == swarm_->options.model->actions.at(basename).scanParam){
 				continue;
 			}
 
@@ -138,9 +140,9 @@ void Data::parseData(){
 			if (col->size() > 3 && col->find("_SD") == col->size()-3) {
 				string colWithoutSD = regex_replace(*col,regex("_SD$"),"");
 				//cout << "inserting sd at col " << colWithoutSD << ": " << stof(values[0]) << " " << stof(values[i]) << endl;
-				//standardDeviations_[col].insert(make_pair(stof(values[0]),stof(values[i])));
-				standardDeviations_[colWithoutSD][stod(values[0])] = stod(values[i]);
-				//cout << "test " << colWithoutSD << ": " << standardDeviations_[colWithoutSD][stof(values[0])] << endl;
+				//standardDeviations[col].insert(make_pair(stof(values[0]),stof(values[i])));
+				standardDeviations[colWithoutSD][stod(values[0])] = stod(values[i]);
+				//cout << "test " << colWithoutSD << ": " << standardDeviations[colWithoutSD][stof(values[0])] << endl;
 				// TODO: Make sure all SD's have values if we're using objfunc 2, lest we div_by_0
 				// TODO: Make sure all normal columns also have SD columns if we're using objfunc 2
 			}
@@ -154,8 +156,8 @@ void Data::parseData(){
 		}
 	}
 
-	// Always keep dataCurrent_ pointing to the most recent version of the data.
-	dataCurrent_ = &dataOrig_;
+	// Always keep dataCurrent pointing to the most recent version of the data.
+	dataCurrent = &dataOrig_;
 }
 
 void Data::standardizeData() {
@@ -167,10 +169,10 @@ void Data::standardizeData() {
 	double stdev;
 
 	// Loop through data map
-	for(map<string,map<double,double> >::iterator c = dataCurrent_->begin(); c != dataCurrent_->end(); ++c) {
+	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
 
 		// Grab our mean, which has already been calculated
-		mean = colAverages_[c->first];
+		mean = colAverages[c->first];
 		sqtotal = 0;
 		counter = 0;
 
@@ -182,7 +184,7 @@ void Data::standardizeData() {
 		// Here we get the riemann sum squared for use in the stdev calculation
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "sd loop" << endl;
-			if (v->second == NAN) {
+			if (v->second == NaN) {
 				continue;
 			}
 			sqtotal += pow(mean - v->second, 2);
@@ -195,8 +197,8 @@ void Data::standardizeData() {
 		// Loop through and set values according to formula: val_new = (val_old - column_mean) / (column_stdev)
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "stand loop" << endl;
-			if (v->second == NAN) {
-				dataStandardized_[c->first][v->first] = NAN;
+			if (v->second == NaN) {
+				dataStandardized_[c->first][v->first] = NaN;
 				continue;
 			}
 			//cout << "inserting: " << (v->second - mean) / stdev << endl;
@@ -206,14 +208,14 @@ void Data::standardizeData() {
 }
 
 void Data::divideByInit() {
-	for(map<string,map<double,double> >::iterator c = dataCurrent_->begin(); c != dataCurrent_->end(); ++c) {
+	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			if (v->second == 0) {
 				string errMsg = "You chose to divide_by_init, but the first value in the column '" + c->first + "' is 0. We cannot divide by 0.";
 				outputError(errMsg);
 			}
-			if (v->second == NAN) {
-				dataDividedByInit_[c->first][v->first] = NAN;
+			if (v->second == NaN) {
+				dataDividedByInit_[c->first][v->first] = NaN;
 				continue;
 			}
 			dataDividedByInit_[c->first][v->first] = v->second / c->second.begin()->first;
@@ -225,7 +227,7 @@ void Data::divideByInit() {
 void Data::getColumnAverages() {
 	double sum;
 	int counter;
-	for(map<string,map<double,double> >::iterator c = dataCurrent_->begin(); c != dataCurrent_->end(); ++c) {
+	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
 		cout << "gca col loop" << endl;
 
 		sum = 0;
@@ -233,28 +235,28 @@ void Data::getColumnAverages() {
 
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "gca tp loop" << endl;
-			if (v->second == NAN) {
+			if (v->second == NaN) {
 				continue;
 			}
 			sum += v->second;
 			counter++;
 		}
-		colAverages_.insert(pair<string,double>(c->first,sum/counter));
+		colAverages.insert(pair<string,double>(c->first,sum/counter));
 	}
 }
 
 void Data::logTransformData() {
-	for(map<string,map<double,double> >::iterator c = dataCurrent_->begin(); c != dataCurrent_->end(); ++c) {
+	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			if (v->second == 0) {
 				string errMsg = "You chose to log transform simulation output, but the first value in the column '" + c->first + "' is 0. We cannot take the log of 0.";
 				outputError(errMsg);
 			}
-			else if (v->second == NAN) {
-				dataLogTransformed_[c->first][v->first] = NAN;
+			else if (v->second == NaN) {
+				dataLogTransformed_[c->first][v->first] = NaN;
 				continue;
 			}
-			dataLogTransformed_[c->first][v->first] = log10(v->second)/log10(swarm_->options_.logTransformSimData);
+			dataLogTransformed_[c->first][v->first] = log10(v->second)/log10(swarm_->options.logTransformSimData);
 		}
 	}
 }

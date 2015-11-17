@@ -18,7 +18,7 @@ void Pheromones::init(Swarm *s) {
 	swarm_ = s;
 
 	// Using MPI
-	if (swarm_->options_.useCluster) {
+	if (swarm_->options.useCluster) {
 		// Set up our MPI environment and communicator
 		mpi::environment *env_ = new mpi::environment();
 		mpi::communicator *world_ = new mpi::communicator();
@@ -75,7 +75,7 @@ void Pheromones::init(Swarm *s) {
 
 void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message) {
 	// Using MPI
-	if (swarm_->options_.useCluster) {
+	if (swarm_->options.useCluster) {
 		std::vector<int> receivers;
 
 		// Sending to the entire swarm
@@ -104,8 +104,6 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 	}
 	// Using IPC
 	else {
-
-
 		std::vector<int> receivers;
 
 		// Sending to entire swarm
@@ -130,8 +128,8 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			}
 
 			// Receive a message from master containing list of running particles
-			std::vector<std::vector<std::string>> messageHolder;
-			recvMessage(0,senderID,SEND_RUNNING_PARTICLES,true,messageHolder);
+			//std::vector<std::vector<std::string>> messageHolder;
+			recvMessage(0,senderID,SEND_RUNNING_PARTICLES,true, univMessageReceiver);
 			//std::cout << "got list of running particles. sending message" << std::endl;
 
 			// [RECEIVER]
@@ -144,13 +142,19 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			//		...
 
 			// Add all running particles to list of message receivers
-			for (std::vector<std::string>::iterator r = messageHolder[0].begin(); r != messageHolder[0].end(); ++r) {
-				receivers.push_back( atoi(r->c_str()) );
+			//for (std::vector<std::string>::iterator r = messageHolder[0].begin(); r != messageHolder[0].end(); ++r) {
+			//	receivers.push_back( atoi(r->c_str()) );
+			//}
+			swarmMsgHolderIt sm = univMessageReceiver.find(SEND_RUNNING_PARTICLES);
+			for (std::vector<std::string>::iterator m = sm->second.message.begin(); m != sm->second.message.end(); ++m) {
+				receivers.push_back( atoi(m->c_str()) );
+				//std::cout << "adding receiver: " << m->c_str() << std::endl;
 			}
 		}
 		else {
 			// If we're not sending to swarm, add receiverID to list of message receivers
 			// In this case, the list will only contain 1 item
+			//std::cout << "adding receiverr: " << receiverID << std::endl;
 			receivers.push_back(receiverID);
 		}
 
@@ -185,12 +189,11 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 				//std::cout << "storing vector in swarm map to receiver: " << *r << " with tag: " << tag << std::endl;
 				// Insert vector to map
 				swarmMap_->insert(std::pair<const int,MyVector_>(*r,*swarmVec_));
-				string tests = lexical_cast<string>(*(swarmMap_->find(*r)->second.begin()));
+				//string tests = lexical_cast<string>(*(swarmMap_->find(*r)->second.begin()));
 				//std::cout << "swarmmap is now: " << swarmMap_->size() << " " <<  tests << std::endl;
 				swarmVec_->clear();
 			}
 		}
-		//std::cout << "done sending " << std::endl;
 
 		// Add code to check whether message was seen or not. Only move on once it's gone
 		if (block) {
@@ -207,15 +210,97 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			}
 		}
 	}
-	//std::cout << "really done sending " << std::endl;
 }
 
-int Pheromones::recvMessage(signed int senderID,const int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage) {
+//int Pheromones::recvMessage(signed int senderID,const int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage) {
+int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, bool block, swarmMsgHolder &messageHolder, bool eraseMessage) {
 	int numMessages = 0;
-	if (swarm_->options_.useCluster) {
+	if (swarm_->options.useCluster) {
 
 	}
 	else {
+		//std::cout << "in rcv msg" << std::endl;
+
+		while (1) {
+			if (!swarmMap_->empty()) {
+				//std::cout << "sm size: " << swarmMap_->size() << std::endl;
+
+				MyMap_::iterator s = swarmMap_->find(receiverID);
+
+				if (s != swarmMap_->end()) {
+					//std::cout << receiverID << " found message" << std::endl;
+					// Lock the mutex so no other processes can access the shared memory
+					scoped_lock<interprocess_mutex> lock(*mutex_);
+
+					int currTag;
+					int currSender;
+
+					for (MyVector_::iterator v = s->second.begin(); v != s->second.end(); ) {
+						std::string theString = lexical_cast<std::string>(*v);
+						//std::cout << "msg: " << *v << std::endl;
+						if (!theString.empty() && stoi(theString) < -10) {
+							swarmMessage smessage;
+
+							currTag = lexical_cast<int>(*v);
+							v+=2;
+							currSender = lexical_cast<int>(*v);
+
+							if ( (tag == -1 || currTag == tag) && (senderID == -1 || senderID == currSender) ) {
+								numMessages += 1;
+								smessage.tag = currTag;
+								//std::cout << "currTag is " << currTag << std::endl;
+								smessage.sender = currSender;
+								//std::cout << "currSender is " << currSender << std::endl;
+								--v;
+								smessage.id = lexical_cast<int>(*v);
+								//std::cout << "id " << smessage.id << std::endl;
+
+								v+=2;
+								int size = lexical_cast<int>(*v);
+								//std::cout << "size is " << size << std::endl;
+
+								for (int i = 0; i < size; ++i) {
+									++v;
+									smessage.message.push_back(lexical_cast<std::string>(*v));
+								}
+								//std::cout << "inserting: " << lexical_cast<std::string>(*v) << std::endl;
+								messageHolder.insert(std::pair<int, swarmMessage>(currTag, smessage));
+								//messageHolder[currTag] = smessage;
+
+								if (eraseMessage) {
+									// Jump to beginning of message
+									v -= (size+3);
+									for (int i = 0; i <= (size+3); ++i) {
+										//std::cout << "erasing: " << *v << std::endl;
+										//sleep(1);
+										v = s->second.erase(v);
+									}
+									//sleep(10);
+								}
+								else {
+									++v;
+								}
+							}
+						}
+					}
+					if (s->second.empty()) {
+						//std::cout << "erasing map pair" << std::endl;
+						s = swarmMap_->erase(s);
+					}
+				}
+			}
+			if (block && numMessages < 1) {
+				usleep(10000);
+				//std::cout << "wait" << std::endl;
+			}
+			else {
+				//std::cout << "going to break" << std::endl;
+				break;
+			}
+		}
+	}
+
+	/*
 		while (1) {
 			if (!swarmMap_->empty()) {
 				//std::cout << "sm size: " << swarmMap_->size() << std::endl;
@@ -237,6 +322,7 @@ int Pheromones::recvMessage(signed int senderID,const int receiverID, int tag, b
 							// Set our tag and sender
 
 							currTag = lexical_cast<int>(*v);
+
 							v+=2;
 							currSender = lexical_cast<int>(*v);
 							v-=2;
@@ -293,7 +379,6 @@ int Pheromones::recvMessage(signed int senderID,const int receiverID, int tag, b
 				break;
 			}
 		}
-		//std::cout << "out of loop?" << std::endl;
-	}
+	 */
 	return numMessages;
 }

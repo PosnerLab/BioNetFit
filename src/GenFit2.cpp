@@ -3,23 +3,22 @@
 // Author      : Brandon Thomas
 // Version     :
 // Copyright   : 
-// Description : Hello World in C++, Ansi-style
+// Description :
 //============================================================================
 
 #include <iostream>
-#include <mpi.h>
-#include <sys/shm.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <unistd.h>
+
+//#include <mpi.h>
+//#include <sys/shm.h>
+//#include <sys/types.h>
+//#include <fcntl.h>
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <sys/stat.h>
+//#include <sys/wait.h>
+//#include <unistd.h>
 
 #include "GenFit2.hh"
-
-#define MAX_BUF 1024
 
 using namespace std;
 
@@ -27,7 +26,7 @@ int main(int argc, char *argv[]) {
 
 	srand(clock());
 
-	int generation;
+	int generation = 0;
 	string action;
 	string configFile;
 	string type;
@@ -86,35 +85,64 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Regardless of type or action, we need to set up the Swarm
-	Timer tmr;
+	//Timer tmr;
 
 	Config myconfig(configFile);
 
-	double t = tmr.elapsed();
-	cout << "Adding .conf took " << t << " seconds" << endl;
+	//double t = tmr.elapsed();
+	//cout << "Adding .conf took " << t << " seconds" << endl;
 
-	tmr.reset();
-	Swarm *s = myconfig.createSwarmFromConfig((type=="master") ? true : false);
+	//tmr.reset();
 
-	t = tmr.elapsed();
-	cout << "Processing .conf took " << t << " seconds" << endl;
-	s->setType(type);
-	s->setExePath(argv[0]);
-	if (generation) {
-		s->currentGeneration_ = generation;
-	}
-
-	// We are the master
+	Swarm *s;
 	if (type == "master") {
+		s = myconfig.createSwarmFromConfig((type=="master") ? true : false);
+
+		//t = tmr.elapsed();
+		//cout << "Processing .conf took " << t << " seconds" << endl;
+		s->setType(type);
+		s->setExePath(argv[0]);
+		s->initComm();
+
+		if (generation) {
+			cout << "setting gen to " << generation << endl;
+			s->currentGeneration = generation;
+		}
+
+		cout << "trying to serialize swarm class" << endl;
+
+		std::ofstream ofs("swarm.txt");
+		if (ofs.is_open()) {
+			boost::archive::text_oarchive ar(ofs);
+			ar & s;
+			ofs.close();
+		}
+
 		s->setIsMaster(true);
 		s->doSwarm();
 	}
+
 	// We are a particle
 	else if (type == "particle"){
+
+		// Create and input archive
+		std::ifstream ifs("swarm.txt");
+		if (ifs.is_open()) {
+			boost::archive::text_iarchive ar(ifs);
+
+			cout << "particle trying to load swarm";
+			// Load data
+			ar & s;
+			ifs.close();
+		}
+
 		s->setIsMaster(false);
+		s->setExePath(argv[0]);
+		s->initComm();
 		Particle *p = s->createParticle(pID);
 		p->setModel(s->getModel());
-		if (generation == 1) {
+
+		if (s->currentGeneration == 1) {
 			p->generateParams();
 		}
 		p->doParticle();

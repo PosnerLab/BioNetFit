@@ -29,7 +29,14 @@ public:
 	void createConfigFromSwarm ();
 
 private:
+	friend class boost::serialization::access;
+
 	std::string configPath_;
+
+	template<typename Archive>
+	void serialize(Archive& ar, const unsigned version) {
+		ar & configPath_;
+	}
 };
 
 #endif /* CONFIG_HH_ */

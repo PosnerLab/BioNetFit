@@ -32,6 +32,7 @@ class Model {
 
 public:
 	Model(std::string path);
+	Model();
 
 	std::string getLocation();
 	int makeCopyofOrig(std::string newLocation);
@@ -50,16 +51,29 @@ public:
 		std::string scanParam = "";
 
 		Data *dataSet;
+
+		template<typename Archive>
+		void serialize(Archive& ar, const unsigned version) {
+
+			ar & full;
+			ar & t_end;
+			ar & type;
+			ar & scanParam;
+
+			ar & dataSet;
+		}
 	};
 
-	const std::map<std::string, FreeParam*>& getFreeParams() const {
+	const std::map<std::string, FreeParam*>& getfreeParams_() const {
 		return freeParams_;
 	}
 
 	// Map key contains the action prefix, map value contains the action information
-	std::unordered_map<std::string,action > actions;
+	std::unordered_map<std::string, action> actions;
 
 private:
+	friend class boost::serialization::access;
+
 	void parseModel();
 
 	std::string modelPath_;
@@ -68,7 +82,22 @@ private:
 
 	bool hasGenerateNetwork_ = false;
 	//std::map<std::string,std::string> freeParams_;
-	std::map<std::string,FreeParam*> freeParams_;
+	std::map<std::string, FreeParam*> freeParams_;
+
+	template<typename Archive>
+	void serialize(Archive& ar, const unsigned version) {
+		//std::cout << " serializing model" << std::endl;
+
+		ar & freeParams_;
+
+		ar & actions;
+		ar & modelPath_;
+		ar & fullContents_;
+		ar & netContents_;
+
+		ar & hasGenerateNetwork_;
+
+	}
 };
 
 #endif /* MODEL_HH_ */

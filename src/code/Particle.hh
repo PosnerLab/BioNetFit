@@ -38,22 +38,13 @@ public:
 	int getID() { return id_; }
 	void doParticle();
 	void calculateFit();
-	void setBasePath(std::string path) { basePath_ = path; }
+	//void setBasePath(std::string path) { basePath_ = path; }
 	void generateParams();
 
 	std::unordered_map<int,double> fitCalcs;
 
 private:
-	typedef double (Particle::*objFunc)(double exp,double sim ,double stdev);
-	objFunc objFuncPtr;
-
-	Model * model_;
-	std::map<std::string,double> simParams_;
-	int id_;
-	std::unordered_map<std::string,Data*> dataFiles_;
-	std::string basePath_;
-	std::string state_; // Stopped, running, simulating, analyzing, results, breeding, waiting
-	Swarm * swarm_;
+	friend class boost::serialization::access;
 
 	double objFunc_chiSquare(double sim, double exp, double stdev);
 	double objFunc_sumOfSquares(double sim, double exp, double dummyvar);
@@ -63,5 +54,27 @@ private:
 	void initBreedWithParticle(int pID, int swapID);
 	void rcvBreedWithParticle(std::vector<std::string>& params, int reciprocateTo, int swapID, int pID);
 	double mutateParam(FreeParam* fp, double paramValue);
+
+	typedef double (Particle::*objFunc)(double exp,double sim ,double stdev);
+
+	objFunc objFuncPtr;
+
+	Model * model_;
+	std::map<std::string,double> simParams_;
+	int id_;
+	std::unordered_map<std::string,Data*> dataFiles_;
+	std::string state_; // Stopped, running, simulating, analyzing, results, breeding, waiting
+	Swarm * swarm_;
+
+	template<typename Archive>
+	void serialize(Archive& ar, const unsigned version) {
+
+		ar & model_;
+		ar & simParams_;
+		ar & id_;
+		ar & dataFiles_;
+		ar & state_;
+		ar & swarm_;
+	}
 };
 #endif /* PARTICLE_HH_ */

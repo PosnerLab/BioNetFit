@@ -10,11 +10,24 @@
 using namespace std;
 using namespace std::chrono;
 
-Swarm::Swarm(bool isMaster) {
+Swarm::Swarm(bool master) {
 
 	// Whether or not we are master
-	isMaster_ = isMaster;
+	isMaster = master;
 
+	// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
+	// Seed our random number engine
+	randNumEngine.seed(std::random_device{}());
+	randNumEngine.discard(700000);
+	srand (std::random_device{}());
+}
+
+Swarm::Swarm() {
+	cout << "in default" << endl;
+	options.swarmType = "test";
+}
+
+void Swarm::initComm() {
 	// Create the comunication class
 	Pheromones *ph = new Pheromones();
 
@@ -22,12 +35,7 @@ Swarm::Swarm(bool isMaster) {
 	ph->init(this);
 
 	// Set our communication class
-	swarmComm_ = ph;
-
-	// Seed our random number engine
-	randNumEngine.seed(std::random_device{}());
-	randNumEngine.discard(700000);
-	srand (std::random_device{}());
+	swarmComm = ph;
 }
 
 void Swarm::addExp(string path) {
@@ -37,7 +45,7 @@ void Swarm::addExp(string path) {
 	string basename = getFilename(path);
 
 	//cout << "inserting EXP?" << endl;
-	this->options_.expFiles.insert(make_pair(basename, new Data(path, this, true)));
+	this->options.expFiles.insert(make_pair(basename, new Data(path, this, true)));
 	//cout << "exp inserted" << endl;
 
 	double t = tmr.elapsed();
@@ -49,7 +57,7 @@ void Swarm::setModel(string path) {
 
 	path = convertToAbsPath(path);
 	//cout << "setting model" << endl;
-	this->options_.model = new Model(path);
+	this->options.model = new Model(path);
 	//cout << "model set" << endl;
 
 	double t = tmr.elapsed();
@@ -57,23 +65,23 @@ void Swarm::setModel(string path) {
 }
 
 void Swarm::setSwarmSize(int size) {
-	this->options_.swarmSize = size;
+	this->options.swarmSize = size;
 }
 
 void Swarm::setSwarmType(string type) {
-	this->options_.swarmType = type;
+	this->options.swarmType = type;
 }
 
 void Swarm::setSwarmSynchronicity(int synchronicity) {
-	this->options_.synchronicity = synchronicity;
+	this->options.synchronicity = synchronicity;
 }
 
 void Swarm::setSwarmGenerations(int generations) {
-	this->options_.maxGenerations = generations;
+	this->options.maxGenerations = generations;
 }
 
 void Swarm::setSwarmMinFit(float minfit) {
-	this->options_.minFit = minfit;
+	this->options.minFit = minfit;
 }
 
 bool Swarm::checkSwarmConsistency() {
@@ -84,22 +92,23 @@ void Swarm::addMutate(std::string mutateString) {
 	vector<string> mutComponents;
 	split(mutateString, mutComponents);
 
+	// TODO: Should the parsing belong in the Config class? Maybe.
 	// Make sure we have three components to work with
 	if (mutComponents.size() == 3) {
 		// Make sure first parameter name exists as a free parameter
-		if (options_.model->freeParams_.count(mutComponents[0]) > 0 || mutComponents[0] == "default") {
+		if (options.model->freeParams_.count(mutComponents[0]) > 0 || mutComponents[0] == "default") {
 			// Make sure 2nd and 3rd components are numeric
 			if (isFloat(mutComponents[1]) && isFloat(mutComponents[2])) {
 				if (mutComponents[0] != "default") {
 					cout << "not default" << endl;
-					options_.model->freeParams_.at(mutComponents[0])->setMutationRate(stof(mutComponents[1]));
-					options_.model->freeParams_.at(mutComponents[0])->setMutationFactor(stof(mutComponents[2]));
-					options_.model->freeParams_.at(mutComponents[0])->setHasMutation(true);
+					options.model->freeParams_.at(mutComponents[0])->setMutationRate(stof(mutComponents[1]));
+					options.model->freeParams_.at(mutComponents[0])->setMutationFactor(stof(mutComponents[2]));
+					options.model->freeParams_.at(mutComponents[0])->setHasMutation(true);
 
 					//cout << "setting " << mutComponents[0] << " to " << mutComponents[1] << ":" << mutComponents[2] << endl;
 				}
 				else {
-					for (map<string,FreeParam*>::iterator fp = options_.model->freeParams_.begin(); fp != options_.model->freeParams_.end(); ++fp) {
+					for (map<string,FreeParam*>::iterator fp = options.model->freeParams_.begin(); fp != options.model->freeParams_.end(); ++fp) {
 						//cout << "setting " << mutComponents[0] << " to " << mutComponents[1] << ":" << mutComponents[2] << endl;
 
 						fp->second->setMutationRate(stof(mutComponents[1]));
@@ -128,61 +137,53 @@ void Swarm::doSwarm() {
 	// Generate all particles that will be present in the swarm
 	allParticles_ = generateInitParticles();
 
-	// If we are running ODE, we want to generate a network and network reader.
-	// The network file has parameters that are replaced in every generation,
-	// and the network reader is used to read those network files
-	if (options_.model->getHasGenerateNetwork()) {
-
-		// First create a particle which will generate the network
-		// and fill it with dummy params
-		allParticles_.at(1)->setModel(options_.model);
-		allParticles_.at(1)->generateParams();
-
-		// Output model file with dummy parameters. This file will be used to generate
-		// our initial network
-		options_.model->outputModelWithParams(allParticles_.at(1)->getParams(), options_.outputDir, "base.bngl", "", false, false, false, false, false);
-
-		// Construct our simulation command and run the network generator
-		string modelPath = options_.outputDir + "/base.bngl";
-		string command = "/home/brandon/projects/GenFit/Simulators/BNG2.pl --outdir " + options_.outputDir + " " + modelPath + " >> " + options_.outputDir + "/netgen_output 2>&1";
-		int ret = system(command.c_str());
-
-		// Now that we have a .net file, replace the full .bngl with a .bngl
-		// containing ONLY action commands and a .net file loader. This is
-		// used later to run our .net files.
-		options_.model->outputModelWithParams(allParticles_.at(1)->getParams(), options_.outputDir, "base.bngl", "", false, true, false, false, false);
-
-		// Now store our .net file for later use
-		string netPath = options_.outputDir + "/base.net";
-		options_.model->parseNet(netPath);
-	}
-
 	// Main swarming loops
-	if (options_.synchronicity == 1) {
+	if (options.synchronicity == 1) {
 
-		string createDirCmd = "mkdir " + options_.outputDir + "/1";
+		// TODO: Error checking
+		string createDirCmd = "mkdir " + options.outputDir + "/1";
 		system(createDirCmd.c_str());
 
-		while (currentGeneration_ < options_.maxGenerations){
+		while (currentGeneration < options.maxGenerations){
 			runGeneration();
 
-			string currentDirectory = options_.outputDir + "/" + to_string(currentGeneration_);
-			if (options_.deleteOldFiles) {
+			string currentDirectory = options.outputDir + "/" + to_string(currentGeneration);
+			if (options.deleteOldFiles) {
 				cleanupFiles(currentDirectory.c_str());
 			}
 
-			if (currentGeneration_ < options_.maxGenerations) {
+			if (currentGeneration < options.maxGenerations) {
 				breedGeneration();
 			}
 		}
 		cout << "fit finished " << endl;
 		finishFit();
 	}
+	else {
+		int finishedSimulations = options.swarmSize;
+		double totalFitTime;
+
+		runGeneration();
+		while(1) {
+			finishedSimulations += checkMasterMessages;
+
+			if (options.maxNumSimulations && finishedSimulations > options.maxNumSimulations) {
+				break;
+			}
+			if (options.maxFitTime && totalFitTime > options.maxFitTime) {
+				break;
+			}
+			if (options.minFit && allGenFits.begin()->first < options.maxFitTime) {
+				break;
+			}
+		}
+		finishFit();
+	}
 }
 
 Particle * Swarm::createParticle(int pID) {
 	Particle * p = new Particle(this, pID);
-	p->setBasePath(particleBasePath_);
+	//p->setBasePath(particleBasePath_);
 
 	return p;
 }
@@ -196,9 +197,7 @@ unordered_map<int,Particle*> Swarm::generateInitParticles(int pID) {
 	// Why not just keep track of them as integers? Maybe as backups in case
 	// any of them fail??
 	if (pID == -1) {
-		for (int i = 1; i <= options_.swarmSize; i++) {
-			//Particle *p = new Particle(i);
-			//p->setBasePath(particleBasePath_);
+		for (int i = 1; i <= options.swarmSize; i++) {
 			allParticles[i] = createParticle(i);
 		}
 	}
@@ -208,16 +207,13 @@ unordered_map<int,Particle*> Swarm::generateInitParticles(int pID) {
 	cout << "Particle creation took " << t << " seconds" << endl;
 }
 
-void Swarm::launchParticle(Particle *p) {
+void Swarm::launchParticle(int pID) {
 
-	if (options_.useCluster) {
-
-	}
-	else {
+	if (currentGeneration == 1) {
 		//string rm = "rm " + to_string(p->getID());
 		//system(rm.c_str());
 		int i;
-		string command = exePath_ + " particle " + to_string(p->getID()) + " run " + to_string(currentGeneration_) + " " + configPath_;
+		string command = exePath_ + " particle " + to_string(pID) + " run " + to_string(currentGeneration) + " " + configPath_;
 		//if (p->getID() == 10) {
 		//command = command + ">> " + to_string(p->getID()) + " 2>&1";
 		command = command + ">> pOUT 2>&1";
@@ -227,152 +223,61 @@ void Swarm::launchParticle(Particle *p) {
 		//string path = particleBasePath_ + to_string(p->getID());
 		//createParticlePipe(path.c_str());
 
-		if (options_.verbosity >= 3) {
-			cout << "Running Particle " << p->getID() << endl;
+		if (options.verbosity >= 3) {
+			cout << "Running Particle " << pID << endl;
 		}
 
 		i = system(command.c_str());
 		//runningParticles_[p] = "";
-		runningParticles_.insert(p->getID());
+		runningParticles_.insert(pID);
 	}
+	else {
+		cout << "Launching particle " << pID << endl;
+		swarmComm->sendToSwarm(0, pID, NEXT_GENERATION, false, swarmComm->univMessageSender);
+		runningParticles_.insert(pID);
+	}
+	runningParticles_.insert(pID);
 }
 
 void Swarm::setUseCluster(bool useCluster) {
-	options_.useCluster = useCluster;
+	options.useCluster = useCluster;
 }
 
 void Swarm::setCurrentGen(int gen) {
-	currentGeneration_ = gen;
+	currentGeneration = gen;
 }
 
 void Swarm::runGeneration () {
 	// TODO: Implement walltime
-	if(options_.verbosity >= 1) {
-		cout << "Running generation " << currentGeneration_ + 1 << " with " << allParticles_.size() << " particles..." << endl;
+	if(options.verbosity >= 1) {
+		cout << "Running generation " << currentGeneration << " with " << allParticles_.size() << " particles..." << endl;
 	}
 
-	currentGeneration_ += 1;
+	pair<int, int> finishedAndFailedParticles;
 
-	std::vector<std::vector<std::string>> messageHolder;
-	int numMessages = 0;
 	int numLaunchedParticles = 0;
 	int numFinishedParticles = 0;
 	unordered_map<int,Particle*>::iterator p = allParticles_.begin();
 
-	while (numFinishedParticles < options_.swarmSize) {
+	while (numFinishedParticles < options.swarmSize) {
 		// Launch particles (staying within bounds of parallel_count)
-		if (runningParticles_.size() < options_.parallelCount && numLaunchedParticles < options_.swarmSize) {
-			if (currentGeneration_ == 1) {
-				launchParticle(p->second);
-			}
-			else {
-				swarmComm_->sendToSwarm(0, p->first, NEXT_GENERATION, false, swarmComm_->univMessageSender);
-				runningParticles_.insert(p->first);
-			}
+		if (runningParticles_.size() < options.parallelCount && numLaunchedParticles < options.swarmSize) {
+			launchParticle(p->first);
 			numLaunchedParticles += 1;
 			++p;
 		}
 
 		// Check for any messages from particles
 		usleep(10000);
-		//cout << "checking messages" << endl;
-		numMessages = swarmComm_->recvMessage(-1, 0, -1, false, messageHolder);
+		numFinishedParticles += checkMasterMessages();
 
-		if (numMessages >= 1) {
-			//cout << "found message" << endl;
-			// First loop through individual messages
-			for (std::vector<std::vector<std::string>>::iterator i = messageHolder.begin(); i != messageHolder.end(); ++i) {
-				/// Loop through message contents
-				//for (std::vector<std::string>::iterator o = (*i).begin(); o != (*i).end(); ++o) {
-				std::vector<std::string>::iterator o = (*i).begin();
-
-				if (stoi(*o) == SIMULATION_END || stoi(*o) == SIMULATION_FAIL) {
-
-					// Jump to the particle ID and store it
-					o+=2;
-					int pID = stoi(*o);
-					o-=2;
-
-					//cout << "found simulation end for" << pID << endl;
-
-					// Get an iterator to the particle in our list of running particles
-					runningParticlesIterator_ = runningParticles_.find(pID);
-					// Then remove it
-					runningParticles_.erase(runningParticlesIterator_);
-					// Increment our finished counter
-					numFinishedParticles += 1;
-					//cout << "particle " << pID << " finished simulation" << endl;
-					// Jump back to the message tag
-
-					if (stoi(*o) == SIMULATION_FAIL) {
-						o+=2;
-						cout << "Particle " << pID << " failed in gen " << currentGeneration_ << endl;
-
-						// Store particle ID in our list of failed particles
-						failedParticles_.insert(stoi(*o));
-
-						// Give the particle a very large fit value
-						//allParticles_.at(pID)->fitCalcs[currentGeneration_] = 1E10;
-						//currGenFits.push_back(allParticles_.at(pID));
-						//allGenFits.insert(pair<double,string>(-1,""));
-					}
-					else {
-
-						// [TAG]
-						// [ID]
-						// [SENDER]
-						// [MESSAGESIZE]
-						// [ARR0]
-						// [ARR1]
-						// ...
-
-						string params = "gen" + to_string(currentGeneration_) + "perm" + to_string(pID) + " ";
-
-						o+=4; // Jump to the fit value
-						double fitCalc = stod(*o);
-
-						// Store the parameters given to us by the particle
-						while(1) {
-							o++;
-							if (o != (*i).end()) {
-								params += *o + " ";
-								//cout << "adding " << *o<< endl;
-							}
-							else {
-								//cout << "message end" << endl;
-								break;
-							}
-						}
-
-						// Then store it
-						//allParticles_.at(pID)->fitCalcs[currentGeneration_] = stod(*o);
-						//currGenFits.push_back(allParticles_.at(pID));
-						//cout << "saving fit for " << pID << " of " << fitCalc << endl;
-						allGenFits.insert(pair<double,string>(fitCalc,params));
-						//cout << "particle " << pID << " has fit calc of " << allGenFits.find(fitCalc)->first << endl;
-					}
-					//cout << "finished processing simulation end" << endl;
-				}
-				else if (stoi(*o) == GET_RUNNING_PARTICLES) {
-					vector<string> intParts;
-					for (auto i: runningParticles_) {
-						intParts.push_back(to_string(i));
-					}
-					o+=2;
-					swarmComm_->sendToSwarm(0,stoi(*o),SEND_RUNNING_PARTICLES,true,intParts);
-				}
-			}
-			messageHolder.clear();
-			numMessages = 0;
-		}
 	}
-	if (failedParticles_.size() > (options_.swarmSize - 3) ) {
+	if (failedParticles_.size() > (options.swarmSize - 3) ) {
 		outputError("Error: You had too many failed runs. Check simulation output or adjust walltime.");
 		//TODO: Cleanup and exit
 	}
 
-	// Sort current generation particle fit vector
-	//sort(currGenFits.begin(), currGenFits.end(), [this](Particle * a, Particle * b) {return sortFits(a, b);});
+	currentGeneration += 1;
 }
 
 void Swarm::cleanupFiles(const char * path) {
@@ -411,13 +316,13 @@ void Swarm::cleanupFiles(const char * path) {
 }
 
 bool Swarm::sortFits(Particle * a, Particle * b) {
-	return a->fitCalcs.at(currentGeneration_) < b->fitCalcs.at(currentGeneration_);
+	return a->fitCalcs.at(currentGeneration) < b->fitCalcs.at(currentGeneration);
 }
 
 void Swarm::breedGeneration() {
 	//Timer tmr;
 
-	string createDirCmd = "mkdir " + options_.outputDir + "/" + to_string(currentGeneration_ + 1);
+	string createDirCmd = "mkdir " + options.outputDir + "/" + to_string(currentGeneration);
 	system(createDirCmd.c_str());
 
 	// We let particles do the actual breeding.  The master's role is to generate a breeding pattern and
@@ -425,7 +330,7 @@ void Swarm::breedGeneration() {
 	/*
 	cout << "fit\tperm\t";
 
-	for (auto i: options_.model->freeParams_) {
+	for (auto i: options.model->freeParams_) {
 		cout << i.first << "\t";
 	}
 
@@ -457,7 +362,7 @@ void Swarm::breedGeneration() {
 	for (auto i: weights) {
 		cout << "weight diff: " << i.second << endl;
 	}*/
-	int parentPairs = options_.swarmSize / 2;
+	int parentPairs = options.swarmSize / 2;
 
 	//cout << "we have " << parentPairs << " parent pairs" << endl;
 
@@ -475,15 +380,15 @@ void Swarm::breedGeneration() {
 		swapID += 2;
 
 		// Pick the fit values (particle parents) used in breeding
-		p1 = pickWeighted(weightSum, weights, options_.extraWeight, randNumEngine);
-		p2 = pickWeighted(weightSum, weights, options_.extraWeight, randNumEngine);
+		p1 = pickWeighted(weightSum, weights, options.extraWeight, randNumEngine);
+		p2 = pickWeighted(weightSum, weights, options.extraWeight, randNumEngine);
 
 		// If we want different parents used in breeding, make sure that happens
 		int retryCount = 0;
-		while (p1 == p2 && options_.forceDifferentParents) {
+		while (p1 == p2 && options.forceDifferentParents) {
 			retryCount++;
-			if (retryCount > options_.maxRetryDifferentParents) {
-				if (options_.verbosity >= 3) {
+			if (retryCount > options.maxRetryDifferentParents) {
+				if (options.verbosity >= 3) {
 					cout << "Tried to many time to select different parents for breeding. Selecting the first two." << endl;
 				}
 
@@ -502,7 +407,7 @@ void Swarm::breedGeneration() {
 
 				break;
 			}
-			p2 = pickWeighted(weightSum, weights, options_.extraWeight, randNumEngine);
+			p2 = pickWeighted(weightSum, weights, options.extraWeight, randNumEngine);
 		}
 
 		//cout << "selected " << p1 << " and " << p2 << endl;
@@ -537,15 +442,15 @@ void Swarm::breedGeneration() {
 		//cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
 
 		// Add second parent and swapID to the message
-		swarmComm_->univMessageSender.push_back(to_string(swapID));
-		swarmComm_->univMessageSender.push_back(pID2);
+		swarmComm->univMessageSender.push_back(to_string(swapID));
+		swarmComm->univMessageSender.push_back(pID2);
 
 		// Send the message to the first parent
 		//cout << "sending message to " << stoi(pID1) << " with id of " << to_string(swapID) << endl;
 
 		// Tell parent 1 to initiate breeding
-		swarmComm_->sendToSwarm(0, stoi(pID1), INIT_BREEDING, false, swarmComm_->univMessageSender);
-		swarmComm_->univMessageSender.clear();
+		swarmComm->sendToSwarm(0, stoi(pID1), INIT_BREEDING, false, swarmComm->univMessageSender);
+		swarmComm->univMessageSender.clear();
 		numCurrBreeding+=2;
 
 		//double t = tmr.elapsed();
@@ -553,23 +458,25 @@ void Swarm::breedGeneration() {
 		//tmr.reset();
 
 		// While the current number of breeding particles is greater than twice the parallel count
-		while ( numCurrBreeding >= (options_.parallelCount * 15)) {
-			//cout << "checking for finished" << endl;
-			int numMessages = swarmComm_->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm_->univMessageReceiver, true);
-			//cout << "found " << numMessages << " finished" << endl;
+		while ( numCurrBreeding >= (options.parallelCount * 15)) {
+
+			int numMessages = swarmComm->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm->univMessageReceiver, true);
+
 			numFinishedBreeding+=numMessages;
 			numCurrBreeding-=numMessages;
 		}
 	}
-	while (numFinishedBreeding < options_.swarmSize) {
-		int numMessages = swarmComm_->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm_->univMessageReceiver, true);
+	while (numFinishedBreeding < options.swarmSize) {
+
+		int numMessages = swarmComm->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm->univMessageReceiver, true);
+
 		numFinishedBreeding+=numMessages;
 	}
 	//cout << "got them all!" << endl;
 }
 
 void Swarm::finishFit() {
-	string outputDir = options_.outputDir + "/Results";
+	string outputDir = options.outputDir + "/Results";
 	string command = "mkdir " + outputDir;
 
 	if (system(command.c_str())) {
@@ -580,9 +487,10 @@ void Swarm::finishFit() {
 	outputRunSummary(outputDir);
 	//generateBestFitModels(outputDir);
 	//copyBestFitToResults(outputDir);
+
 	killAllParticles(FIT_FINISHED);
 
-	cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options_.outputDir << "/Results" << endl;
+	cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options.outputDir << "/Results" << endl;
 }
 
 void Swarm::outputRunSummary(string outputDir) {
@@ -599,7 +507,7 @@ void Swarm::outputRunSummary(string outputDir) {
 		outputFile << left << setw(16) << "Fit" << left << setw(16) << "Permutation";
 
 		// Output parameter names
-		for (auto i: options_.model->freeParams_) {
+		for (auto i: options.model->freeParams_) {
 			outputFile << left << setw(16) << i.first;
 		}
 
@@ -630,23 +538,23 @@ void Swarm::outputRunSummary(string outputDir) {
 
 void Swarm::killAllParticles(int tag) {
 	for (auto p: allParticles_) {
-		swarmComm_->sendToSwarm(0, p.first, tag, false, swarmComm_->univMessageSender);
+		swarmComm->sendToSwarm(0, p.first, tag, false, swarmComm->univMessageSender);
 	}
 }
 
 void Swarm::getClusterInformation() {
 
 	// If user didn't specify cluster platform, let's figure it out ourself
-	if (options_.clusterSoftware.size() == 0) {
+	if (options.clusterSoftware.size() == 0) {
 		// Test for slurm
 		if (getOutputFromCommand("which srun").length() > 0) {
-			options_.clusterSoftware = "slurm";
+			options.clusterSoftware = "slurm";
 		}
 		// Test for PBS-type
 		else if (getOutputFromCommand("which qsub").length() > 0) {
 			// Test for Torque/PBS
 			if(getOutputFromCommand("which maui").length() > 0 || getOutputFromCommand("which moab").length() > 0) {
-				options_.clusterSoftware = "torque";
+				options.clusterSoftware = "torque";
 			}
 			// Test for SGE
 			else if (getOutputFromCommand("which sge_execd").length() > 0 || getOutputFromCommand("which qconf").length() > 0 || getOutputFromCommand("which qmon").length() > 0) {
@@ -655,13 +563,13 @@ void Swarm::getClusterInformation() {
 		}
 	}
 	else {
-		if (options_.clusterSoftware != "slurm" && options_.clusterSoftware != "torque") {
+		if (options.clusterSoftware != "slurm" && options.clusterSoftware != "torque") {
 			outputError("You specified an unrecognized cluster type in your .conf file. BioNetFit only supports 'torque' or 'slurm' cluster types.");
 		}
 	}
 
 	// If we still don't know the cluster type, let's ask the user.
-	if (options_.clusterSoftware.size() == 0) {
+	if (options.clusterSoftware.size() == 0) {
 		string input;
 		string clusterType;
 
@@ -671,10 +579,12 @@ void Swarm::getClusterInformation() {
 			stringstream(input) >> clusterType;
 
 			if (clusterType == "S" || clusterType == "s") {
-				options_.clusterSoftware = "slurm";
+				options.clusterSoftware = "slurm";
+				break;
 			}
 			else if (clusterType == "T" || clusterType == "t") {
-				options_.clusterSoftware = "torque";
+				options.clusterSoftware = "torque";
+				break;
 			}
 		}
 	}
@@ -687,27 +597,126 @@ string Swarm::generateSlurmCommand(string cmd) {
 	command += "srun";
 
 	// Add the job name
-	command += " -J " + options_.jobName;
+	command += " -J " + options.jobName;
 
 	// Only need one CPU per particle
 	command += " -c 1";
 
 	// Specify the cluster account if needed
-	if (!options_.clusterAccount.empty()) {
-		command += " -A " + options_.clusterAccount;
+	if (!options.clusterAccount.empty()) {
+		command += " -A " + options.clusterAccount;
 	}
 
-	if (!options_.clusterQueue.empty()) {
-		command += " -p	" + options_.clusterQueue;
+	if (!options.clusterQueue.empty()) {
+		command += " -p	" + options.clusterQueue;
 	}
 
 	// Specify output directory if needed
-	if (options_.saveClusterOutput) {
-		command += " -o " + options_.jobOutputDir + options_.jobName + "_cluster_output";
+	if (options.saveClusterOutput) {
+		command += " -o " + options.jobOutputDir + options.jobName + "_cluster_output";
 	}
 	else {
 		command += " -o /dev/null";
 	}
 
 	command+= " " + cmd;
+
+	return command;
+}
+
+void Swarm::initFit () {
+	// If we are running ODE, we want to generate a network and network reader.
+	// The network file has parameters that are replaced in every generation,
+	// and the network reader is used to read those network files
+	if (options.model->getHasGenerateNetwork()) {
+
+		// First create a particle which will generate the network
+		// and fill it with dummy params
+		allParticles_.at(1)->setModel(options.model);
+		allParticles_.at(1)->generateParams();
+
+		// Output model file with dummy parameters. This file will be used to generate
+		// our initial network
+		options.model->outputModelWithParams(allParticles_.at(1)->getParams(), options.outputDir, "base.bngl", "", false, false, false, false, false);
+
+		// Construct our simulation command and run the network generator
+		string modelPath = options.outputDir + "/base.bngl";
+		string command = "/home/brandon/projects/GenFit/Simulators/BNG2.pl --outdir " + options.outputDir + " " + modelPath + " >> " + options.outputDir + "/netgen_output 2>&1";
+		int ret = system(command.c_str());
+
+		// Now that we have a .net file, replace the full .bngl with a .bngl
+		// containing ONLY action commands and a .net file loader. This is
+		// used later to run our .net files.
+		options.model->outputModelWithParams(allParticles_.at(1)->getParams(), options.outputDir, "base.bngl", "", false, true, false, false, false);
+
+		// Now store our .net file for later use
+		string netPath = options.outputDir + "/base.net";
+		options.model->parseNet(netPath);
+	}
+}
+
+int Swarm::checkMasterMessages() {
+	int numFinishedParticles = 0;
+	int numMessages = swarmComm->recvMessage(-1, 0, -1, false, swarmComm->univMessageReceiver);
+
+	if (numMessages >= 1) {
+		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
+
+		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_END);
+		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
+			int pID = sm->second.sender;
+
+			// Get an iterator to the particle in our list of running particles
+			runningParticlesIterator_ = runningParticles_.find(pID);
+			// Then remove it
+			runningParticles_.erase(runningParticlesIterator_);
+			// Increment our finished counter
+			numFinishedParticles += 1;
+			//cout << "particle " << pID << " finished simulation" << endl;
+
+			string params = "gen" + to_string(currentGeneration) + "perm" + to_string(pID) + " ";
+
+			double fitCalc = stod(sm->second.message[0]);
+
+			// Store the parameters given to us by the particle
+			for (vector<string>::iterator m = sm->second.message.begin()+1; m != sm->second.message.end(); ++m) {
+				params += *m + " ";
+			}
+
+			// Then store it
+			//cout << "saving fit for " << pID << " of " << fitCalc << endl;
+			allGenFits.insert(pair<double,string>(fitCalc,params));
+		}
+
+		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_FAIL);
+		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
+			int pID = sm->second.sender;
+
+			// Get an iterator to the particle in our list of running particles
+			runningParticlesIterator_ = runningParticles_.find(pID);
+			// Then remove it
+			runningParticles_.erase(runningParticlesIterator_);
+			// Increment our finished counter
+			numFinishedParticles += 1;
+
+			cout << "Particle " << pID << " failed in gen " << currentGeneration << endl;
+
+			// Store particle ID in our list of failed particles
+			failedParticles_.insert(pID);
+		}
+
+		smhRange = swarmComm->univMessageReceiver.equal_range(GET_RUNNING_PARTICLES);
+		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
+			vector<string> intParts;
+			for (auto i: runningParticles_) {
+				intParts.push_back(to_string(i));
+			}
+			swarmComm->sendToSwarm(0,sm->second.sender,SEND_RUNNING_PARTICLES,true,intParts);
+		}
+
+		swarmComm->univMessageReceiver.clear();
+		numMessages = 0;
+	}
+
+	return numFinishedParticles;
 }
