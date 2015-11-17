@@ -160,12 +160,14 @@ void Swarm::doSwarm() {
 		finishFit();
 	}
 	else {
-		int finishedSimulations = options.swarmSize;
+		vector<int> finishedSimulations = options.swarmSize;
+		int numFinishedSimulations = 0;
 		double totalFitTime;
 
 		runGeneration();
 		while(1) {
-			finishedSimulations += checkMasterMessages;
+			finishedSimulations = checkMasterMessages();
+			numFinishedSimulations += finishedSimulations.size();
 
 			if (options.maxNumSimulations && finishedSimulations > options.maxNumSimulations) {
 				break;
@@ -175,6 +177,10 @@ void Swarm::doSwarm() {
 			}
 			if (options.minFit && allGenFits.begin()->first < options.maxFitTime) {
 				break;
+			}
+
+			for (auto pID: finishedSimulations) {
+				launchParticle(pID);
 			}
 		}
 		finishFit();
@@ -227,6 +233,7 @@ void Swarm::launchParticle(int pID) {
 			cout << "Running Particle " << pID << endl;
 		}
 
+		// TODO: Check system return value for success
 		i = system(command.c_str());
 		//runningParticles_[p] = "";
 		runningParticles_.insert(pID);
@@ -253,10 +260,10 @@ void Swarm::runGeneration () {
 		cout << "Running generation " << currentGeneration << " with " << allParticles_.size() << " particles..." << endl;
 	}
 
-	pair<int, int> finishedAndFailedParticles;
-
 	int numLaunchedParticles = 0;
 	int numFinishedParticles = 0;
+
+	vector<int> finishedParticles;
 	unordered_map<int,Particle*>::iterator p = allParticles_.begin();
 
 	while (numFinishedParticles < options.swarmSize) {
@@ -269,7 +276,9 @@ void Swarm::runGeneration () {
 
 		// Check for any messages from particles
 		usleep(10000);
-		numFinishedParticles += checkMasterMessages();
+		finishedParticles += checkMasterMessages();
+		numFinishedParticles += finishedParticles.size();
+		finishedParticles.clear();
 
 	}
 	if (failedParticles_.size() > (options.swarmSize - 3) ) {
@@ -655,7 +664,8 @@ void Swarm::initFit () {
 	}
 }
 
-int Swarm::checkMasterMessages() {
+vector<int> Swarm::checkMasterMessages() {
+	vector<int> finishedParticles;
 	int numFinishedParticles = 0;
 	int numMessages = swarmComm->recvMessage(-1, 0, -1, false, swarmComm->univMessageReceiver);
 
@@ -671,7 +681,8 @@ int Swarm::checkMasterMessages() {
 			// Then remove it
 			runningParticles_.erase(runningParticlesIterator_);
 			// Increment our finished counter
-			numFinishedParticles += 1;
+			//numFinishedParticles += 1;
+			finishedParticles.push_back(pID);
 			//cout << "particle " << pID << " finished simulation" << endl;
 
 			string params = "gen" + to_string(currentGeneration) + "perm" + to_string(pID) + " ";
@@ -688,6 +699,7 @@ int Swarm::checkMasterMessages() {
 			allGenFits.insert(pair<double,string>(fitCalc,params));
 		}
 
+		// TODO: When sending NEXT_GENERATION, make sure failed particles have actually run again. If not, they need re-launched.
 		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_FAIL);
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 			int pID = sm->second.sender;
@@ -697,7 +709,8 @@ int Swarm::checkMasterMessages() {
 			// Then remove it
 			runningParticles_.erase(runningParticlesIterator_);
 			// Increment our finished counter
-			numFinishedParticles += 1;
+			//numFinishedParticles += 1;
+			finishedParticles.push_back(pID);
 
 			cout << "Particle " << pID << " failed in gen " << currentGeneration << endl;
 

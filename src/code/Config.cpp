@@ -345,6 +345,11 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	}
 
 	// TODO: Make sure we have either min fit, max time, or max sims when doing an asynchronous fit
+	if (s->options.synchronicity) {
+		if (s->options.minFit == -1 && s->options.maxFitTime == LONG_MAX && s->options.maxNumSimulations == LONG_MAX) {
+			outputError("Error: You are running an asynchronous fit, but failed to specify either a minimum fitting value, maximum fit time, or maximum number of simulations in the .conf file.");
+		}
+	}
 
 	/*
 	for (auto i : s->options.expFiles){

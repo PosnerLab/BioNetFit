@@ -44,6 +44,8 @@ class Data;
 class Pheromones;
 class Particle;
 
+#define LONG_MAX 9223372036854775807
+
 // Forward declaration of class boost::serialization::access
 namespace boost {
 namespace serialization {
@@ -126,7 +128,7 @@ public:
 	Particle *createParticle(int pID);
 	std::string recvFromParticle(Particle *p);
 	std::unordered_map<int,Particle*> generateInitParticles(int numParticles = -1);
-	int checkMasterMessages();
+	std::vector<int> checkMasterMessages();
 
 	void getClusterInformation();
 	std::string generateSlurmCommand(std::string cmd);
@@ -155,7 +157,7 @@ public:
 
 		int maxGenerations = 10;// maximum number of generations
 		int swarmSize = 10;		// how many particles in the swarm
-		float minFit = 0;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
+		float minFit = -1;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
 		float maxFit = 0;		// we stop fitting if we reach this value // TODO: Implement this
 		int boostrap = 0;		// how many times to bootstrap
 		int parallelCount = 2;	// how many particles to run in parallel
@@ -175,8 +177,8 @@ public:
 		float swapRate = 0.5;	// the rate at which to swap parent parameters during breeding
 		bool forceDifferentParents = true;// whether or not to force difference parents when breeding
 		int maxRetryDifferentParents = 100;// how many times to attempt selection of different parents if forceDifferentParents is true
-		long maxFitTime;
-		long maxNumSimulations;
+		long maxFitTime = LONG_MAX;
+		long maxNumSimulations = LONG_MAX;
 
 		int verbosity = 1;		// terminal output verbosity
 
