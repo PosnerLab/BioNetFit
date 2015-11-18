@@ -250,7 +250,7 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 
 				// If we are not blocking (used irecv), need to wait on the message to receive its metadata
 				if (!block) {
-					recvStatus_ = wait(recvRequest_, recvRequest_+1);
+					recvStatus_ = recvRequest_.wait();
 				}
 
 				// Construct our swarmMessage and fill it with message and metadata
