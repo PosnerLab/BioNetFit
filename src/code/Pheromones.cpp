@@ -33,7 +33,7 @@ void Pheromones::init(Swarm *s) {
 				}
 				~shm_remove(){
 					//shared_memory_object::remove("Swarm");
-					//TODO: Destructor gets called when we go out of scope. Let's call it somewhere else..
+					//TODO: Destructrr gets called when we go out of scope. Let's call it somewhere else..
 				}
 			} remover;
 
@@ -76,25 +76,35 @@ void Pheromones::init(Swarm *s) {
 void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message) {
 	// Using MPI
 	if (swarm_->options.useCluster) {
+
 		std::vector<int> receivers;
 
 		// Sending to the entire swarm
 		if (receiverID == -1) {
+			std::vector<std::string> runningParticles;
+
 			// First we need to get a list of all running particles from the master
 			world_->send(0, GET_RUNNING_PARTICLES, "");
-			world_->recv(0, SEND_RUNNING_PARTICLES, runningParticles_);
-			receivers = runningParticles_;
+			world_->recv(0, SEND_RUNNING_PARTICLES, runningParticles);
+
+			for (auto p: runningParticles) {
+				receivers.push_back(stoi(p));
+			}
 		}
 		else {
 			// If we're not sending to the entire swarm, put only the target pID into the receivers list
 			receivers.push_back(receiverID);
 		}
 
+		if (tag == -1) {
+			tag = mpi::any_tag;
+		}
+
 		// Loop through receivers and perform the send operation
 		for (std::vector<int>::iterator i = receivers.begin(); i != receivers.end(); ++i) {
 			// Blocking send
 			if (block) {
-
+				world_->send(receiverID, tag, message);
 			}
 			// Non-blocking send
 			else {
@@ -216,7 +226,55 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, bool block, swarmMsgHolder &messageHolder, bool eraseMessage) {
 	int numMessages = 0;
 	if (swarm_->options.useCluster) {
+		std::vector<std::string> mpiMessage;
 
+		if (senderID == -1) {
+			senderID = mpi::any_source;
+		}
+
+		if (tag == -1) {
+			tag == mpi::any_tag;
+		}
+
+		while (1) {
+			// TODO: Need to put this in a loop to gather more than one message at a taime
+			if (block) {
+				recvStatus_ = world_->recv(senderID, tag, mpiMessage);
+			}
+			else {
+				recvRequest_ = world_->irecv(senderID, tag, mpiMessage);
+			}
+
+			// If we have any messages in our messageHolder, let's proces them
+			if (messageHolder.size()) {
+
+				// If we are not blocking (used irecv), need to wait on the message to receive its metadata
+				if (!block) {
+					recvStatus_ = wait(recvRequest_, recvRequest_+1);
+				}
+
+				// Construct our swarmMessage and fill it with message and metadata
+				swarmMessage smessage;
+				for (auto m: mpiMessage) {
+					smessage.message.push_back(m);
+					smessage.tag = recvStatus_.tag();
+					smessage.sender = recvStatus_.source();
+				}
+
+				// Insert the message into our message holder and increment numMessages
+				messageHolder.insert(std::pair<int, swarmMessage>(tag, smessage));
+				numMessages++;
+			}
+
+			// If we didn't receive any messages, time to clean up and exit the loop
+			else if (!block) {
+				recvRequest_.cancel();
+				break;
+			}
+			else {
+				break;
+			}
+		}
 	}
 	else {
 		//std::cout << "in rcv msg" << std::endl;

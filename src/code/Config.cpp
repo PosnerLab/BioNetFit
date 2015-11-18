@@ -170,7 +170,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	// Set fit value that will cause fit to end
 	if(pairs.find("min_fit") != pairs.end()) {
 			//cout << "Adding model file: " << pairs.find("model")->second << endl;
-			s->options.minFit = stod(pairs.find("min_fit")->second));
+			s->options.minFit = stod(pairs.find("min_fit")->second);
 	}
 
 	// Set the maximum fit value to consider in breeding

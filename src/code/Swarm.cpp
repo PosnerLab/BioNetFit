@@ -160,8 +160,8 @@ void Swarm::doSwarm() {
 		finishFit();
 	}
 	else {
-		vector<int> finishedSimulations = options.swarmSize;
-		int numFinishedSimulations = 0;
+		vector<int> finishedSimulations;
+		int numFinishedSimulations = options.swarmSize;
 		double totalFitTime;
 
 		runGeneration();
@@ -169,7 +169,7 @@ void Swarm::doSwarm() {
 			finishedSimulations = checkMasterMessages();
 			numFinishedSimulations += finishedSimulations.size();
 
-			if (options.maxNumSimulations && finishedSimulations > options.maxNumSimulations) {
+			if (options.maxNumSimulations && numFinishedSimulations > options.maxNumSimulations) {
 				break;
 			}
 			if (options.maxFitTime && totalFitTime > options.maxFitTime) {
@@ -276,7 +276,7 @@ void Swarm::runGeneration () {
 
 		// Check for any messages from particles
 		usleep(10000);
-		finishedParticles += checkMasterMessages();
+		finishedParticles = checkMasterMessages();
 		numFinishedParticles += finishedParticles.size();
 		finishedParticles.clear();
 
@@ -666,7 +666,7 @@ void Swarm::initFit () {
 
 vector<int> Swarm::checkMasterMessages() {
 	vector<int> finishedParticles;
-	int numFinishedParticles = 0;
+	//int numFinishedParticles = 0;
 	int numMessages = swarmComm->recvMessage(-1, 0, -1, false, swarmComm->univMessageReceiver);
 
 	if (numMessages >= 1) {
@@ -731,5 +731,5 @@ vector<int> Swarm::checkMasterMessages() {
 		numMessages = 0;
 	}
 
-	return numFinishedParticles;
+	return finishedParticles;
 }

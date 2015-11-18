@@ -135,7 +135,8 @@ private:
 	MyMap_ *swarmMap_;
 	MyVector_ *swarmVec_;
 
-	std::vector<int> runningParticles_;
+	boost::mpi::request recvRequest_;
+	boost::mpi::status	recvStatus_;
 
 	boost::interprocess::interprocess_mutex *mutex_;
 
