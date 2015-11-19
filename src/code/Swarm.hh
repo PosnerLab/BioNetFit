@@ -8,7 +8,6 @@
 #ifndef SWARM_HH_
 #define SWARM_HH_
 
-#include <unordered_map>
 #include <vector>
 #include <iostream>
 #include <cstdlib>
@@ -127,7 +126,7 @@ public:
 	void launchParticle(int pID);
 	Particle *createParticle(int pID);
 	std::string recvFromParticle(Particle *p);
-	std::unordered_map<int,Particle*> generateInitParticles(int numParticles = -1);
+	std::map<int,Particle*> generateInitParticles(int numParticles = -1);
 	std::vector<int> checkMasterMessages();
 
 	void getClusterInformation();
@@ -189,7 +188,7 @@ public:
 		bool saveClusterOutput;		// whether or not to save output during a cluster fit // TODO: Parse
 		std::string clusterQueue;	// The cluster queue to submit to // TODO: Parse
 
-		std::unordered_map<std::string,Data*> expFiles; // experimental data file
+		std::map<std::string,Data*> expFiles; // experimental data file
 
 		template<class Archive>
 		void serialize(Archive &ar, const unsigned int version)
@@ -265,7 +264,7 @@ private:
 	std::string configPath_;
 	//const char * particleBasePath_ = "";
 
-	std::unordered_map<int,Particle*> allParticles_;
+	std::map<int,Particle*> allParticles_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

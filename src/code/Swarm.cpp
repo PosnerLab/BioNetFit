@@ -194,10 +194,10 @@ Particle * Swarm::createParticle(int pID) {
 	return p;
 }
 
-unordered_map<int,Particle*> Swarm::generateInitParticles(int pID) {
+std::map<int,Particle*> Swarm::generateInitParticles(int pID) {
 	Timer tmr;
 
-	unordered_map<int,Particle*> allParticles;
+	map<int,Particle*> allParticles;
 
 	// TODO: Do we really need to create particle objects if we're a master?
 	// Why not just keep track of them as integers? Maybe as backups in case
@@ -264,7 +264,7 @@ void Swarm::runGeneration () {
 	int numFinishedParticles = 0;
 
 	vector<int> finishedParticles;
-	unordered_map<int,Particle*>::iterator p = allParticles_.begin();
+	std::map<int,Particle*>::iterator p = allParticles_.begin();
 
 	while (numFinishedParticles < options.swarmSize) {
 		// Launch particles (staying within bounds of parallel_count)

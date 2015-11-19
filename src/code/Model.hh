@@ -9,7 +9,6 @@
 #define MODEL_HH_
 
 #include <iostream>
-#include <unordered_map>
 #include <vector>
 #include <fstream>
 #include <regex>
@@ -69,7 +68,7 @@ public:
 	}
 
 	// Map key contains the action prefix, map value contains the action information
-	std::unordered_map<std::string, action> actions;
+	std::map<std::string, action> actions;
 
 private:
 	friend class boost::serialization::access;

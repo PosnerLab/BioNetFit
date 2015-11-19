@@ -307,7 +307,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	vector<string> prefixedActions;
 	vector<Model::action> toDeleteActs;
 
-	for (unordered_map<string,Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
+	for (std::map<string,Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
 		//for (vector<Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
 	{
 		//if (!i->prefix.empty()) {

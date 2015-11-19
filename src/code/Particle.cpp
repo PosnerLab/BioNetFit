@@ -115,7 +115,7 @@ void Particle::doParticle() {
 
 		// Generate .gdat pipes if we're using pipes
 		if (swarm_->options.usePipes) {
-			for (std::unordered_map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
+			for (std::map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
 				pipePath = path + "/" + i->first + "_" + to_string(id_) + ".gdat";
 				createParticlePipe(pipePath.c_str());
 			}
@@ -139,7 +139,7 @@ void Particle::doParticle() {
 			string dataPath;
 
 			// Save our simulation outputs to data objects
-			for (std::unordered_map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
+			for (std::map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
 				dataPath = path + "/" + i->first + "_" + to_string(id_) + ".gdat";
 				dataFiles_[i->first] = new Data(dataPath, swarm_, false);
 			}
@@ -510,7 +510,7 @@ void Particle::calculateFit() {
 	double divisor = 0;
 
 	// Loop through .exp files. Iterator points to string/dataset pair
-	for (std::unordered_map<std::string,Data*>::iterator e = swarm_->options.expFiles.begin(); e != swarm_->options.expFiles.end(); ++e) {
+	for (std::map<std::string,Data*>::iterator e = swarm_->options.expFiles.begin(); e != swarm_->options.expFiles.end(); ++e) {
 		// Loop through .exp columns. Iterator points to column/map pair
 		//cout << "exp loop " << e->first << endl;
 		setSum = 0;

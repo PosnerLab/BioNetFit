@@ -41,7 +41,7 @@ public:
 	//void setBasePath(std::string path) { basePath_ = path; }
 	void generateParams();
 
-	std::unordered_map<int,double> fitCalcs;
+	std::map<int,double> fitCalcs;
 
 private:
 	friend class boost::serialization::access;
@@ -62,7 +62,7 @@ private:
 	Model * model_;
 	std::map<std::string,double> simParams_;
 	int id_;
-	std::unordered_map<std::string,Data*> dataFiles_;
+	std::map<std::string,Data*> dataFiles_;
 	std::string state_; // Stopped, running, simulating, analyzing, results, breeding, waiting
 	Swarm * swarm_;
 
