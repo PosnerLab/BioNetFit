@@ -233,7 +233,7 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 		}
 
 		if (tag == -1) {
-			tag == mpi::any_tag;
+			tag = mpi::any_tag;
 		}
 
 		while (1) {

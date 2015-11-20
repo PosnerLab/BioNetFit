@@ -5,6 +5,8 @@
  *      Author: brandon
  */
 
+#include <unordered_map>
+
 #include "Config.hh"
 
 using namespace std;
@@ -38,14 +40,14 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 					continue;
 
 				regex keyVal("^\\s*([a-zA-Z_]+)\\s*=\\s*(.*)\\s*$");
-				if (regex_search(line.cbegin(),line.cend(),matches,keyVal)){
+				if (regex_search(line,matches,keyVal)){
 					name = matches[1];
 					value = matches[2];
 					pairs.insert(make_pair(name,value));
 				}
 				else {
 					regex keyVal("^\\s*([a-zA-Z_]+)\\s+(.*)\\s*$");
-					if (regex_search(line.cbegin(),line.cend(),matches,keyVal)){
+					if (regex_search(line,matches,keyVal)){
 						name = matches[1];
 						value = matches[2];
 						pairs.insert(make_pair(name,value));
@@ -230,12 +232,13 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	}
 
 	// Add any init param generation options
-	for (auto pair : pairs) {
+	//for (auto pair: pairs) {
+	for (unordered_multimap<string, string>::iterator pair = pairs.begin(); pair != pairs.end(); ++pair) {
 		// TODO: Implement a map.equalrange to speed this part up
-		if (pair.first == "random_var" || pair.first == "lognormrandom_var" || pair.first == "loguniform_var") {
+		if (pair->first == "random_var" || pair->first == "lognormrandom_var" || pair->first == "loguniform_var") {
 			vector<string> paramComponents;
-			split(pair.second,paramComponents);
-			//string genString = pair.first + " " + paramComponents[1] + " " + paramComponents[2];
+			split(pair->second,paramComponents);
+			//string genString = pair->first + " " + paramComponents[1] + " " + paramComponents[2];
 
 			// Make sure we have three components to work with
 			if (paramComponents.size() == 3) {
@@ -243,12 +246,12 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 				if (s->options.model->freeParams_.count(paramComponents[0]) > 0) {
 					// Make sure 2nd and 3rd components are numeric
 					if (isFloat(paramComponents[1]) && isFloat(paramComponents[2])) {
-						s->options.model->freeParams_.at(paramComponents[0])->setGenerationMethod(pair.first);
+						s->options.model->freeParams_.at(paramComponents[0])->setGenerationMethod(pair->first);
 						s->options.model->freeParams_.at(paramComponents[0])->setParameterName(paramComponents[0]);
 						s->options.model->freeParams_.at(paramComponents[0])->setGenMin(stof(paramComponents[1]));
 						s->options.model->freeParams_.at(paramComponents[0])->setGenMax(stof(paramComponents[2]));
 
-						//cout << "setting " << paramComponents[0] << " to " << pair.first << ":" << paramComponents[1] << ":" << paramComponents[2] << endl;
+						//cout << "setting " << paramComponents[0] << " to " << pair->first << ":" << paramComponents[1] << ":" << paramComponents[2] << endl;
 					}
 					else {
 						outputError("Error: Problem parsing your free parameter generation option in your .conf file. The min and/or max values were non-numeric.");
@@ -264,9 +267,10 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		}
 	}
 
-	for (auto i : s->options.model->freeParams_) {
-		if (!i.second) {
-			string errMsg = "Error: We found a free parameter '" + i.first + "' specified in your model file but can't find a matching parameter generator in your .conf file.";
+	//for (auto i : s->options.model->freeParams_) {
+	for (map<string, FreeParam*>::iterator i = s->options.model->freeParams_.begin(); i != s->options.model->freeParams_.end(); ++i) {
+		if (!i->second) {
+			string errMsg = "Error: We found a free parameter '" + i->first + "' specified in your model file but can't find a matching parameter generator in your .conf file.";
 			outputError(errMsg);
 		}
 	}
@@ -294,9 +298,9 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	/*
 	for (auto pair : pairs) {
-		if (pair.first == "exp") {
-			//cout << "Adding exp file: " << pair.second << endl;
-			s->addExp(pair.second);
+		if (pair->first == "exp") {
+			//cout << "Adding exp file: " << pair->second << endl;
+			s->addExp(pair->second);
 		}
 	}
 	 */
@@ -307,7 +311,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	vector<string> prefixedActions;
 	vector<Model::action> toDeleteActs;
 
-	for (std::map<string,Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
+	for (map<string, Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
 		//for (vector<Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
 	{
 		//if (!i->prefix.empty()) {
@@ -324,29 +328,25 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		}
 		else { // Have a prefix but no .exp file
 			cout << "Warning: The model file specifies an action with the prefix '" << i->first << "' but there isn't a matching .exp file specified in your .conf file. We will ignore this action command." << endl;
-			i = s->options.model->actions.erase(i);
+			//i = s->options.model->actions.erase(i);
+			s->options.model->actions.erase(++i);
 		}
 	}
 
-	vector<Data*> toDeleteExp;
-	for (auto &i : s->options.expFiles){ // Have .exp but no prefix
-		if(std::find(prefixedActions.begin(), prefixedActions.end(), i.first) == prefixedActions.end() ) {
-			cout << "Warning: The .conf file specifies an .exp file '" << i.first << "' but there isn't a matching action command in your model file specified with the prefix=> argument." << endl;
-			toDeleteExp.push_back(s->options.expFiles[i.first]);
+	//vector<Data*> toDeleteExp;
+	//for (auto &i : s->options.expFiles){ // Have .exp but no prefix
+	for (map<string, Data*>::iterator i = s->options.expFiles.begin(); i != s->options.expFiles.end(); ++i) {
+		if(std::find(prefixedActions.begin(), prefixedActions.end(), i->first) == prefixedActions.end() ) {
+			cout << "Warning: The .conf file specifies an .exp file '" << i->first << "' but there isn't a matching action command in your model file specified with the prefix=> argument." << endl;
+			//toDeleteExp.push_back(s->options.expFiles[i->first]);
+			//i = s->options.expFiles.erase(i);
+			s->options.expFiles.erase(++i);
 		}
-	}
-
-	// TODO: We could probably delete in the loop
-	// Delete the unmatched Exp objects
-	for (auto i : toDeleteExp) {
-		//cout << "Deleting object" << endl;
-		s->options.expFiles.erase(getFilename(i->getPath()));
-		delete i;
 	}
 
 	// TODO: Make sure we have either min fit, max time, or max sims when doing an asynchronous fit
-	if (s->options.synchronicity) {
-		if (s->options.minFit == -1 && s->options.maxFitTime == LONG_MAX && s->options.maxNumSimulations == LONG_MAX) {
+	if (!s->options.synchronicity) {
+		if (s->options.minFit == -1 && s->options.maxFitTime == MAX_LONG && s->options.maxNumSimulations == MAX_LONG) {
 			outputError("Error: You are running an asynchronous fit, but failed to specify either a minimum fitting value, maximum fit time, or maximum number of simulations in the .conf file.");
 		}
 	}

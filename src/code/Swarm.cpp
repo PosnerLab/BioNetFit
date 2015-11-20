@@ -15,6 +15,37 @@ Swarm::Swarm(bool master) {
 	// Whether or not we are master
 	isMaster = master;
 
+	if (isMaster) {
+		currentGeneration = 1;
+	}
+
+	options.maxGenerations = 10;
+	options.swarmSize = 10;
+	options.minFit = -1;
+	options.maxFit = 0;
+	options.boostrap = 0;
+	options.parallelCount = 0;
+	options.useCluster = false;
+	options.usePipes = false;
+
+	options.divideByInit = false;
+	options.logTransformSimData = false;
+	options.standardizeSimData = false;
+	options.standardizeExpData = false;
+
+	options.deleteOldFiles = true;
+	options.objFunc = 1;
+	options.extraWeight = 0;
+	options.swapRate = 0.5;
+	options.forceDifferentParents = true;
+	options.maxRetryDifferentParents = 100;
+
+	options.maxFitTime = MAX_LONG;
+	options.maxNumSimulations = MAX_LONG;
+
+	options.verbosity = 1;
+	options.hasMutate = false;
+
 	// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
 	// Seed our random number engine
 	randNumEngine.seed(std::random_device{}());
@@ -23,8 +54,36 @@ Swarm::Swarm(bool master) {
 }
 
 Swarm::Swarm() {
-	cout << "in default" << endl;
-	options.swarmType = "test";
+	if (isMaster) {
+		currentGeneration = 1;
+	}
+
+	options.maxGenerations = 10;
+	options.swarmSize = 10;
+	options.minFit = -1;
+	options.maxFit = 0;
+	options.boostrap = 0;
+	options.parallelCount = 0;
+	options.useCluster = false;
+	options.usePipes = false;
+
+	options.divideByInit = false;
+	options.logTransformSimData = false;
+	options.standardizeSimData = false;
+	options.standardizeExpData = false;
+
+	options.deleteOldFiles = true;
+	options.objFunc = 1;
+	options.extraWeight = 0;
+	options.swapRate = 0.5;
+	options.forceDifferentParents = true;
+	options.maxRetryDifferentParents = 100;
+
+	options.maxFitTime = MAX_LONG;
+	options.maxNumSimulations = MAX_LONG;
+
+	options.verbosity = 1;
+	options.hasMutate = false;
 }
 
 void Swarm::initComm() {
@@ -136,6 +195,7 @@ void Swarm::doSwarm() {
 
 	// Generate all particles that will be present in the swarm
 	allParticles_ = generateInitParticles();
+	initFit();
 
 	// Main swarming loops
 	if (options.synchronicity == 1) {
@@ -218,7 +278,6 @@ void Swarm::launchParticle(int pID) {
 	if (currentGeneration == 1) {
 		//string rm = "rm " + to_string(p->getID());
 		//system(rm.c_str());
-		int i;
 		string command = exePath_ + " particle " + to_string(pID) + " run " + to_string(currentGeneration) + " " + configPath_;
 		//if (p->getID() == 10) {
 		//command = command + ">> " + to_string(p->getID()) + " 2>&1";
@@ -234,6 +293,7 @@ void Swarm::launchParticle(int pID) {
 		}
 
 		// TODO: Check system return value for success
+		int i;
 		i = system(command.c_str());
 		//runningParticles_[p] = "";
 		runningParticles_.insert(pID);

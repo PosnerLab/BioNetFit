@@ -18,32 +18,23 @@
 #include <iomanip>
 #include <chrono>
 #include <cstdio>
+#include <set>
 
-#include <boost/filesystem.hpp>
-#include <boost/mpi/environment.hpp>
-#include <boost/mpi/communicator.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
 
-#include <sys/types.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-//#include "Model.hh"
-class Model;
-class FreeParam;
-
-
 #include "Utils.hh"
 #include "Timer.hh"
-class Data;
 #include "Particle.hh"
 #include "Pheromones.hh"
 
+class Model;
+class FreeParam;
+class Data;
 class Pheromones;
 class Particle;
 
-#define LONG_MAX 9223372036854775807
+#define MAX_LONG 9223372036854775807
 
 // Forward declaration of class boost::serialization::access
 namespace boost {
@@ -117,8 +108,6 @@ public:
 
 	void setType(std::string t) { type = t; }
 
-	//std::string getParticleBasePath() { return particleBasePath_; }
-
 	void doSwarm();
 	void runGeneration();
 	void breedGeneration();
@@ -140,7 +129,7 @@ public:
 	std::multimap<double,std::string> allGenFits;
 	bool isMaster;
 	std::mt19937 randNumEngine;
-	int currentGeneration = 1;
+	int currentGeneration;
 	std::string type;
 
 	struct SwarmOpts {
@@ -154,34 +143,34 @@ public:
 
 		Model * model; 			// the model file
 
-		int maxGenerations = 10;// maximum number of generations
-		int swarmSize = 10;		// how many particles in the swarm
-		float minFit = -1;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
-		float maxFit = 0;		// we stop fitting if we reach this value // TODO: Implement this
-		int boostrap = 0;		// how many times to bootstrap
-		int parallelCount = 2;	// how many particles to run in parallel
+		int maxGenerations;// maximum number of generations
+		int swarmSize;		// how many particles in the swarm
+		float minFit;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
+		float maxFit;		// we stop fitting if we reach this value // TODO: Implement this
+		int boostrap;		// how many times to bootstrap
+		int parallelCount;	// how many particles to run in parallel
 
-		bool usePipes = false;	// whether or not to use pipes to gather simulation output
-		bool useCluster = false;// whether or not we are running on a cluster
+		bool usePipes;	// whether or not to use pipes to gather simulation output
+		bool useCluster;// whether or not we are running on a cluster
 
-		bool divideByInit = false;// whether or not to divide simulation outputs by the value at t=0
-		int logTransformSimData = 0;// whether or not to log transform simulation data. this value acts as the base.
-		bool standardizeSimData = false;// whether or not to standardize simulation data
-		bool standardizeExpData = false;// whether or not to standardize experimental data
+		bool divideByInit;// whether or not to divide simulation outputs by the value at t=0
+		int logTransformSimData;// whether or not to log transform simulation data. this value acts as the base.
+		bool standardizeSimData;// whether or not to standardize simulation data
+		bool standardizeExpData;// whether or not to standardize experimental data
 
-		bool deleteOldFiles = true; // whether or not to delete unneeded files during the fitting run
+		bool deleteOldFiles; // whether or not to delete unneeded files during the fitting run
 
-		int objFunc = 1;		// which objective function to use
-		int extraWeight = 0;	// how much extra weight to add while breeding in genetic algorithm
-		float swapRate = 0.5;	// the rate at which to swap parent parameters during breeding
-		bool forceDifferentParents = true;// whether or not to force difference parents when breeding
-		int maxRetryDifferentParents = 100;// how many times to attempt selection of different parents if forceDifferentParents is true
-		long maxFitTime = LONG_MAX;
-		long maxNumSimulations = LONG_MAX;
+		int objFunc;		// which objective function to use
+		int extraWeight;	// how much extra weight to add while breeding in genetic algorithm
+		float swapRate;	// the rate at which to swap parent parameters during breeding
+		bool forceDifferentParents;// whether or not to force difference parents when breeding
+		int maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
+		long maxFitTime;
+		long maxNumSimulations;
 
-		int verbosity = 1;		// terminal output verbosity
+		int verbosity;		// terminal output verbosity
 
-		bool hasMutate = false; // whether or not we should be mutating parameters during breeding in genetic algorithm
+		bool hasMutate; // whether or not we should be mutating parameters during breeding in genetic algorithm
 
 		std::string clusterSoftware;// which cluster software to use
 		std::string clusterAccount;	// user account to specify in cluster submission commands // TODO: Parse

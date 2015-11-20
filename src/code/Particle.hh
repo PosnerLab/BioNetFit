@@ -8,25 +8,17 @@
 #ifndef PARTICLE_HH_
 #define PARTICLE_HH_
 
-#include <fstream>
-#include <cstdlib>
-#include <cstdio>
-#include <iostream>
-#include <string>
-#include <chrono>
-
-#include <dirent.h>
-
-#include <boost/filesystem.hpp>
-#include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream.hpp>
-
-namespace io = boost::iostreams;
-
 #include "Model.hh"
 #include "Swarm.hh"
 
 class Swarm;
+class Data;
+class FreeParam;
+class Model;
+class FreeParam;
+class Data;
+class Pheromones;
+class Particle;
 
 class Particle {
 public:

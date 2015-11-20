@@ -11,18 +11,15 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include <regex>
+#include <tr1/regex>
 #include <cstdlib>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <fcntl.h>
 
 #include "Utils.hh"
 #include "Data.hh"
 #include "FreeParam.hh"
 
 class FreeParam;
+class Data;
 
 class Model {
 	friend class Config;
@@ -47,7 +44,7 @@ public:
 		//double o_steps;
 
 		std::string type;
-		std::string scanParam = "";
+		std::string scanParam;
 
 		Data *dataSet;
 
@@ -79,7 +76,7 @@ private:
 	std::vector<std::string> fullContents_;
 	std::vector<std::string> netContents_;
 
-	bool hasGenerateNetwork_ = false;
+	bool hasGenerateNetwork_;
 	//std::map<std::string,std::string> freeParams_;
 	std::map<std::string, FreeParam*> freeParams_;
 

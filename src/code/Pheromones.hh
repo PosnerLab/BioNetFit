@@ -19,8 +19,6 @@
 #include <boost/serialization/unordered_map.hpp>
 #include <boost/serialization/set.hpp>
 
-//#include <boost/interprocess/shared_memory_object.hpp>
-//#include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/string.hpp>
@@ -82,6 +80,19 @@ public:
 		int sender;
 
 		std::vector<std::string> message;
+
+		friend class boost::serialization::access;
+
+		template<class Archive>
+		void serialize(Archive & ar, const unsigned int version)
+		{
+			ar & tag;
+
+			ar & id;
+			ar & sender;
+
+			ar & message;
+		}
 	};
 
 	typedef std::unordered_multimap<int, swarmMessage> swarmMsgHolder;

@@ -8,6 +8,7 @@
 #ifndef GENFIT2_HH_
 #define GENFIT2_HH_
 
+#include <iostream>
 
 #include "code/Config.hh"
 #include "code/Swarm.hh"

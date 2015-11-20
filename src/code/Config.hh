@@ -8,11 +8,6 @@
 #ifndef CONFIG_HH_
 #define CONFIG_HH_
 
-#include <iostream>
-#include <fstream>
-#include <regex>
-#include <vector>
-
 #include "Parser.hh"
 #include "Utils.hh"
 #include "Data.hh"

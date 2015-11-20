@@ -12,12 +12,13 @@
 #include <map>
 #include <random>
 #include <sstream>
-#include <string>
 
 #include <boost/filesystem.hpp>
 #include <sys/stat.h>
 
 #include "FreeParam.hh"
+
+class FreeParam;
 
 void outputError(std::string errorMessage);
 std::string convertToAbsPath(std::string relPath);

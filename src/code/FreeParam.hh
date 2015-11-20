@@ -8,8 +8,6 @@
 #ifndef CODE_FREEPARAM_HH_
 #define CODE_FREEPARAM_HH_
 
-#include <string>
-
 #include "Swarm.hh"
 
 class FreeParam {

@@ -8,10 +8,6 @@
 #ifndef DATA_HH_
 #define DATA_HH_
 
-#include <iostream>
-#include <fstream>
-#include <map>
-
 #include "Utils.hh"
 #include "Swarm.hh"
 
@@ -51,7 +47,7 @@ private:
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
-		std::cout << "serializing data" << std::endl;
+		//std::cout << "serializing data" << std::endl;
 
 		ar & standardDeviations;
 		ar & colAverages;

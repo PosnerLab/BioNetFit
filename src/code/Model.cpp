@@ -10,6 +10,8 @@
 using namespace std;
 
 Model::Model(string path) {
+	hasGenerateNetwork_ = false;
+
 	modelPath_ = convertToAbsPath(path);
 	parseModel();
 }
