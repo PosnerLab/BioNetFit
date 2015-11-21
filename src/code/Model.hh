@@ -11,7 +11,7 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include <tr1/regex>
+#include <boost/regex.hpp>
 #include <cstdlib>
 
 #include "Utils.hh"

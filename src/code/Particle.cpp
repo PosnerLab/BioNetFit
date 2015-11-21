@@ -5,6 +5,8 @@
  *      Author: brandon
  */
 
+// TODO: Let's replace all the static_cast's with a custom function that converts ints/doubles to strings using stringstream
+
 #include "Particle.hh"
 
 using namespace std;
@@ -92,8 +94,8 @@ void Particle::doParticle() {
 
 	while(1) {
 		// First get our path and filename variables set up for use in model generation, sim command, etc
-		string bnglFilename = to_string(id_) + ".bngl";
-		string path = swarm_->options.outputDir + "/" + to_string(swarm_->currentGeneration);
+		string bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
+		string path = swarm_->options.outputDir + "/" + to_string(static_cast<long long int>(swarm_->currentGeneration));
 		string bnglFullPath = path + "/" + bnglFilename;
 
 		string pipePath;
@@ -106,23 +108,23 @@ void Particle::doParticle() {
 				string netFullPath = swarm_->options.outputDir + "/" + netFilename;
 
 				swarm_->options.model->parseNet(netFullPath);
-				model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, true, false, false);
+				model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(static_cast<long long int>(id_)), false, false, true, false, false);
 			}
 			else {
-				model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, false, false, false);
+				model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(static_cast<long long int>(id_)), false, false, false, false, false);
 			}
 		}
 
 		// Generate .gdat pipes if we're using pipes
 		if (swarm_->options.usePipes) {
 			for (std::map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
-				pipePath = path + "/" + i->first + "_" + to_string(id_) + ".gdat";
+				pipePath = path + "/" + i->first + "_" + to_string(static_cast<long long int>(id_)) + ".gdat";
 				createParticlePipe(pipePath.c_str());
 			}
 		}
 
 		// Construct our simulation command
-		string command = "/home/brandon/projects/GenFit/Simulators/BNG2.pl --outdir " + path + " " + bnglFullPath + ">> " + path + "/" + to_string(id_) + ".BNG_OUT 2>&1";
+		string command = "/home/brandon/projects/GenFit/Simulators/BNG2.pl --outdir " + path + " " + bnglFullPath + ">> " + path + "/" + to_string(static_cast<long long int>(id_)) + ".BNG_OUT 2>&1";
 		if (swarm_->options.usePipes) {
 			command += " &";
 		}
@@ -140,7 +142,7 @@ void Particle::doParticle() {
 
 			// Save our simulation outputs to data objects
 			for (std::map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
-				dataPath = path + "/" + i->first + "_" + to_string(id_) + ".gdat";
+				dataPath = path + "/" + i->first + "_" + to_string(static_cast<long long int>(id_)) + ".gdat";
 				dataFiles_[i->first] = new Data(dataPath, swarm_, false);
 			}
 
@@ -148,11 +150,11 @@ void Particle::doParticle() {
 			calculateFit();
 
 			// Put our fit calc into the message vector
-			swarm_->swarmComm->univMessageSender.push_back(to_string(fitCalcs.at(swarm_->currentGeneration)));
+			swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(fitCalcs.at(swarm_->currentGeneration))));
 
 			// Put our simulation params into the message vector
 			for (map<string,double>::iterator i = simParams_.begin(); i != simParams_.end(); ++i){
-				swarm_->swarmComm->univMessageSender.push_back(to_string(i->second));
+				swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(i->second)));
 			}
 
 			// Tell the swarm master that we're finished
@@ -229,18 +231,18 @@ void Particle::doParticle() {
 					}
 
 					// Construct our filenames
-					bnglFilename = to_string(id_) + ".bngl";
-					path = swarm_->options.outputDir + "/" + to_string(swarm_->currentGeneration + 1);
+					bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
+					path = swarm_->options.outputDir + "/" + to_string(static_cast<long long int>(swarm_->currentGeneration + 1));
 					bnglFullPath = path + "/" + bnglFilename;
 
 					// And generate our models
 					if (swarm_->options.model->getHasGenerateNetwork()){
 						// If we're using ODE solver, output .net and .bngl
-						model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, true, false, false);
+						model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(static_cast<long long int>(id_)), false, false, true, false, false);
 					}
 					else {
 						// If we're using network free simulation, output .bngl
-						model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, false, false, false);
+						model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(static_cast<long long int>(id_)), false, false, false, false, false);
 					}
 
 					// Tell the master we have our new params and are ready for the next generation
@@ -574,12 +576,14 @@ double Particle::objFunc_divByMean(double sim, double exp, double mean) {
 
 void Particle::initBreedWithParticle(int pID, int swapID) {
 	//Timer tmr;
-	uniform_int_distribution<int> unif(1, 100);
+	//uniform_int_distribution<int> unif(1, 100);
+	tr1::uniform_int<int> unif(1, 100);
 
-	for (auto p : simParams_) {
+	//for (auto p : simParams_) {
+	for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 		// Swap
 		if (unif(swarm_->randNumEngine) < (swarm_->options.swapRate * 100) ) {
-			swarm_->swarmComm->univMessageSender.push_back(to_string(p.second));
+			swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(p->second)));
 		}
 		// Don't swap
 		else {
@@ -604,29 +608,30 @@ void Particle::rcvBreedWithParticle(vector<string>& params, int reciprocateTo, i
 		vector<string> messageToChild;
 
 		int pi = 0;
-		for (auto p : simParams_){
+		//for (auto p : simParams_){
+		for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 
 			// If the parameter value is empty, we are not swapping that value. We give
 			// parent #1 back an empty string, and give the child our value.
 			if (params[pi] == "") {
 				swarm_->swarmComm->univMessageSender.push_back("");
-				messageToChild.push_back(to_string(p.second));
+				messageToChild.push_back(to_string(static_cast<long double>(p->second)));
 
-				string vm = "DIDN'T SWAP " + to_string(p.second);
+				//string vm = "DIDN'T SWAP " + to_string(static_cast<long double>(p->second));
 			}
 
 			// If the parameter is NOT empty, we are swapping. We give parent #1 our value
 			// and give the child the (possible mutated) value from parent #2.
 			else {
-				swarm_->swarmComm->univMessageSender.push_back(to_string(p.second));
+				swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(p->second)));
 
 				double mutParam = stod(params[pi]);
 
-				if (swarm_->options.hasMutate && swarm_->options.model->getfreeParams_().at(p.first)->isHasMutation()) {
-					mutParam = mutateParam(swarm_->options.model->freeParams_.at(p.first), mutParam);
+				if (swarm_->options.hasMutate && swarm_->options.model->getfreeParams_().at(p->first)->isHasMutation()) {
+					mutParam = mutateParam(swarm_->options.model->freeParams_.at(p->first), mutParam);
 				}
-				messageToChild.push_back(to_string(mutParam));
-				string vm = "SWAPPED " + to_string(mutParam);
+				messageToChild.push_back(to_string(static_cast<long double>(mutParam)));
+				//string vm = "SWAPPED " + to_string(mutParam);
 			}
 			++pi;
 		}
@@ -641,23 +646,23 @@ void Particle::rcvBreedWithParticle(vector<string>& params, int reciprocateTo, i
 	else {
 		int pi = 0;
 
-		for (auto p : simParams_){
+		for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 
 			// If the parameter is empty, we are keeping our parameter value. We
 			// give that value to the child.
 			if (params[pi] == "") {
-				swarm_->swarmComm->univMessageSender.push_back(to_string(p.second));
+				swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(p->second)));
 			}
 
 			// If the parameter is NOT empty, we are give the child the (possibly
 			// mutated) value from parent #1.
 			else {
 				double finalParam = stod(params[pi]);
-				if (swarm_->options.hasMutate && swarm_->options.model->getfreeParams_().at(p.first)->isHasMutation()) {
-					finalParam = mutateParam(swarm_->options.model->freeParams_.at(p.first), finalParam);
+				if (swarm_->options.hasMutate && swarm_->options.model->getfreeParams_().at(p->first)->isHasMutation()) {
+					finalParam = mutateParam(swarm_->options.model->freeParams_.at(p->first), finalParam);
 				}
 
-				swarm_->swarmComm->univMessageSender.push_back(to_string(finalParam));
+				swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(finalParam)));
 			}
 			++pi;
 		}
@@ -673,17 +678,20 @@ void Particle::rcvBreedWithParticle(vector<string>& params, int reciprocateTo, i
 
 double Particle::mutateParam(FreeParam* fp, double paramValue) {
 	//Timer tmr;
-	uniform_real_distribution<double> unif(0,1);
+	//uniform_real_distribution<double> unif(0,1);
+	tr1::uniform_real<double> unif(0,1);
 
 	// Generate a random number and see if it's less than our mutation rate.  If is, we mutate.
 	if (unif(swarm_->randNumEngine) < fp->getMutationRate()) {
 		// Store our mutation factor
 		float maxChange = paramValue * fp->getMutationFactor();
 
-		// Generate a new distribution between
-		using param_t = std::uniform_real_distribution<>::param_type;
-		param_t p{0.0, maxChange * 2};
-		unif.param(p);
+		// Generate a new distribution between 0 and double maxChange
+		//using param_t = uniform_real_distribution<>::param_type;
+		//param_t p{0.0, maxChange * 2};
+		//unif.param(p);
+
+		tr1::uniform_real<double> unif(0.0, maxChange * 2);
 
 		// Ger our new random number between 0 and maxChange, subtract maxChange.
 		double change = unif(swarm_->randNumEngine) - maxChange;

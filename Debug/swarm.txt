@@ -200,7 +200,7 @@
  21 generate_network();
  2 
  49 # Simulate for 600 seconds to reach equilibrium
- 76 simulate({method=>"ode",t_start=>0,t_end=>600,n_steps=>1,suffix=>"equil"})
+ 61 simulate({method=>"ode",t_start=>0,t_end=>600,n_steps=>1,})
  2 
  88 # Set Ligand_isPresent to 1 to enable ligand binding by means of the "func()" function
  36 setParameter("Ligand_isPresent",1)

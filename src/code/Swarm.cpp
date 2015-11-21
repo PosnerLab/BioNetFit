@@ -48,9 +48,10 @@ Swarm::Swarm(bool master) {
 
 	// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
 	// Seed our random number engine
-	randNumEngine.seed(std::random_device{}());
-	randNumEngine.discard(700000);
-	srand (std::random_device{}());
+	randNumEngine.seed(std::tr1::random_device{}());
+	//randNumEngine.discard(700000);
+
+	srand (std::tr1::random_device{}());
 }
 
 Swarm::Swarm() {
@@ -207,7 +208,7 @@ void Swarm::doSwarm() {
 		while (currentGeneration < options.maxGenerations){
 			runGeneration();
 
-			string currentDirectory = options.outputDir + "/" + to_string(currentGeneration);
+			string currentDirectory = options.outputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
 			if (options.deleteOldFiles) {
 				cleanupFiles(currentDirectory.c_str());
 			}
@@ -239,8 +240,9 @@ void Swarm::doSwarm() {
 				break;
 			}
 
-			for (auto pID: finishedSimulations) {
-				launchParticle(pID);
+			//for (auto pID: finishedSimulations) {
+			for (auto pID = finishedSimulations.begin(); pID != finishedSimulations.end(); ++pID) {
+				launchParticle(*pID);
 			}
 		}
 		finishFit();
@@ -278,7 +280,7 @@ void Swarm::launchParticle(int pID) {
 	if (currentGeneration == 1) {
 		//string rm = "rm " + to_string(p->getID());
 		//system(rm.c_str());
-		string command = exePath_ + " particle " + to_string(pID) + " run " + to_string(currentGeneration) + " " + configPath_;
+		string command = exePath_ + " particle " + to_string(static_cast<long long int>(pID)) + " run " + to_string(static_cast<long long int>(currentGeneration)) + " " + configPath_;
 		//if (p->getID() == 10) {
 		//command = command + ">> " + to_string(p->getID()) + " 2>&1";
 		command = command + ">> pOUT 2>&1";
@@ -367,7 +369,7 @@ void Swarm::cleanupFiles(const char * path) {
 			de = readdir( dp );
 			if (de == NULL) break;
 			//cout << "read " << de->d_name << endl;
-			if (regex_match(string( de->d_name ),regex(".+xml$|.+species$|.+cdat$|.+gdat$|.+net$|.+BNG_OUT"))) {
+			if (boost::regex_match(string( de->d_name ),boost::regex(".+xml$|.+species$|.+cdat$|.+gdat$|.+net$|.+BNG_OUT"))) {
 				//cout << "found a file";
 				filesToDel.push_back( string(de->d_name) );
 			}
@@ -378,8 +380,9 @@ void Swarm::cleanupFiles(const char * path) {
 		cout << "Warning: Couldn't open " << path << " to delete un-needed simulation files." << endl;
 	}
 
-	for (auto i: filesToDel) {
-		string fullPath = string(path) + "/" + i;
+	//for (auto i: filesToDel) {
+	for (auto i = filesToDel.begin(); i != filesToDel.end(); ++i) {
+		string fullPath = string(path) + "/" + *i;
 		remove(fullPath.c_str());
 	}
 }
@@ -391,7 +394,7 @@ bool Swarm::sortFits(Particle * a, Particle * b) {
 void Swarm::breedGeneration() {
 	//Timer tmr;
 
-	string createDirCmd = "mkdir " + options.outputDir + "/" + to_string(currentGeneration);
+	string createDirCmd = "mkdir " + options.outputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
 	system(createDirCmd.c_str());
 
 	// We let particles do the actual breeding.  The master's role is to generate a breeding pattern and
@@ -437,7 +440,7 @@ void Swarm::breedGeneration() {
 
 	double p1;
 	double p2;
-	smatch match;
+	boost::smatch match;
 	vector<string> parentVec;
 	int numCurrBreeding = 0;
 	int numFinishedBreeding = 0;
@@ -496,7 +499,7 @@ void Swarm::breedGeneration() {
 		split(parentString1,parentVec);
 
 		// Extract the particle ID
-		regex_search(parentVec[0], match, regex("gen\\d+perm(\\d+)"));
+		boost::regex_search(parentVec[0], match, boost::regex("gen\\d+perm(\\d+)"));
 		string pID1 = match[1];
 
 		// Clear the parent vector for use with the next parent
@@ -504,14 +507,14 @@ void Swarm::breedGeneration() {
 
 		// Do same as above, but for the second parent
 		split(parentString2,parentVec);
-		regex_search(parentVec[0], match, regex("gen\\d+perm(\\d+)"));
+		boost::regex_search(parentVec[0], match, boost::regex("gen\\d+perm(\\d+)"));
 		string pID2 = match[1];
 		parentVec.clear();
 
 		//cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
 
 		// Add second parent and swapID to the message
-		swarmComm->univMessageSender.push_back(to_string(swapID));
+		swarmComm->univMessageSender.push_back(to_string(static_cast<long long int>(swapID)));
 		swarmComm->univMessageSender.push_back(pID2);
 
 		// Send the message to the first parent
@@ -576,18 +579,20 @@ void Swarm::outputRunSummary(string outputDir) {
 		outputFile << left << setw(16) << "Fit" << left << setw(16) << "Permutation";
 
 		// Output parameter names
-		for (auto i: options.model->freeParams_) {
-			outputFile << left << setw(16) << i.first;
+		//for (auto i: options.model->freeParams_) {
+		for (auto i = options.model->freeParams_.begin(); i != options.model->freeParams_.end(); ++i) {
+			outputFile << left << setw(16) << i->first;
 		}
 
 		outputFile << endl;
 
 		vector<string> paramVals;
 
-		for (auto i: allGenFits) {
-			split(i.second, paramVals);
+		//for (auto i: allGenFits) {
+		for (auto i = allGenFits.begin(); i != allGenFits.end(); ++i) {
+			split(i->second, paramVals);
 
-			outputFile << left << setw(16) << i.first << left << setw(16) << paramVals[0];
+			outputFile << left << setw(16) << i->first << left << setw(16) << paramVals[0];
 
 			for (int i = 1; i < paramVals.size(); i++) {
 				outputFile << left << setw(16) << stod(paramVals[i]);
@@ -606,8 +611,9 @@ void Swarm::outputRunSummary(string outputDir) {
 }
 
 void Swarm::killAllParticles(int tag) {
-	for (auto p: allParticles_) {
-		swarmComm->sendToSwarm(0, p.first, tag, false, swarmComm->univMessageSender);
+	//for (auto p: allParticles_) {
+	for (auto p = allParticles_.begin(); p != allParticles_.end(); ++p) {
+		swarmComm->sendToSwarm(0, p->first, tag, false, swarmComm->univMessageSender);
 	}
 }
 
@@ -645,7 +651,8 @@ void Swarm::getClusterInformation() {
 		while (1) {
 			cout << "BioNetFit couldn't determine which type of cluster software you are using. Specify (T) for Torque, or (S) for Slurm" << endl;
 			getline(cin, input);
-			stringstream(input) >> clusterType;
+			stringstream myInp(input);
+			myInp >> clusterType;
 
 			if (clusterType == "S" || clusterType == "s") {
 				options.clusterSoftware = "slurm";
@@ -711,6 +718,7 @@ void Swarm::initFit () {
 		// Construct our simulation command and run the network generator
 		string modelPath = options.outputDir + "/base.bngl";
 		string command = "/home/brandon/projects/GenFit/Simulators/BNG2.pl --outdir " + options.outputDir + " " + modelPath + " >> " + options.outputDir + "/netgen_output 2>&1";
+		//cout << "running command: " << command << endl;
 		int ret = system(command.c_str());
 
 		// Now that we have a .net file, replace the full .bngl with a .bngl
@@ -745,7 +753,7 @@ vector<int> Swarm::checkMasterMessages() {
 			finishedParticles.push_back(pID);
 			//cout << "particle " << pID << " finished simulation" << endl;
 
-			string params = "gen" + to_string(currentGeneration) + "perm" + to_string(pID) + " ";
+			string params = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(pID)) + " ";
 
 			double fitCalc = stod(sm->second.message[0]);
 
@@ -781,10 +789,11 @@ vector<int> Swarm::checkMasterMessages() {
 		smhRange = swarmComm->univMessageReceiver.equal_range(GET_RUNNING_PARTICLES);
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 			vector<string> intParts;
-			for (auto i: runningParticles_) {
-				intParts.push_back(to_string(i));
+			//for (auto i: runningParticles_) {
+			for (auto i = runningParticles_.begin(); i != runningParticles_.end(); ++i) {
+				intParts.push_back(to_string(static_cast<long long int>(*i)));
 			}
-			swarmComm->sendToSwarm(0,sm->second.sender,SEND_RUNNING_PARTICLES,true,intParts);
+			swarmComm->sendToSwarm(0, sm->second.sender, SEND_RUNNING_PARTICLES, true, intParts);
 		}
 
 		swarmComm->univMessageReceiver.clear();

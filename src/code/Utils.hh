@@ -10,7 +10,7 @@
 
 #include <iostream>
 #include <map>
-#include <random>
+#include <tr1/random>
 #include <sstream>
 
 #include <boost/filesystem.hpp>
@@ -27,7 +27,7 @@ int checkIfFileExists(std::string path);
 void split(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " ");
 void outputHelp();
 bool createParticlePipe(const char * path);
-double pickWeighted(double weightSum, std::multimap<double,double>& weights, int extraWeight, std::mt19937 &randNumEngine);
+double pickWeighted(double weightSum, std::multimap<double,double>& weights, int extraWeight, std::tr1::mt19937 &randNumEngine);
 bool isFloat(std::string number);
 double mutateParam(FreeParam* fp, double paramValue);
 std::string getOutputFromCommand(std::string cmd);

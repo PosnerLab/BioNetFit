@@ -20,7 +20,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	string line;
 	ifstream confFile(configPath_);
-	smatch matches;
+	boost::smatch matches;
 	string name, value;
 	unordered_multimap<string,string> pairs;
 
@@ -39,15 +39,15 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 				if (line.at(0) == '#')
 					continue;
 
-				regex keyVal("^\\s*([a-zA-Z_]+)\\s*=\\s*(.*)\\s*$");
-				if (regex_search(line,matches,keyVal)){
+				boost::regex keyVal("^\\s*([a-zA-Z_]+)\\s*=\\s*(.*)\\s*$");
+				if (boost::regex_search(line,matches,keyVal)){
 					name = matches[1];
 					value = matches[2];
 					pairs.insert(make_pair(name,value));
 				}
 				else {
-					regex keyVal("^\\s*([a-zA-Z_]+)\\s+(.*)\\s*$");
-					if (regex_search(line,matches,keyVal)){
+					boost::regex keyVal("^\\s*([a-zA-Z_]+)\\s+(.*)\\s*$");
+					if (boost::regex_search(line,matches,keyVal)){
 						name = matches[1];
 						value = matches[2];
 						pairs.insert(make_pair(name,value));
@@ -290,7 +290,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		s->addMutate(exp->second);
 		s->options.hasMutate = true;
 
-		if (regex_search(exp->second, regex("^default\\s"))) {
+		if (boost::regex_search(exp->second, boost::regex("^default\\s"))) {
 			//cout << "found default mutation rate. breaking" << endl;
 			break;
 		}

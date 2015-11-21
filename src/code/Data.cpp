@@ -112,8 +112,8 @@ void Data::parseData(){
 		dataFile.close();
 	}
 
-	string basename = regex_replace(getFilename(dataPath),regex("_\\d+$"),"");
-
+	string replacement = "";
+	string basename = boost::regex_replace(getFilename(dataPath),boost::regex("_\\d+$"),replacement);
 
 	if(allLines[0].at(0) != '#') {
 		string errMsg = "Error: Your data file (" + dataPath + ") doesn't contain (#) as the first value.";
@@ -138,7 +138,7 @@ void Data::parseData(){
 
 			// If our column name ends in "_SD" we need to store the value in our stdev map
 			if (col->size() > 3 && col->find("_SD") == col->size()-3) {
-				string colWithoutSD = regex_replace(*col,regex("_SD$"),"");
+				string colWithoutSD = boost::regex_replace(*col,boost::regex("_SD$"),string(""));
 				//cout << "inserting sd at col " << colWithoutSD << ": " << stof(values[0]) << " " << stof(values[i]) << endl;
 				//standardDeviations[col].insert(make_pair(stof(values[0]),stof(values[i])));
 				standardDeviations[colWithoutSD][stod(values[0])] = stod(values[i]);

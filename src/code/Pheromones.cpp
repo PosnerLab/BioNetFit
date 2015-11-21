@@ -87,8 +87,9 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			world_->send(0, GET_RUNNING_PARTICLES, "");
 			world_->recv(0, SEND_RUNNING_PARTICLES, runningParticles);
 
-			for (auto p: runningParticles) {
-				receivers.push_back(stoi(p));
+			//for (auto p: runningParticles) {
+			for (auto p = runningParticles.begin(); p != runningParticles.end(); ++p) {
+				receivers.push_back(stoi(*p));
 			}
 		}
 		else {
@@ -124,13 +125,13 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			{
 				scoped_lock<interprocess_mutex> lock(*mutex_);
 
-				*vecString_ = std::to_string(GET_RUNNING_PARTICLES).c_str(); // Set tag
+				*vecString_ = std::to_string(static_cast<long long int>(GET_RUNNING_PARTICLES)).c_str(); // Set tag
 				swarmVec_->push_back(*vecString_); // Push tag
-				*vecString_ = std::to_string(rand()).c_str(); // Set unique ID
+				*vecString_ = std::to_string(static_cast<long long int>(rand())).c_str(); // Set unique ID
 				swarmVec_->push_back(*vecString_); // Store unique ID
-				*vecString_ = std::to_string(senderID).c_str(); // Set sender
+				*vecString_ = std::to_string(static_cast<long long int>(senderID)).c_str(); // Set sender
 				swarmVec_->push_back(*vecString_); // Push sender
-				*vecString_ = std::to_string(0).c_str(); // Set message size of 0
+				*vecString_ = std::to_string(static_cast<long long int>(0)).c_str(); // Set message size of 0
 				swarmVec_->push_back(*vecString_); // Store message size
 
 				swarmMap_->insert(std::pair<const int,MyVector_>(0,*swarmVec_)); // Insert vector to first position (master slot) of map
@@ -177,16 +178,16 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			for(std::vector<int>::iterator r = receivers.begin(); r != receivers.end(); ++r) {
 				int numMsgElements = message.size();
 
-				*vecString_ = std::to_string(tag).c_str(); // Set tag
+				*vecString_ = std::to_string(static_cast<long long int>(tag)).c_str(); // Set tag
 				swarmVec_->push_back(*vecString_); // Store tag
 
-				*vecString_ = std::to_string(messageID).c_str(); // Set unique ID
+				*vecString_ = std::to_string(static_cast<long long int>(messageID)).c_str(); // Set unique ID
 				swarmVec_->push_back(*vecString_); // Store unique ID
 
-				*vecString_ = std::to_string(senderID).c_str(); // Set sender
+				*vecString_ = std::to_string(static_cast<long long int>(senderID)).c_str(); // Set sender
 				swarmVec_->push_back(*vecString_); // Store sender
 
-				*vecString_ = std::to_string(numMsgElements).c_str(); // Set message size
+				*vecString_ = std::to_string(static_cast<long long int>(numMsgElements)).c_str(); // Set message size
 				swarmVec_->push_back(*vecString_); // Store message size
 
 				// Insert messages in vector
@@ -255,8 +256,9 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 
 				// Construct our swarmMessage and fill it with message and metadata
 				swarmMessage smessage;
-				for (auto m: mpiMessage) {
-					smessage.message.push_back(m);
+				//for (auto m: mpiMessage) {
+				for (auto m = mpiMessage.begin(); m != mpiMessage.end(); ++m) {
+					smessage.message.push_back(*m);
 					smessage.tag = recvStatus_.tag();
 					smessage.sender = recvStatus_.source();
 				}

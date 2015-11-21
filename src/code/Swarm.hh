@@ -14,7 +14,7 @@
 #include <cmath>
 #include <ctime>
 #include <fstream>
-#include <random>
+#include <tr1/random>
 #include <iomanip>
 #include <chrono>
 #include <cstdio>
@@ -128,7 +128,7 @@ public:
 
 	std::multimap<double,std::string> allGenFits;
 	bool isMaster;
-	std::mt19937 randNumEngine;
+	std::tr1::mt19937 randNumEngine;
 	int currentGeneration;
 	std::string type;
 

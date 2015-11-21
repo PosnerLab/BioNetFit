@@ -78,11 +78,11 @@ bool createParticlePipe(const char * path) {
 	}
 }
 
-double pickWeighted(double weightSum, multimap<double,double> &weights, int extraWeight, mt19937 &randNumEngine) {
+double pickWeighted(double weightSum, multimap<double,double> &weights, int extraWeight, tr1::mt19937 &randNumEngine) {
 	double lowerBound = 0;
 	double upperBound = weightSum;
 
-	uniform_real_distribution<double> unif(lowerBound,upperBound);
+	tr1::uniform_real<double> unif(lowerBound,upperBound);
 
 	double random = unif(randNumEngine);
 	double chosen = random * ( 1 - (extraWeight / 10 ));
