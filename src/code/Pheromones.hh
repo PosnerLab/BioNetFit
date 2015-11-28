@@ -13,6 +13,8 @@
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
 
+#include <boost/interprocess/ipc/message_queue.hpp>
+
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/map.hpp>
@@ -81,6 +83,7 @@ public:
 
 		std::vector<std::string> message;
 
+	private:
 		friend class boost::serialization::access;
 
 		template<class Archive>
@@ -100,14 +103,20 @@ public:
 
 	void sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message);
 	//int recvMessage(signed int senderID, const int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage = true);
-	int recvMessage(signed int senderID, const int receiverID, int tag, bool block, swarmMsgHolder &messageHolder, bool eraseMessage = true);
+	int recvMessage(signed int senderID, const int receiverID, int tag, bool block, swarmMsgHolder &messageHolder, bool eraseMessage = true, int messageID = -1);
 
 	std::vector<std::string> univMessageSender;
 	//std::vector<std::vector<std::string>> univMessageReceiver;
 	swarmMsgHolder univMessageReceiver;
 
 private:
+	friend class Swarm;
+	friend class Particle;
+
 	Swarm *swarm_;
+
+	// We use pointers for communication objects because we don't necessarily want to initialize
+	// the objects in every case
 
 	// MPI Stuff
 	boost::mpi::environment * env_;
@@ -117,6 +126,9 @@ private:
 
 	// Our shared memory object
 	boost::interprocess::managed_shared_memory *segment_;
+
+	// MQ Stuff
+	std::vector<boost::interprocess::message_queue *> smq_;
 
 
 	typedef boost::interprocess::allocator<char, boost::interprocess::managed_shared_memory::segment_manager>

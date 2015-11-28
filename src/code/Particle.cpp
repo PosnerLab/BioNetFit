@@ -95,7 +95,7 @@ void Particle::doParticle() {
 	while(1) {
 		// First get our path and filename variables set up for use in model generation, sim command, etc
 		string bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
-		string path = swarm_->options.outputDir + "/" + to_string(static_cast<long long int>(swarm_->currentGeneration));
+		string path = swarm_->options.jobOutputDir + "/" + to_string(static_cast<long long int>(swarm_->currentGeneration));
 		string bnglFullPath = path + "/" + bnglFilename;
 
 		string pipePath;
@@ -105,7 +105,7 @@ void Particle::doParticle() {
 		if (swarm_->currentGeneration == 1) {
 			if (swarm_->options.model->getHasGenerateNetwork()){
 				string netFilename = "base.net";
-				string netFullPath = swarm_->options.outputDir + "/" + netFilename;
+				string netFullPath = swarm_->options.jobOutputDir + "/" + netFilename;
 
 				swarm_->options.model->parseNet(netFullPath);
 				model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(static_cast<long long int>(id_)), false, false, true, false, false);
@@ -124,7 +124,7 @@ void Particle::doParticle() {
 		}
 
 		// Construct our simulation command
-		string command = "/home/brandon/projects/GenFit/Simulators/BNG2.pl --outdir " + path + " " + bnglFullPath + ">> " + path + "/" + to_string(static_cast<long long int>(id_)) + ".BNG_OUT 2>&1";
+		string command = swarm_->options.simPath + "BNG2.pl --outdir " + path + " " + bnglFullPath + ">> " + path + "/" + to_string(static_cast<long long int>(id_)) + ".BNG_OUT 2>&1";
 		if (swarm_->options.usePipes) {
 			command += " &";
 		}
@@ -140,12 +140,14 @@ void Particle::doParticle() {
 		if (ret == 0) { // TODO: Need to check for simulation status when using pipes. Going by return code doesn't work there because we're using the & operator
 			string dataPath;
 
+			cout << "sim success" << endl;
 			// Save our simulation outputs to data objects
 			for (std::map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
 				dataPath = path + "/" + i->first + "_" + to_string(static_cast<long long int>(id_)) + ".gdat";
 				dataFiles_[i->first] = new Data(dataPath, swarm_, false);
 			}
 
+			cout << "calc fit" << endl;
 			// Calculate our fit
 			calculateFit();
 
@@ -157,8 +159,10 @@ void Particle::doParticle() {
 				swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(i->second)));
 			}
 
+			cout << "finished" << endl;
 			// Tell the swarm master that we're finished
-			swarm_->swarmComm->sendToSwarm(int(id_), 0, SIMULATION_END, false, swarm_->swarmComm->univMessageSender);
+			swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, false, swarm_->swarmComm->univMessageSender);
+			cout << "finisheder" << endl;
 
 			// Reset the message vector
 			swarm_->swarmComm->univMessageSender.clear();
@@ -180,7 +184,7 @@ void Particle::doParticle() {
 		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
 
 		while (!doContinue) {
-			// Retreive any messages
+			// Retrieve any messages
 			int numCheckedMessages = 0;
 			int numMessages = swarm_->swarmComm->recvMessage(-1, id_, -1, true, swarm_->swarmComm->univMessageReceiver, true);
 
@@ -200,7 +204,7 @@ void Particle::doParticle() {
 					// Store our swap id so we know which swap we're working within
 					swapTracker[swapID] = pID;
 
-					//cout << id_ << " init breeding with " << *o << ". SwapID: " << swapID << endl;
+					cout << id_ << " init breeding with " << pID << ". SwapID: " << swapID << endl;
 
 					// Initiate breeding with that particle
 					initBreedWithParticle(pID, swapID);
@@ -232,7 +236,7 @@ void Particle::doParticle() {
 
 					// Construct our filenames
 					bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
-					path = swarm_->options.outputDir + "/" + to_string(static_cast<long long int>(swarm_->currentGeneration + 1));
+					path = swarm_->options.jobOutputDir + "/" + to_string(static_cast<long long int>(swarm_->currentGeneration + 1));
 					bnglFullPath = path + "/" + bnglFilename;
 
 					// And generate our models

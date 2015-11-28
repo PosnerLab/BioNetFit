@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
 		type = "master";
 
 	// Be sure action and type are valid
-	if (action != "run") {
+	if (action != "run" && action != "cluster") {
 		outputError("Error: Couldn't find a valid 'action' in your arguments.");
 	}
 	if (type != "master" && type != "particle") {
@@ -75,8 +75,6 @@ int main(int argc, char *argv[]) {
 	// Regardless of type or action, we need to set up the Swarm
 	//Timer tmr;
 
-	Config myconfig(configFile);
-
 	//double t = tmr.elapsed();
 	//cout << "Adding .conf took " << t << " seconds" << endl;
 
@@ -84,6 +82,8 @@ int main(int argc, char *argv[]) {
 
 	Swarm *s;
 	if (type == "master") {
+		Config myconfig(configFile);
+		//TODO: When rerunning BioNetFit master on cluster, let's not load parse config twice. Serialize.
 		s = myconfig.createSwarmFromConfig((type=="master") ? true : false);
 
 		//t = tmr.elapsed();
@@ -99,7 +99,8 @@ int main(int argc, char *argv[]) {
 
 		cout << "trying to serialize swarm class" << endl;
 
-		std::ofstream ofs("swarm.txt");
+		string serializedSwarmPath = "swarm_conf.txt";
+		std::ofstream ofs(serializedSwarmPath);
 		if (ofs.is_open()) {
 			boost::archive::text_oarchive ar(ofs);
 			ar & s;
@@ -107,22 +108,43 @@ int main(int argc, char *argv[]) {
 		}
 
 		s->setIsMaster(true);
+
+		if (action == "cluster") {
+			s->setIsClusterInit(true);
+			string runCmd = string(argv[0]);
+			runCmd = s->generateSlurmMultiProgCmd(runCmd, serializedSwarmPath);
+
+			cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
+
+			// TODO: Check return
+			int ret = system(runCmd.c_str());
+
+			return 0;
+		}
+
 		s->doSwarm();
 	}
 
 	// We are a particle
 	else if (type == "particle"){
 
-		// Create and input archive
-		std::ifstream ifs("swarm.txt");
-		if (ifs.is_open()) {
-			boost::archive::text_iarchive ar(ifs);
+		// Try to open the serialized swarm
+		cout << "particle trying to load swarm" << endl;
+		while(1) {
+			// Create and input archive
+			std::ifstream ifs(configFile);
 
-			cout << "particle trying to load swarm";
-			// Load data
-			ar & s;
-			ifs.close();
+			if (ifs.is_open()) {
+				boost::archive::text_iarchive ar(ifs);
+
+				// Load data
+				ar & s;
+				ifs.close();
+				break;
+			}
 		}
+
+		cout << "useCluster is " << s->options.useCluster << endl;
 
 		s->setIsMaster(false);
 		s->setExePath(argv[0]);

@@ -8,6 +8,7 @@
 #ifndef SWARM_HH_
 #define SWARM_HH_
 
+
 #include <vector>
 #include <iostream>
 #include <cstdlib>
@@ -58,8 +59,12 @@ public:
 	void setIsMaster(bool master) { isMaster = master; }
 	bool getIsMaster() { return isMaster; }
 
+	void setIsClusterInit(bool clusterInit) { isClusterInit = clusterInit; }
+
 	void setExePath(std::string path) { exePath_ = path; }
 	void setConfigPath(std::string path) { configPath_ = path; }
+
+	void setSimPath(std::string path) { options.simPath = path; }
 
 	// TODO: Make get/set methods inline
 	void setSwarmType(std::string type);
@@ -74,8 +79,10 @@ public:
 	void setUsePipes(bool usePipes) { options.usePipes = usePipes; }
 	bool getUsePipes() { return options.usePipes; }
 
-	void setUseCluster(bool useCluster);
+	void setUseCluster(bool useCluster) { options.useCluster = useCluster; }
 	bool getUseCluster() { return options.useCluster; }
+
+	void setSaveClusterOutput(bool saveClusterOutput) { options.saveClusterOutput = saveClusterOutput; }
 
 	void setOutputDir(std::string path) { options.outputDir = path; }
 	std::string getOutputDir() { return options.outputDir; }
@@ -113,13 +120,15 @@ public:
 	void breedGeneration();
 	void doParticle(int pID);
 	void launchParticle(int pID);
+
 	Particle *createParticle(int pID);
 	std::string recvFromParticle(Particle *p);
 	std::map<int,Particle*> generateInitParticles(int numParticles = -1);
 	std::vector<int> checkMasterMessages();
 
 	void getClusterInformation();
-	std::string generateSlurmCommand(std::string cmd);
+	std::string generateSlurmCommand(std::string cmd, bool multiProg = true);
+	std::string generateSlurmMultiProgCmd(std::string runCmd, std::string serializedSwarmPath);
 
 	void initComm();
 	void initFit();
@@ -128,6 +137,7 @@ public:
 
 	std::multimap<double,std::string> allGenFits;
 	bool isMaster;
+	bool isClusterInit;
 	std::tr1::mt19937 randNumEngine;
 	int currentGeneration;
 	std::string type;
@@ -138,6 +148,7 @@ public:
 		std::string swarmType;	// genetic or swarm
 		std::string outputDir;	// root directory to use for output
 		std::string jobOutputDir;// outputDir + jobName
+		std::string simPath;	// Path to simulators
 
 		bool synchronicity;		// 1 for synchronous
 
@@ -190,6 +201,7 @@ public:
 
 			ar & outputDir;	// root directory to use for output
 			ar & jobOutputDir;// outputDir + jobName
+			ar & simPath;
 
 			ar & synchronicity;		// 1 for synchronous
 

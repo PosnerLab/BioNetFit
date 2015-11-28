@@ -14,11 +14,13 @@ Swarm::Swarm(bool master) {
 
 	// Whether or not we are master
 	isMaster = master;
+	isClusterInit = false;
 
 	if (isMaster) {
 		currentGeneration = 1;
 	}
 
+	options.simPath = "";
 	options.maxGenerations = 10;
 	options.swarmSize = 10;
 	options.minFit = -1;
@@ -26,6 +28,7 @@ Swarm::Swarm(bool master) {
 	options.boostrap = 0;
 	options.parallelCount = 0;
 	options.useCluster = false;
+	options.saveClusterOutput = false;
 	options.usePipes = false;
 
 	options.divideByInit = false;
@@ -55,10 +58,14 @@ Swarm::Swarm(bool master) {
 }
 
 Swarm::Swarm() {
+
 	if (isMaster) {
 		currentGeneration = 1;
 	}
 
+	isClusterInit = false;
+
+	options.simPath = "";
 	options.maxGenerations = 10;
 	options.swarmSize = 10;
 	options.minFit = -1;
@@ -66,6 +73,7 @@ Swarm::Swarm() {
 	options.boostrap = 0;
 	options.parallelCount = 0;
 	options.useCluster = false;
+	options.saveClusterOutput = false;
 	options.usePipes = false;
 
 	options.divideByInit = false;
@@ -88,6 +96,7 @@ Swarm::Swarm() {
 }
 
 void Swarm::initComm() {
+	cout << "init com, cluster is " << options.useCluster << endl;
 	// Create the comunication class
 	Pheromones *ph = new Pheromones();
 
@@ -191,7 +200,8 @@ void Swarm::addMutate(std::string mutateString) {
 }
 
 void Swarm::doSwarm() {
-	system ("exec rm -r /home/brandon/projects/GenFit2/Debug/output/*");
+
+	//system ("exec rm -r /home/brandon/projects/GenFit2/Debug/output/*");
 	system ("exec rm /home/brandon/projects/GenFit2/Debug/pOUT");
 
 	// Generate all particles that will be present in the swarm
@@ -201,14 +211,14 @@ void Swarm::doSwarm() {
 	// Main swarming loops
 	if (options.synchronicity == 1) {
 
-		// TODO: Error checking
-		string createDirCmd = "mkdir " + options.outputDir + "/1";
+		// TODO: Error checking. Make particles check and create next gen dir
+		string createDirCmd = "mkdir " + options.jobOutputDir + "/1";
 		system(createDirCmd.c_str());
 
 		while (currentGeneration < options.maxGenerations){
 			runGeneration();
 
-			string currentDirectory = options.outputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
+			string currentDirectory = options.jobOutputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
 			if (options.deleteOldFiles) {
 				cleanupFiles(currentDirectory.c_str());
 			}
@@ -277,39 +287,32 @@ std::map<int,Particle*> Swarm::generateInitParticles(int pID) {
 
 void Swarm::launchParticle(int pID) {
 
-	if (currentGeneration == 1) {
-		//string rm = "rm " + to_string(p->getID());
-		//system(rm.c_str());
-		string command = exePath_ + " particle " + to_string(static_cast<long long int>(pID)) + " run " + to_string(static_cast<long long int>(currentGeneration)) + " " + configPath_;
-		//if (p->getID() == 10) {
-		//command = command + ">> " + to_string(p->getID()) + " 2>&1";
+	if (currentGeneration == 1 && !options.useCluster) {
+
+		string command = exePath_ + " particle " + to_string(static_cast<long long int>(pID)) + " run " + to_string(static_cast<long long int>(currentGeneration)) + " " + "swarm_conf.txt";
 		command = command + ">> pOUT 2>&1";
-		//}
 		command = command + " &";
-		// Create the pipe which will be used to communicate with the particle
-		//string path = particleBasePath_ + to_string(p->getID());
-		//createParticlePipe(path.c_str());
+
+		// TODO: Create function pointer to proper cluster command
+		if (options.useCluster) {
+			command = generateSlurmCommand(command);
+		}
 
 		if (options.verbosity >= 3) {
-			cout << "Running Particle " << pID << endl;
+			cout << "Running Particle " << pID << " with command: " << command << endl;
 		}
 
 		// TODO: Check system return value for success
-		int i;
-		i = system(command.c_str());
-		//runningParticles_[p] = "";
+		int i = system(command.c_str());
 		runningParticles_.insert(pID);
 	}
-	else {
+	else if (currentGeneration > 1){
 		cout << "Launching particle " << pID << endl;
 		swarmComm->sendToSwarm(0, pID, NEXT_GENERATION, false, swarmComm->univMessageSender);
 		runningParticles_.insert(pID);
 	}
-	runningParticles_.insert(pID);
-}
 
-void Swarm::setUseCluster(bool useCluster) {
-	options.useCluster = useCluster;
+	runningParticles_.insert(pID);
 }
 
 void Swarm::setCurrentGen(int gen) {
@@ -394,7 +397,7 @@ bool Swarm::sortFits(Particle * a, Particle * b) {
 void Swarm::breedGeneration() {
 	//Timer tmr;
 
-	string createDirCmd = "mkdir " + options.outputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
+	string createDirCmd = "mkdir " + options.jobOutputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
 	system(createDirCmd.c_str());
 
 	// We let particles do the actual breeding.  The master's role is to generate a breeding pattern and
@@ -482,7 +485,7 @@ void Swarm::breedGeneration() {
 			p2 = pickWeighted(weightSum, weights, options.extraWeight, randNumEngine);
 		}
 
-		//cout << "selected " << p1 << " and " << p2 << endl;
+		cout << "selected " << p1 << " and " << p2 << endl;
 
 		// We always send the breeding information to the first parent. That particle will then
 		// initiate breeding with its mate
@@ -511,14 +514,14 @@ void Swarm::breedGeneration() {
 		string pID2 = match[1];
 		parentVec.clear();
 
-		//cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
+		cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
 
 		// Add second parent and swapID to the message
 		swarmComm->univMessageSender.push_back(to_string(static_cast<long long int>(swapID)));
 		swarmComm->univMessageSender.push_back(pID2);
 
 		// Send the message to the first parent
-		//cout << "sending message to " << stoi(pID1) << " with id of " << to_string(swapID) << endl;
+		cout << "sending message to " << stoi(pID1) << " with id of " << to_string(static_cast<long long int>(swapID)) << endl;
 
 		// Tell parent 1 to initiate breeding
 		swarmComm->sendToSwarm(0, stoi(pID1), INIT_BREEDING, false, swarmComm->univMessageSender);
@@ -544,11 +547,11 @@ void Swarm::breedGeneration() {
 
 		numFinishedBreeding+=numMessages;
 	}
-	//cout << "got them all!" << endl;
+	cout << "got them all!" << endl;
 }
 
 void Swarm::finishFit() {
-	string outputDir = options.outputDir + "/Results";
+	string outputDir = options.jobOutputDir + "/Results";
 	string command = "mkdir " + outputDir;
 
 	if (system(command.c_str())) {
@@ -562,7 +565,7 @@ void Swarm::finishFit() {
 
 	killAllParticles(FIT_FINISHED);
 
-	cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options.outputDir << "/Results" << endl;
+	cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options.jobOutputDir << "/Results" << endl;
 }
 
 void Swarm::outputRunSummary(string outputDir) {
@@ -666,17 +669,17 @@ void Swarm::getClusterInformation() {
 	}
 }
 
-string Swarm::generateSlurmCommand(string cmd) {
+string Swarm::generateSlurmCommand(string cmd, bool multiProg) {
 	string command;
+
+	//TODO: Need to generate job submission name
+	//TODO: Need to display terminal output from cluster jobs
 
 	// srun submits the job to the cluster
 	command += "srun";
 
 	// Add the job name
 	command += " -J " + options.jobName;
-
-	// Only need one CPU per particle
-	command += " -c 1";
 
 	// Specify the cluster account if needed
 	if (!options.clusterAccount.empty()) {
@@ -689,13 +692,21 @@ string Swarm::generateSlurmCommand(string cmd) {
 
 	// Specify output directory if needed
 	if (options.saveClusterOutput) {
-		command += " -o " + options.jobOutputDir + options.jobName + "_cluster_output";
+		command += " -o " + options.outputDir + "/" + options.jobName + "_cluster_output/" + options.jobName;
 	}
 	else {
 		command += " -o /dev/null";
 	}
 
-	command+= " " + cmd;
+	if (!multiProg) {
+		command += " -c 1";
+		command+= " " + cmd;
+	}
+	else {
+		command += " -n " + options.swarmSize;
+		command += " -l";
+		command += " --multi-prog " + cmd;
+	}
 
 	return command;
 }
@@ -713,21 +724,23 @@ void Swarm::initFit () {
 
 		// Output model file with dummy parameters. This file will be used to generate
 		// our initial network
-		options.model->outputModelWithParams(allParticles_.at(1)->getParams(), options.outputDir, "base.bngl", "", false, false, false, false, false);
+		options.model->outputModelWithParams(allParticles_.at(1)->getParams(), options.jobOutputDir, "base.bngl", "", false, false, false, false, false);
 
 		// Construct our simulation command and run the network generator
-		string modelPath = options.outputDir + "/base.bngl";
-		string command = "/home/brandon/projects/GenFit/Simulators/BNG2.pl --outdir " + options.outputDir + " " + modelPath + " >> " + options.outputDir + "/netgen_output 2>&1";
-		//cout << "running command: " << command << endl;
+		string modelPath = options.jobOutputDir + "/base.bngl";
+		string command = options.simPath + "BNG2.pl --outdir " + options.jobOutputDir + " " + modelPath + " >> " + options.jobOutputDir + "/netgen_output 2>&1";
+		cout << "Generating initial .net file with command: " << command << endl;
+
+		// TODO: Check this return
 		int ret = system(command.c_str());
 
 		// Now that we have a .net file, replace the full .bngl with a .bngl
 		// containing ONLY action commands and a .net file loader. This is
 		// used later to run our .net files.
-		options.model->outputModelWithParams(allParticles_.at(1)->getParams(), options.outputDir, "base.bngl", "", false, true, false, false, false);
+		options.model->outputModelWithParams(allParticles_.at(1)->getParams(), options.jobOutputDir, "base.bngl", "", false, true, false, false, false);
 
 		// Now store our .net file for later use
-		string netPath = options.outputDir + "/base.net";
+		string netPath = options.jobOutputDir + "/base.net";
 		options.model->parseNet(netPath);
 	}
 }
@@ -751,7 +764,7 @@ vector<int> Swarm::checkMasterMessages() {
 			// Increment our finished counter
 			//numFinishedParticles += 1;
 			finishedParticles.push_back(pID);
-			//cout << "particle " << pID << " finished simulation" << endl;
+			cout << "particle " << pID << " finished simulation" << endl;
 
 			string params = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(pID)) + " ";
 
@@ -801,4 +814,20 @@ vector<int> Swarm::checkMasterMessages() {
 	}
 
 	return finishedParticles;
+}
+
+string Swarm::generateSlurmMultiProgCmd(string runCmd, string serializedSwarmPath) {
+	string multiProgConfPath = options.jobOutputDir + "multiprog.conf";
+	ofstream multiprog(multiProgConfPath, ios::out);
+
+	if (multiprog.is_open()) {
+		multiprog << "0 " << runCmd << " " << configPath_ << endl;
+		for (int id = 1; id <= options.swarmSize; ++id) {
+			multiprog << to_string(static_cast<long long int>(id)) + " " << runCmd << " particle " << to_string(static_cast<long long int>(id)) << " run " << serializedSwarmPath << endl;
+		}
+		multiprog.close();
+	}
+
+
+	return generateSlurmCommand(multiProgConfPath);
 }

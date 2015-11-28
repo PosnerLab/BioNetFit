@@ -80,6 +80,12 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 		s->setSwarmSize(swarmSize);
 	}
 
+	// Update the sim path
+	if(pairs.find("sim_path") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->setSimPath(pairs.find("sim_path")->second);
+	}
+
 	// Update the swarm type
 	if(pairs.find("swarm_type") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
@@ -113,14 +119,25 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	// Tell the swarm if we're using a cluster
 	if(pairs.find("use_cluster") != pairs.end()) {
 		if (stoi(pairs.find("use_cluster")->second)) {
+
+			// Set cluster platform if it was specified
 			if(pairs.find("cluster_software") != pairs.end()) {
 				s->options.clusterSoftware = pairs.find("cluster_software")->second;
 			}
 
 			s->setUseCluster((atoi(pairs.find("use_cluster")->second.c_str()) == 1) ? true : false );
-			//s->setParallelCount(s->getSwarmSize());
 			s->getClusterInformation();
+			cout << "setting useCluster to " << s->options.useCluster << endl;
+			// TODO: Set parallel count accordingly
+			s->setParallelCount(s->options.swarmSize);
 		}
+	}
+
+	// TODO: Need to ensure path gets made
+	// Tell the swarm if we should save cluster output
+	if(pairs.find("save_cluster_output") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->setSaveClusterOutput((atoi(pairs.find("save_cluster_output")->second.c_str()) == 1) ? true : false );
 	}
 
 	// Update swap rate
@@ -138,8 +155,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	// Whether or not to force difference parents
 	if(pairs.find("force_different_parents") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setUseCluster((atoi(pairs.find("force_different_parents")->second.c_str()) == 1) ? true : false );
-		s->setParallelCount(s->getSwarmSize());
+		s->setForceDifferentParents((atoi(pairs.find("force_different_parents")->second.c_str()) == 1) ? true : false );
 	}
 
 	// How many retries when breeding
@@ -162,6 +178,14 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	// Set the job output directory
 	s->options.jobOutputDir = s->options.outputDir + "/" + s->options.jobName + "/";
+	// TODO: Move directory creation to a swam function.  Also need to check cmd success.
+
+	// TODO: Check for existence of outputdir first
+	string cmd = "mkdir " + s->options.outputDir;
+	int ret = system(cmd.c_str());
+
+	cmd = "mkdir " + s->options.jobOutputDir;
+	ret = system(cmd.c_str());
 
 	// Set verbosity
 	if(pairs.find("verbosity") != pairs.end()) {
@@ -171,8 +195,8 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	// Set fit value that will cause fit to end
 	if(pairs.find("min_fit") != pairs.end()) {
-			//cout << "Adding model file: " << pairs.find("model")->second << endl;
-			s->options.minFit = stod(pairs.find("min_fit")->second);
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->options.minFit = stod(pairs.find("min_fit")->second);
 	}
 
 	// Set the maximum fit value to consider in breeding
