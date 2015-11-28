@@ -306,6 +306,10 @@ void Swarm::launchParticle(int pID) {
 		int i = system(command.c_str());
 		runningParticles_.insert(pID);
 	}
+	else if (currentGeneration == 1 && options.useCluster) {
+		runningParticles_.insert(pID);
+		cout << "launching " << pID	 << endl;
+	}
 	else if (currentGeneration > 1){
 		cout << "Launching particle " << pID << endl;
 		swarmComm->sendToSwarm(0, pID, NEXT_GENERATION, false, swarmComm->univMessageSender);
@@ -332,11 +336,20 @@ void Swarm::runGeneration () {
 	std::map<int,Particle*>::iterator p = allParticles_.begin();
 
 	while (numFinishedParticles < options.swarmSize) {
-		// Launch particles (staying within bounds of parallel_count)
-		if (runningParticles_.size() < options.parallelCount && numLaunchedParticles < options.swarmSize) {
-			launchParticle(p->first);
-			numLaunchedParticles += 1;
-			++p;
+		// If we're running on a cluster and submitting all particles at once
+		if (options.useCluster && options.parallelCount == options.swarmSize) {
+			while (p != allParticles_.end()) {
+				launchParticle(p->first);
+				numLaunchedParticles += 1;
+				++p;
+			}
+		}
+		else {
+			if (runningParticles_.size() < options.parallelCount && numLaunchedParticles < options.swarmSize) {
+				launchParticle(p->first);
+				numLaunchedParticles += 1;
+				++p;
+			}
 		}
 
 		// Check for any messages from particles
@@ -344,7 +357,6 @@ void Swarm::runGeneration () {
 		finishedParticles = checkMasterMessages();
 		numFinishedParticles += finishedParticles.size();
 		finishedParticles.clear();
-
 	}
 	if (failedParticles_.size() > (options.swarmSize - 3) ) {
 		outputError("Error: You had too many failed runs. Check simulation output or adjust walltime.");
@@ -752,32 +764,50 @@ vector<int> Swarm::checkMasterMessages() {
 
 	if (numMessages >= 1) {
 		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
+		cout << "found " << numMessages << " messages" << endl;
+
+		for (auto i = swarmComm->univMessageReceiver.begin(); i != swarmComm->univMessageReceiver.end(); ++i) {
+			cout << "i: " << i->first << endl;
+		}
 
 		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_END);
+		cout << "got er" << endl;
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
+			cout << "loop" << endl;
 			int pID = sm->second.sender;
+			cout << "particle " << pID << " finished simulation" << endl;
 
 			// Get an iterator to the particle in our list of running particles
 			runningParticlesIterator_ = runningParticles_.find(pID);
 			// Then remove it
+			if (runningParticlesIterator_ == runningParticles_.end()) {
+				outputError("Error: Couldn't remove particle from runningParticle list.");
+			}
 			runningParticles_.erase(runningParticlesIterator_);
 			// Increment our finished counter
 			//numFinishedParticles += 1;
+			cout << "erased it" << endl;
+
+
 			finishedParticles.push_back(pID);
-			cout << "particle " << pID << " finished simulation" << endl;
+			cout << "pushed pid" << endl;
 
 			string params = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(pID)) + " ";
+			cout << "make string" << endl;
 
 			double fitCalc = stod(sm->second.message[0]);
+			cout << "stored calc" << endl;
 
 			// Store the parameters given to us by the particle
 			for (vector<string>::iterator m = sm->second.message.begin()+1; m != sm->second.message.end(); ++m) {
 				params += *m + " ";
 			}
+			cout << "stored params" << endl;
 
 			// Then store it
-			//cout << "saving fit for " << pID << " of " << fitCalc << endl;
+			cout << "saving fit for " << pID << " of " << fitCalc << endl;
 			allGenFits.insert(pair<double,string>(fitCalc,params));
+			cout << "saved fit" << endl;
 		}
 
 		// TODO: When sending NEXT_GENERATION, make sure failed particles have actually run again. If not, they need re-launched.

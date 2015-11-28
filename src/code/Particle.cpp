@@ -195,7 +195,7 @@ void Particle::doParticle() {
 
 					// Convert the swapID to a unique negative number less than 1000
 					int swapID = stoi(sm->second.message[0]);
-					swapID = (swapID * -1) - 1000;
+					swapID += 1000;
 					cout << id_ << " init loop " << swapID << endl;
 
 					// Store the particle with which to breed
@@ -266,7 +266,7 @@ void Particle::doParticle() {
 
 			// TODO: maybe we should search for all tags within this loop, rather then using equal_ranges
 			for (Pheromones::swarmMsgHolderIt sm = swarm_->swarmComm->univMessageReceiver.begin(); sm != swarm_->swarmComm->univMessageReceiver.end(); ++sm) {
-				if (sm->first < -1000) {
+				if (sm->first > 1000) {
 					//Timer tmr;
 
 					// Store our swapID
@@ -290,7 +290,7 @@ void Particle::doParticle() {
 						//cout << id_ << " found " << swapTracker[swapID] << " at " << swapID << endl;
 						//cout <<  id_ << " being given swapped parameters in swapID " << swapID << ". Receiving from the reciprocator: "<< reciprocateTo << endl;
 						// Convert swapID to pID. pID is the "child" who receives the final parameter set
-						pID = (swapID * - 1) - 1000;
+						pID = swapID - 1000;
 
 						// Parse the received particles and integrate them with our own
 						rcvBreedWithParticle(params, 0, swapID, pID);
@@ -309,7 +309,7 @@ void Particle::doParticle() {
 
 						//cout << id_  << " being given swapped parameters in swapID " << swapID << ". Receiving from the initiator: "<< reciprocateTo << endl;
 						// Convert swapID to pID. pID is the "child" who receives the final parameter set
-						pID = (swapID * - 1) - 999;
+						pID = swapID - 999;
 
 						// Parse the received particles and integrate them with our own
 						rcvBreedWithParticle(params, reciprocateTo, swapID, pID);

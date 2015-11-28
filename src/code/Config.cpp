@@ -130,6 +130,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 			cout << "setting useCluster to " << s->options.useCluster << endl;
 			// TODO: Set parallel count accordingly
 			s->setParallelCount(s->options.swarmSize);
+			cout << "setting parallelCount to swarmSize" << endl;
 		}
 	}
 

@@ -157,15 +157,15 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 		for (std::vector<int>::iterator i = receivers.begin(); i != receivers.end(); ++i) {
 			// Blocking send
 			if (block) {
-				//std::cout << "attempting a block send from " << senderID << " to " << receiverID << std::endl;
+				std::cout << "attempting a block send from " << senderID << " to " << receiverID << std::endl;
 				world_->send(receiverID, tag, smessage);
-				//std::cout << "block send from " << senderID << " to " << receiverID << " succeeded" << std::endl;
+				std::cout << "block send from " << senderID << " to " << receiverID << " succeeded" << std::endl;
 			}
 			// Non-blocking send
 			else {
-				//std::cout << "attempting a non-block send from " << senderID << " to " << receiverID << std::endl;
+				std::cout << "attempting a non-block send from " << senderID << " to " << receiverID << std::endl;
 				world_->isend(receiverID, tag, smessage);
-				//std::cout << "non-block send from " << senderID << " to " << receiverID << " succeeded" << std::endl;
+				std::cout << "non-block send from " << senderID << " to " << receiverID << " succeeded" << std::endl;
 			}
 		}
 	}
@@ -390,52 +390,46 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 		swarmMessage smessage;
 
 		while (1) {
-
-			//std::cout << "rcv loop" << std::endl;
+			std::cout << "rcv loop" << std::endl;
+			sleep(1);
 			if (block) {
-				//std::cout << "trying a blocking receive to " << receiverID << " from " << senderID << std::endl;
-				recvStatus_ = world_->recv(senderID, tag, smessage);
+				std::cout << "trying a blocking receive to " << receiverID << " from " << senderID << std::endl;
+				world_->recv(senderID, tag, smessage);
 				block = false;
-				//std::cout << "blocking receive to " << receiverID << " from " << senderID << " succeeded" << std::endl;
+				std::cout << "blocking receive to " << receiverID << " from " << senderID << " succeeded" << std::endl;
 			}
 			else {
-				//std::cout << "trying a non-blocking receive to " << receiverID << " from " << senderID << std::endl;
+				std::cout << "trying a non-blocking receive to " << receiverID << " from " << senderID << std::endl;
 				recvRequest_ = world_->irecv(senderID, tag, smessage);
-				recvStatus_ = recvRequest_.wait();
-				//std::cout << "non-blocking receive to " << receiverID << " from " << senderID << " succeeded" << std::endl;
+				std::cout << "waiting.." << std::endl;
+
+				if (!recvRequest_.test()) {
+					std::cout << "nonblock break" << std::endl;
+					recvRequest_.cancel();
+					break;
+				}
+
+				std::cout << "non-blocking receive to " << receiverID << " from " << senderID << " succeeded" << std::endl;
 			}
 
 			// If we have any messages in our messageHolder, let's process them
-			if (recvStatus_.m_count) {
-				//std::cout << "messageholder not empty" << std::endl;
-				// If we are not blocking (used irecv), need to wait on the message to receive its metadata
+			std::cout << "messageholder not empty: " << smessage.tag << ":" << smessage.sender << std::endl;
 
-				// Make sure our message matches the sender, tag, and id we requested
-				if ( (tag == -1 || stoi(smessage.tag) == tag) && (senderID == -1 || senderID == smessage.sender) && (messageID == -1 || messageID == smessage.id)) {
-					// Insert the message into our message holder and increment numMessages
-					messageHolder.insert(std::pair<int, swarmMessage>(tag, smessage));
-					++numMessages;
+			// Make sure our message matches the sender, tag, and id we requested
+			if ( (tag == -1 || tag == stoi(smessage.tag)) && (senderID == -1 || senderID == smessage.sender) && (messageID == -1 || messageID == smessage.id)) {
+				// Insert the message into our message holder and increment numMessages
+				std::cout << "inserting " << std::endl;
+				messageHolder.insert(std::pair<int, swarmMessage>(stoi(smessage.tag), smessage));
+				++numMessages;
 
-					// If user doesn't want to erase the message, put it back in the queue
-					if (!eraseMessage) {
-						sendToSwarm(senderID, receiverID, tag, false, smessage.message);
-					}
-				}
-				else {
-					std::cout << "putting it back in the queue..." << std::endl;
+				// If user doesn't want to erase the message, put it back in the queue
+				if (!eraseMessage) {
 					sendToSwarm(senderID, receiverID, tag, false, smessage.message);
 				}
 			}
-
-			// If we didn't receive any messages, time to clean up and exit the loop
-			else if (!block) {
-				//std::cout << "nonblock break" << std::endl;
-				recvRequest_.cancel();
-				break;
-			}
 			else {
-				//std::cout << "block break" << std::endl;
-				break;
+				std::cout << "putting it back in the queue..." << std::endl;
+				sendToSwarm(senderID, receiverID, tag, false, smessage.message);
 			}
 		}
 	}
