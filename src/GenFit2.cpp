@@ -105,15 +105,14 @@ int main(int argc, char *argv[]) {
 			s->initComm();
 		}
 
-		if (action == "cluster") {
-
+		if (action == "cluster" || action == "run") {
 			int randNum = rand();
 			string serializedSwarmPath = to_string(static_cast<long long int>(randNum)) + ".sconf";
 
 			std::ofstream ofs(serializedSwarmPath);
 			if (ofs.is_open()) {
 				s->setsConf(convertToAbsPath(serializedSwarmPath));
-				cout << "Path is: " << s->getsConf() << endl;
+				//cout << "Path is: " << s->getsConf() << endl;
 
 				boost::archive::text_oarchive ar(ofs);
 				ar & s;
@@ -121,6 +120,9 @@ int main(int argc, char *argv[]) {
 			}
 
 			s->setIsMaster(true);
+		}
+
+		if (action == "cluster") {
 			s->setIsClusterInit(true);
 
 			string runCmd = string(convertToAbsPath(argv[0]));
@@ -134,7 +136,6 @@ int main(int argc, char *argv[]) {
 			return 0;
 		}
 		else if (action == "load") {
-			cout << "master loading config file: " << configFile << endl;
 			std::ifstream ifs(configFile);
 
 			if (ifs.is_open()) {
@@ -149,15 +150,12 @@ int main(int argc, char *argv[]) {
 			s->setExePath(convertToAbsPath(argv[0]));
 			s->initComm();
 		}
-		cout << "doswarm" << endl;
 		s->doSwarm();
 	}
 
 	// We are a particle
 	else if (type == "particle"){
-
 		// Try to open the serialized swarm
-		cout << "particle trying to load swarm" << endl;
 		while(1) {
 			// Create and input archive
 			std::ifstream ifs(configFile);
@@ -172,9 +170,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		cout << "setting master to false" << endl;
 		s->setIsMaster(false);
-		cout << "setting exe path to " << convertToAbsPath(argv[0]) << endl;
 		s->setExePath(convertToAbsPath(argv[0]));
 
 		s->initComm();

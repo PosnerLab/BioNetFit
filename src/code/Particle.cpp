@@ -92,13 +92,15 @@ void Particle::generateParams() {
 
 void Particle::doParticle() {
 
+	//cout << "Particle " << id_ << " waiting to begin" << endl;
 	swarm_->swarmComm->recvMessage(0, id_, 18, true, swarm_->swarmComm->univMessageReceiver);
+	//cout << "Particle " << id_ << " starting" << endl;
 
 	while(1) {
 		// First get our path and filename variables set up for use in model generation, sim command, etc
 		string bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
-		string path = swarm_->options.jobOutputDir + "/" + to_string(static_cast<long long int>(swarm_->currentGeneration));
-		string bnglFullPath = path + "/" + bnglFilename;
+		string path = swarm_->options.jobOutputDir + "" + to_string(static_cast<long long int>(swarm_->currentGeneration)) + "/";
+		string bnglFullPath = path + bnglFilename;
 
 		string pipePath;
 
@@ -107,7 +109,7 @@ void Particle::doParticle() {
 		if (swarm_->currentGeneration == 1) {
 			if (swarm_->options.model->getHasGenerateNetwork()){
 				string netFilename = "base.net";
-				string netFullPath = swarm_->options.jobOutputDir + "/" + netFilename;
+				string netFullPath = swarm_->options.jobOutputDir + netFilename;
 
 				swarm_->options.model->parseNet(netFullPath);
 				model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(static_cast<long long int>(id_)), false, false, true, false, false);
@@ -120,7 +122,7 @@ void Particle::doParticle() {
 		// Generate .gdat pipes if we're using pipes
 		if (swarm_->options.usePipes) {
 			for (std::map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
-				pipePath = path + "/" + i->first + "_" + to_string(static_cast<long long int>(id_)) + ".gdat";
+				pipePath = path + i->first + "_" + to_string(static_cast<long long int>(id_)) + ".gdat";
 				createParticlePipe(pipePath.c_str());
 			}
 		}
@@ -142,14 +144,12 @@ void Particle::doParticle() {
 		if (ret == 0) { // TODO: Need to check for simulation status when using pipes. Going by return code doesn't work there because we're using the & operator
 			string dataPath;
 
-			cout << "sim success" << endl;
 			// Save our simulation outputs to data objects
 			for (std::map<std::string,Model::action>::iterator i = model_->actions.begin(); i != model_->actions.end(); ++i) {
 				dataPath = path + "/" + i->first + "_" + to_string(static_cast<long long int>(id_)) + ".gdat";
 				dataFiles_[i->first] = new Data(dataPath, swarm_, false);
 			}
 
-			cout << "calc fit" << endl;
 			// Calculate our fit
 			calculateFit();
 
@@ -161,11 +161,10 @@ void Particle::doParticle() {
 				swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(i->second)));
 			}
 
-			cout << "finished" << endl;
 			// Tell the swarm master that we're finished
+			cout << id_ << " telling swarm we're finished" << endl;
 			swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, true, swarm_->swarmComm->univMessageSender);
-			cout << "finisheder" << endl;
-
+			cout << id_ << " done telling swarm" << endl;
 			// Reset the message vector
 			swarm_->swarmComm->univMessageSender.clear();
 		}
@@ -198,7 +197,7 @@ void Particle::doParticle() {
 					// Convert the swapID to a unique negative number less than 1000
 					int swapID = stoi(sm->second.message[0]);
 					swapID += 1000;
-					cout << id_ << " init loop " << swapID << endl;
+					//cout << id_ << " init loop " << swapID << endl;
 
 					// Store the particle with which to breed
 					int pID = stoi(sm->second.message[1]);
@@ -206,13 +205,13 @@ void Particle::doParticle() {
 					// Store our swap id so we know which swap we're working within
 					swapTracker[swapID] = pID;
 
-					cout << id_ << " init breeding with " << pID << ". SwapID: " << swapID << endl;
+					//cout << id_ << " init breeding with " << pID << ". SwapID: " << swapID << endl;
 
 					// Initiate breeding with that particle
 					initBreedWithParticle(pID, swapID);
 
-					double t = tmr.elapsed();
-					cout << id_ << " INIT_BREEDING took " << t << " seconds" << endl;
+					//double t = tmr.elapsed();
+					//cout << id_ << " INIT_BREEDING took " << t << " seconds" << endl;
 
 					++numCheckedMessages;
 				}
@@ -225,7 +224,7 @@ void Particle::doParticle() {
 
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(SEND_FINAL_PARAMS_TO_PARTICLE);
 			if (smhRange.first != smhRange.second) {
-				cout << id_ << "found final " << endl;
+				//cout << id_ << "found final " << endl;
 				for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 					//Timer tmr;
 
@@ -252,7 +251,7 @@ void Particle::doParticle() {
 					}
 
 					// Tell the master we have our new params and are ready for the next generation
-					cout << id_ << " telling master we're finished " << endl;
+					//cout << id_ << " telling master we're finished " << endl;
 					swarm_->swarmComm->sendToSwarm(id_, 0, DONE_BREEDING, false, swarm_->swarmComm->univMessageSender);
 
 					//double t = tmr.elapsed();

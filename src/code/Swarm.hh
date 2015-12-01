@@ -112,6 +112,7 @@ public:
 	void addMutate(std::string mutateString);
 	void setsConf(std::string conf) { sConf_ = conf; }
 	std::string getsConf() { return sConf_; }
+	void setJobOutputDir(std::string dir);
 
 	void setCurrentGen(int gen);
 

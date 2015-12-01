@@ -98,7 +98,6 @@ Swarm::Swarm() {
 }
 
 void Swarm::initComm() {
-	cout << "init com, cluster is " << options.useCluster << endl;
 	// Create the comunication class
 	Pheromones *ph = new Pheromones();
 
@@ -119,8 +118,8 @@ void Swarm::addExp(string path) {
 	this->options.expFiles.insert(make_pair(basename, new Data(path, this, true)));
 	//cout << "exp inserted" << endl;
 
-	double t = tmr.elapsed();
-	cout << "Adding .exp took " << t << " seconds" << endl;
+	//double t = tmr.elapsed();
+	//cout << "Adding .exp took " << t << " seconds" << endl;
 }
 
 void Swarm::setModel(string path) {
@@ -145,6 +144,42 @@ void Swarm::setSwarmType(string type) {
 	if (options.swarmType == "swarm") {
 		setParallelCount(options.swarmSize);
 		cout << "setting parallelCount to swarmSize" << endl;
+	}
+}
+
+void Swarm::setJobOutputDir(string path) {
+	options.jobOutputDir = path;
+
+	if (!checkIfFileExists(options.outputDir)) {
+		string cmd = "mkdir " + options.outputDir;
+		//cout << "running: " << cmd << endl;
+		int ret = system(cmd.c_str());
+	}
+
+	if (checkIfFileExists(options.jobOutputDir)) {
+		string input;
+		string answer;
+		while (1) {
+			cout << "Warning: Your output directory " << options.jobOutputDir << " already exists. Overwrite? (Y or N) ";
+			getline(cin, input);
+			stringstream myInp(input);
+			myInp >> answer;
+
+			if (answer == "Y" || answer == "y") {
+				string cmd = "rm -r " + options.jobOutputDir + "*";
+				//cout << "running: " << cmd << endl;
+				int ret = system(cmd.c_str());
+				break;
+			}
+			else if (answer == "N" || answer == "n") {
+				outputError("Error: Output directory already exists. Quitting.");
+			}
+		}
+	}
+	else {
+		string cmd = "mkdir " + options.jobOutputDir;
+		//cout << "else running: " << cmd << endl;
+		int ret = system(cmd.c_str());
 	}
 }
 
@@ -222,7 +257,7 @@ void Swarm::doSwarm() {
 		string createDirCmd = "mkdir " + options.jobOutputDir + "1";
 		system(createDirCmd.c_str());
 
-		while (currentGeneration < options.maxGenerations){
+		while (currentGeneration <= options.maxGenerations){
 			runGeneration();
 
 			string currentDirectory = options.jobOutputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
@@ -230,7 +265,7 @@ void Swarm::doSwarm() {
 				cleanupFiles(currentDirectory.c_str());
 			}
 
-			if (currentGeneration < options.maxGenerations) {
+			if (currentGeneration <= options.maxGenerations) {
 				breedGeneration();
 			}
 		}
@@ -342,7 +377,6 @@ void Swarm::runGeneration () {
 		else {*/
 
 		if (runningParticles_.size() < options.parallelCount && numLaunchedParticles < options.swarmSize) {
-			cout << "rp: " << runningParticles_.size() << " pc: " << options.parallelCount << endl;
 			launchParticle(p->first);
 			numLaunchedParticles += 1;
 			++p;
@@ -406,8 +440,9 @@ bool Swarm::sortFits(Particle * a, Particle * b) {
 void Swarm::breedGeneration() {
 	//Timer tmr;
 
-	string createDirCmd = "mkdir " + options.jobOutputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
-	system(createDirCmd.c_str());
+	// TODO: Check ret
+	string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
+	int ret = system(createDirCmd.c_str());
 
 	// We let particles do the actual breeding.  The master's role is to generate a breeding pattern and
 	// tell which particles to breed with which
@@ -494,7 +529,7 @@ void Swarm::breedGeneration() {
 			p2 = pickWeighted(weightSum, weights, options.extraWeight, randNumEngine);
 		}
 
-		cout << "selected " << p1 << " and " << p2 << endl;
+		//cout << "selected " << p1 << " and " << p2 << endl;
 
 		// We always send the breeding information to the first parent. That particle will then
 		// initiate breeding with its mate
@@ -523,14 +558,14 @@ void Swarm::breedGeneration() {
 		string pID2 = match[1];
 		parentVec.clear();
 
-		cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
+		//cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
 
 		// Add second parent and swapID to the message
 		swarmComm->univMessageSender.push_back(to_string(static_cast<long long int>(swapID)));
 		swarmComm->univMessageSender.push_back(pID2);
 
 		// Send the message to the first parent
-		cout << "sending message to " << stoi(pID1) << " with id of " << to_string(static_cast<long long int>(swapID)) << endl;
+		//cout << "sending message to " << stoi(pID1) << " with id of " << to_string(static_cast<long long int>(swapID)) << endl;
 
 		// Tell parent 1 to initiate breeding
 		swarmComm->sendToSwarm(0, stoi(pID1), INIT_BREEDING, false, swarmComm->univMessageSender);
@@ -556,7 +591,7 @@ void Swarm::breedGeneration() {
 
 		numFinishedBreeding+=numMessages;
 	}
-	cout << "got them all!" << endl;
+	//cout << "got them all!" << endl;
 }
 
 void Swarm::finishFit() {
@@ -574,7 +609,7 @@ void Swarm::finishFit() {
 
 	killAllParticles(FIT_FINISHED);
 
-	cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options.jobOutputDir << "/Results" << endl;
+	cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options.jobOutputDir << "Results" << endl;
 }
 
 void Swarm::outputRunSummary(string outputDir) {
@@ -759,23 +794,19 @@ void Swarm::initFit () {
 vector<int> Swarm::checkMasterMessages() {
 	vector<int> finishedParticles;
 	//int numFinishedParticles = 0;
-	cout << "checking messages" << endl;
+	//cout << "checking messages" << endl;
 	int numMessages = swarmComm->recvMessage(-1, 0, -1, false, swarmComm->univMessageReceiver);
 
 	if (numMessages >= 1) {
 		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
-		cout << "found " << numMessages << " messages" << endl;
-
-		for (auto i = swarmComm->univMessageReceiver.begin(); i != swarmComm->univMessageReceiver.end(); ++i) {
-			cout << "i: " << i->first << endl;
-		}
 
 		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_END);
-		cout << "got er" << endl;
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
-			cout << "loop" << endl;
 			int pID = sm->second.sender;
-			cout << "particle " << pID << " finished simulation" << endl;
+
+			if (options.verbosity >= 3) {
+				cout << "Particle " << pID << " finished simulation" << endl;
+			}
 
 			// Get an iterator to the particle in our list of running particles
 			runningParticlesIterator_ = runningParticles_.find(pID);
@@ -786,28 +817,26 @@ vector<int> Swarm::checkMasterMessages() {
 			runningParticles_.erase(runningParticlesIterator_);
 			// Increment our finished counter
 			//numFinishedParticles += 1;
-			cout << "erased it" << endl;
 
 
 			finishedParticles.push_back(pID);
-			cout << "pushed pid" << endl;
+			//cout << "pushed pid" << endl;
 
 			string params = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(pID)) + " ";
-			cout << "make string" << endl;
 
 			double fitCalc = stod(sm->second.message[0]);
-			cout << "stored calc" << endl;
+			//cout << "stored calc" << endl;
 
 			// Store the parameters given to us by the particle
 			for (vector<string>::iterator m = sm->second.message.begin()+1; m != sm->second.message.end(); ++m) {
 				params += *m + " ";
 			}
-			cout << "stored params" << endl;
+			//cout << "stored params" << endl;
 
 			// Then store it
-			cout << "saving fit for " << pID << " of " << fitCalc << endl;
+			//cout << "saving fit for " << pID << " of " << fitCalc << endl;
 			allGenFits.insert(pair<double,string>(fitCalc,params));
-			cout << "saved fit" << endl;
+			//cout << "saved fit" << endl;
 		}
 
 		// TODO: When sending NEXT_GENERATION, make sure failed particles have actually run again. If not, they need re-launched.

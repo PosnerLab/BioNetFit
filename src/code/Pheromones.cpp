@@ -26,21 +26,21 @@ void Pheromones::init(Swarm *s) {
 	// Using IPC
 	else {
 
-		std::cout << "init ipc" << std::endl;
+		//std::cout << "init ipc" << std::endl;
 		if (s->getIsMaster()) {
 			for (int i = 0; i <= swarm_->options.swarmSize; ++i) {
 				// TODO: The type conversion here is horrible
 				message_queue::remove(std::to_string(static_cast<long long int>(i)).c_str());
 				message_queue *smq = new message_queue(create_only, std::to_string(static_cast<long long int>(i)).c_str(), 10, 1000);
 				smq_.push_back(smq);
-				std::cout << "creating: " << std::to_string(static_cast<long long int>(i)) << std::endl;
+				//std::cout << "creating: " << std::to_string(static_cast<long long int>(i)) << std::endl;
 			}
 		}
 		else {
 			for (int i = 0; i <= swarm_->options.swarmSize; ++i) {
 				message_queue *smq = new message_queue(open_only, std::to_string(static_cast<long long int>(i)).c_str());
 				smq_.push_back(smq);
-				std::cout << "opening: " << std::to_string(static_cast<long long int>(i)) << " with max size of " << smq_[i]->get_max_msg() << std::endl;
+				//std::cout << "opening: " << std::to_string(static_cast<long long int>(i)) << " with max size of " << smq_[i]->get_max_msg() << std::endl;
 			}
 		}
 
@@ -53,7 +53,7 @@ void Pheromones::init(Swarm *s) {
 			smq_ = new message_queue(open_only, "SwarmQ");
 		}
 		 */
-		std::cout << "end init ipc" << std::endl;
+		//std::cout << "end init ipc" << std::endl;
 		/*
 		std::cout << "init ipc" << std::endl;
 		if (s->getIsMaster()) {
@@ -105,7 +105,7 @@ void Pheromones::init(Swarm *s) {
 	}
 }
 
-void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message) {
+void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message, int messageID) {
 	// Using MPI
 	if (swarm_->options.useCluster) {
 		std::vector<int> receivers;
@@ -236,41 +236,41 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 		// Add the message array to the swarmMessage
 		//for (auto m: mpiMessage) {
 		for (auto m = message.begin(); m != message.end(); ++m) {
-			//std::cout << "adding: " << *m << std::endl;
+			//std::cout << senderID << " adding: " << *m << std::endl;
 			smessage.message.push_back(*m);
 		}
 
 		// Set a random messageID
-		int id = rand();
-		smessage.id = id;
+		if (messageID == -1) {
+			messageID = rand();
+		}
+
+		smessage.id = messageID;
 
 		// Serialize the swarmMessage
-		// NEW
 		std::string serializedMessage = serializeSwarmMessage(smessage);
 		serializedMessage.resize(1000);
 
 		// Loop through receivers and perform the send operation
 		for (std::vector<int>::iterator i = receivers.begin(); i != receivers.end(); ++i) {
-
-			//std::cout << "sending " << smessage.tag << " to " << *i	<< ". ser: " << serializedMessage.data() << std::endl;
+			//std::cout << senderID << " sending " << smessage.tag << " to " << *i	<< ". ser: " << serializedMessage.data() << std::endl;
 			smq_[*i]->send(serializedMessage.data(), serializedMessage.size(), 0);
 			//std::cout << "sent" << std::endl;
 			if (block) {
-				if (block) {
-					bool foundMessage = true;
-					while (foundMessage) {
-						usleep(250000);
+				bool foundMessage = true;
+				while (foundMessage) {
+					usleep(150000);
+					//std::cout << senderID << "loop" << std::endl;
 
-						// TODO: This non-erasing recvMessage might slow down the receiver finding the message since it
-						// requires a re-send every time we check
+					// TODO: This non-erasing recvMessage might slow down the receiver finding the message since it
+					// requires a re-send every time we check
 
-						// If we're blocking, we need to repeatedly check to see if the message still exists in the queue
-						if (recvMessage(senderID, receiverID, tag, false, univMessageReceiver, false, id)) {
-							foundMessage = true;
-						}
-						else {
-							foundMessage = false;
-						}
+					// If we're blocking, we need to repeatedly check to see if the message still exists in the queue
+					if (recvMessage(senderID, receiverID, tag, false, univMessageReceiver, false, messageID)) {
+						foundMessage = true;
+					}
+					else {
+						foundMessage = false;
 					}
 				}
 			}
@@ -404,10 +404,10 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 				char smChar[*msgLength+1];
 
 				//if (block) {
-					std::cout << "trying a blocking receive to " << receiverID << " from " << senderID << std::endl;
-					world_->recv(senderID, tag, smChar, *msgLength);
-					block = false;
-					std::cout << "blocking receive to " << receiverID << " from " << senderID << " succeeded" << std::endl;
+				//std::cout << "trying a blocking receive to " << receiverID << " from " << senderID << std::endl;
+				world_->recv(senderID, tag, smChar, *msgLength);
+				block = false;
+				//std::cout << "blocking receive to " << receiverID << " from " << senderID << " succeeded" << std::endl;
 				//}
 				/*
 				else {
@@ -424,7 +424,7 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 						break;
 					}
 				}
-				*/
+				 */
 
 				swarmMessage smessage = deserializeSwarmMessage(std::string(smChar));
 				serializedMessage.clear();
@@ -491,10 +491,16 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 			serializedMessage.resize(recvd_size);
 			swarmMessage smessage = deserializeSwarmMessage(serializedMessage);
 
+
 			serializedMessage.clear();
 			serializedMessage.resize(1000);
 
 			// Make sure our message matches the sender, tag, and id we requested
+			/*
+			std::cout << "tag: " << tag << ":" << smessage.tag << std::endl;
+			std::cout << "sender: " << tag << ":" << smessage.sender << std::endl;
+			std::cout << "id: " << tag << ":" << smessage.id << std::endl;
+			*/
 			if ( (tag == -1 || stoi(smessage.tag) == tag) && (senderID == -1 || senderID == smessage.sender) && (messageID == -1 || messageID == smessage.id)) {
 				// Insert the message into our message holder and increment numMessages
 				messageHolder.insert(std::pair<int, swarmMessage>(stoi(smessage.tag), smessage));
@@ -503,6 +509,7 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 
 				// If user doesn't want to erase the message, put it back in the queue
 				if (!eraseMessage) {
+					//std::cout << "noerase" << std::endl;
 					sendToSwarm(senderID, receiverID, tag, false, smessage.message);
 				}
 			}
@@ -511,7 +518,7 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 				// unless we use a different queue for every particle
 
 				//std::cout << "putting it back in the queue..." << std::endl;
-				sendToSwarm(senderID, receiverID, tag, false, smessage.message);
+				sendToSwarm(smessage.sender, receiverID, stoi(smessage.tag), false, smessage.message, smessage.id);
 			}
 		}
 	}

@@ -1,0 +1,210 @@
+22 serialization::archive 13 0 1 0
+0 0 0 0 0 46 /home/brandon/projects/GenFit2/Debug/test.conf 1 44 /home/brandon/projects/GenFit2/Debug/GenFit2 0 0 8 example5 7 genetic 43 /home/brandon/projects/GenFit2/Debug/output 53 /home/brandon/projects/GenFit2/Debug/output/example5/ 41 /home/brandon/projects/GenFit/Simulators/ 1 3 1 0
+1 0 0 6 0 0 0 4 K2RT 6 1 0
+2 4 K2RT 14 loguniform_var 2.000000030e-01 1.000000015e-01 1.000000047e-03 1.000000000e+03 1 3 KD1 6
+3 3 KD1 14 loguniform_var 2.000000030e-01 1.000000015e-01 1.000000047e-03 1.000000000e+03 1 7 kdephos 6
+4 7 kdephos 14 loguniform_var 2.000000030e-01 1.000000015e-01 1.000000047e-03 1.000000000e+03 1 3 km1 6
+5 3 km1 14 loguniform_var 2.000000030e-01 1.000000015e-01 1.000000047e-03 1.000000000e+03 1 3 km2 6
+6 3 km2 14 loguniform_var 2.000000030e-01 1.000000015e-01 1.000000047e-03 1.000000000e+03 1 5 kphos 6
+7 5 kphos 14 loguniform_var 2.000000030e-01 1.000000015e-01 1.000000047e-03 1.000000000e+03 1 0 0 1 0 0 0 8 example5 0 0 120 simulate({method=>"ode",t_start=>0,t_end=>60,sample_times=>[0,5,10,15,20,25,30,35,40,45,50,55,60],prefix=>"example5"})
+ 6.00000000000000000e+01 3 ode 0  10 1 0
+8 1 0
+9 0 0 0 0 0 0 49 /home/brandon/projects/GenFit2/Debug/example5.exp
+10 2 0 0 0 7 RLbonds 0 0 13 0 0 0 0.00000000000000000e+00 0.00000000000000000e+00 5.00000000000000000e+00 1.03000000000000000e+04 1.00000000000000000e+01 9.58000000000000000e+03 1.50000000000000000e+01 1.05000000000000000e+04 2.00000000000000000e+01 1.02000000000000000e+04 2.50000000000000000e+01 1.09700000000000000e+04 3.00000000000000000e+01 1.04000000000000000e+04 3.50000000000000000e+01 1.03000000000000000e+04 4.00000000000000000e+01 9.70000000000000000e+03 4.50000000000000000e+01 9.52000000000000000e+03 5.00000000000000000e+01 1.04000000000000000e+04 5.50000000000000000e+01 1.05000000000000000e+04 6.00000000000000000e+01 1.01000000000000000e+04 2 pR 13 0 0.00000000000000000e+00 3.67000000000000000e+03 5.00000000000000000e+00 3.95000000000000000e+03 1.00000000000000000e+01 4.39000000000000000e+03 1.50000000000000000e+01 4.71000000000000000e+03 2.00000000000000000e+01 4.96000000000000000e+03 2.50000000000000000e+01 4.90000000000000000e+03 3.00000000000000000e+01 5.09000000000000000e+03 3.50000000000000000e+01 5.03000000000000000e+03 4.00000000000000000e+01 5.00000000000000000e+03 4.50000000000000000e+01 5.01000000000000000e+03 5.00000000000000000e+01 4.79000000000000000e+03 5.50000000000000000e+01 4.93000000000000000e+03 6.00000000000000000e+01 4.82000000000000000e+03
+11 0 0
+12 0 0
+13 0 0 0 0 1 11 10 50 /home/brandon/projects/GenFit2/Debug/example5.bngl 0 0 194 0 18 # A simple model
+ 3 #
+ 2 
+ 13 begin model
+ 18 begin parameters
+ 26 	# simulation parameters
+ 74 	# fraction of a single cell to be considered in a stochastic simulation
+ 36 	f 0.1 # [=] dimensionless, 0<f<=1
+ 3 	
+ 23 	# physical constants
+ 22 	# Avogadro constant
+ 51 	NA  6.02214e23 # [=] number of molecules per mol
+ 2 
+ 82 	# Scenario 1: Cells are adherant and grown to confluence in a cell culture dish
+ 43 	# volume of extracellular fluid per cell
+ 19 	#   Assumptions:
+ 52 	#    - 15 cm culture dishes (cells 95% confluent)
+ 30 	#    - 1.2e5 cells per cm^2
+ 41 	#    - growth surface area of 140 cm^2
+ 30 	#    - 1.7e7 cells per dish
+ 59 	#    - 0.25 mL of medium per square cm of growth surface
+ 34 	#    - 35 mL of medium per dish
+ 33 	Vecf 2.1e-9*f # [=] L per cell
+ 2 
+ 25 	# ligand concentration
+ 28 	EGF_conc_nM  1.0 # [=] nM
+ 41 	# number of ligands per cell (derived)
+ 3 	
+ 29 	# Convert from nM to Molar
+ 36 	EGF_conc = EGF_conc_nM * 1e-9 # M
+ 2 
+ 74 	EGF_copy_number = EGF_conc*(NA*Vecf) # [=] number of molecules per cell
+ 2 
+ 25 	# receptor copy number
+ 63 	EGFR_copy_number  f*1.0e5 # [=] number of molecules per cell
+ 2 
+ 23 	# binding parameters
+ 2 
+ 56 	# a free ligand reversibly binds a free receptor site
+ 2 
+ 38 	# equilibrium dissociation constant
+ 80 	# KD1 is specified as being free. It has a matching option in the .conf file.
+ 28 	KD1 KD1__FREE__ # [=] nM 
+ 3 	
+ 36 	# reverse rate constant (derived)
+ 79 	#km1 is specified as being free. It has a matching option in the .conf file.
+ 28 	km1 km1__FREE__ # [=] /s 
+ 3 	
+ 36 	# forward rate constant (derived)
+ 28 	kp1=(km1/KD1) # [=] /nM/s
+ 2 
+ 34 	# receptor-receptor interaction
+ 51 	# dimensionless equilibrium association constant
+ 81 	# K2RT is specified as being free. It has a matching option in the .conf file.
+ 40 	K2RT K2RT__FREE__ # [=] dimensionless
+ 42 	#   a value of 0.1 => weak crosslinking
+ 46 	#   a value of 1.0 => moderate crosslinking
+ 45 	#   a value of 10.0 => strong crosslinking
+ 3 	
+ 36 	# reverse rate constant (derived)
+ 27 	km2 km2__FREE__ # [=] /s
+ 3 	
+ 36 	# forward rate constant (derived)
+ 44 	kp2=K2RT*km2/EGFR_copy_number # [=] /nM/s
+ 3 	
+ 14 	kp3=kp2*0.2
+ 2 
+ 34 	# phosphorylation rate constant
+ 82 	# kphos is specified as being free. It has a matching option in the .conf file.
+ 31 	kphos kphos__FREE__ # [=] /s
+ 2 
+ 36 	# dephosphorylation rate constant
+ 84 	# kdephos is specified as being free. It has a matching option in the .conf file.
+ 35 	kdephos kdephos__FREE__ # [=] /s
+ 3 	
+ 67 	# A boolean value indicating whether or not EGF is present. This
+ 67 	# is used to set the forward rate constant for ligand binding in
+ 69 	# the "func()" function. In pre-equilibration this value is set to
+ 66 	# 0 to set the rate of ligand binding to 0. After equilibration
+ 51 	# the value will be set to 1 to let ligand bind.
+ 21 	Ligand_isPresent 0
+ 2 
+ 16 end parameters
+ 2 
+ 2 
+ 22 begin molecule types
+ 11 	# ligand
+ 8 	L(r) 
+ 2 
+ 13 	# receptor
+ 16 	R(l,r,Y~0~P) 
+ 20 end molecule types
+ 2 
+ 21 #bound ligand and p
+ 2 
+ 20 begin seed species
+ 24 	L(r)  EGF_copy_number
+ 31 	R(l,r,Y~0)  EGFR_copy_number
+ 19 end  seed species
+ 2 
+ 19 begin observables
+ 2 
+ 28 	# total number of ligands
+ 21 	Molecules Ltot L()
+ 2 
+ 27 	# number of free ligands
+ 22 	Species freeL L(r) 
+ 3 	
+ 30 	# total number of receptors
+ 21 	Molecules Rtot R()
+ 2 
+ 43 	# number of bound ligands = Ltot - freeL
+ 2 
+ 29 	# number of free receptors
+ 25 	#Species freeR R(l,r) 
+ 2 
+ 48 	# number of monomeric (unclustered) receptors
+ 22 	#Species Rmon R==1 
+ 2 
+ 30 	# number of receptor dimers
+ 20 	Species Rdim R==2
+ 2 
+ 49 	# number of ligand-induced receptor aggregates
+ 36 	#   = number of receptor clusters
+ 61 	#   = number of complexes containing more than 1 receptor 
+ 25 	#Species n_agg_gt1 R>1
+ 2 
+ 36 	# number of ligand-receptor bonds
+ 49 	#   = number of ligand-occupied receptor sites
+ 49 	#   = number of receptor-occupied ligand sites
+ 54 	Molecules RLbonds L(r!1).R(l!1) # = R(l!+) = L(r!+)
+ 2 
+ 48 	# number of receptors in clusters = Rtot - R1
+ 2 
+ 53 	# average size of a receptor cluster (of size >1) 
+ 47 	#   = (# of receptors in clusters)/n_agg_gt1
+ 30 	#   = (Rtot - R1)/n_agg_gt1
+ 2 
+ 39 	# number of phosphorylated receptors
+ 22 	Molecules pR R(Y~P)
+ 2 
+ 17 end observables
+ 2 
+ 2 
+ 17 begin functions
+ 2 
+ 111 # This function evaluates to 0 if Ligand_isPresent = 0. The function evaluates to kp1 if Ligand_isPresent = 1
+ 112 # The function is used in the reaction rule governing ligand binding. After equilibration, Ligand_isPresent is
+ 38 # set to 1 to enable ligand binding.
+ 31 func() kp1 * Ligand_isPresent
+ 2 
+ 15 end functions
+ 2 
+ 2 
+ 22 begin reaction rules
+ 2 
+ 19 	# ligand capture
+ 54 	#   a free ligand binds a receptor with a free site
+ 39 	L(r)+R(l)<->L(r!1).R(l!1) func(),km1
+ 2 
+ 26 	# receptor dimerization
+ 47 	R(l!+,r)+R(l!+,r)->R(l!+,r!1).R(l!+,r!1) kp2
+ 2 
+ 40 	# receptor-receptor bond dissociation
+ 31 	R(r!1).R(r!1)->R(r)+R(r) km2
+ 3 	
+ 38 	# receptor dimerization (no ligand)
+ 43 	R(l,r) + R(l,r) -> R(l,r!1).R(l,r!1) kp3
+ 2 
+ 44 	# dimer-mediated receptor phosphorylation
+ 31 	R(r!+,Y~0)->R(r!+,Y~P) kphos
+ 2 
+ 22 	# dephosphorylation
+ 25 	R(Y~P)->R(Y~0) kdephos
+ 2 
+ 20 end reaction rules
+ 2 
+ 2 
+ 11 end model
+ 2 
+ 2 
+ 11 # actions
+ 2 
+ 24 # Generate the network
+ 21 generate_network();
+ 2 
+ 49 # Simulate for 600 seconds to reach equilibrium
+ 61 simulate({method=>"ode",t_start=>0,t_end=>600,n_steps=>1,})
+ 2 
+ 88 # Set Ligand_isPresent to 1 to enable ligand binding by means of the "func()" function
+ 36 setParameter("Ligand_isPresent",1)
+ 2 
+ 86 # Simulate for 60 seconds. This simulation output is fit to the data in example3.exp
+ 120 simulate({method=>"ode",t_start=>0,t_end=>60,sample_times=>[0,5,10,15,20,25,30,35,40,45,50,55,60],prefix=>"example5"})
+ 0 0 1 50 10 -1.000000000e+00 1.200000000e+02 0 1 1 0 0 0 0 0 0 1 0 5.000000000e-01 0 100 3 1 0  0  0 0  0 0 1 0 0 0 8 example5 10 8

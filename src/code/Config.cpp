@@ -176,15 +176,8 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	}
 
 	// Set the job output directory
-	s->options.jobOutputDir = s->options.outputDir + "/" + s->options.jobName + "/";
+	s->setJobOutputDir(s->options.outputDir + "/" + s->options.jobName + "/");
 	// TODO: Move directory creation to a swam function.  Also need to check cmd success.
-
-	// TODO: Check for existence of outputdir first
-	string cmd = "mkdir " + s->options.outputDir;
-	int ret = system(cmd.c_str());
-
-	cmd = "mkdir " + s->options.jobOutputDir;
-	ret = system(cmd.c_str());
 
 	// Set verbosity
 	if(pairs.find("verbosity") != pairs.end()) {
@@ -221,7 +214,6 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	// Update the maximimum number of parallel threads (non-cluster only)
 	if(pairs.find("parallel_count") != pairs.end()) {
-		cout << "Setting parallelCount: " << pairs.find("parallel_count")->second << endl;
 		s->setParallelCount(stoi(pairs.find("parallel_count")->second));
 	}
 	// Whether or not to divide by value at t=0
