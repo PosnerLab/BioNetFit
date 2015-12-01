@@ -110,10 +110,10 @@ public:
 	void setParallelCount(int parallelCount) { options.parallelCount = parallelCount; }
 	void setJobName(std::string jobName) { options.jobName = jobName; }
 	void addMutate(std::string mutateString);
+	void setsConf(std::string conf) { sConf_ = conf; }
+	std::string getsConf() { return sConf_; }
 
 	void setCurrentGen(int gen);
-
-	void setType(std::string t) { type = t; }
 
 	void doSwarm();
 	void runGeneration();
@@ -129,6 +129,7 @@ public:
 	void getClusterInformation();
 	std::string generateSlurmCommand(std::string cmd, bool multiProg = true);
 	std::string generateSlurmMultiProgCmd(std::string runCmd, std::string serializedSwarmPath);
+	std::string generateSlurmBatchFile(std::string runCmd);
 
 	void initComm();
 	void initFit();
@@ -140,7 +141,8 @@ public:
 	bool isClusterInit;
 	std::tr1::mt19937 randNumEngine;
 	int currentGeneration;
-	std::string type;
+
+	//std::string type;
 
 	struct SwarmOpts {
 		// TODO: Need to define defaults AND check for required variables
@@ -264,6 +266,7 @@ private:
 	std::string exePath_;
 	std::string configPath_;
 	//const char * particleBasePath_ = "";
+	std::string sConf_;
 
 	std::map<int,Particle*> allParticles_;
 

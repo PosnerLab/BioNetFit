@@ -28,6 +28,7 @@ public:
 	std::map<std::string,double> getParams() { return simParams_; }
 	void setID(int id);
 	int getID() { return id_; }
+
 	void doParticle();
 	void calculateFit();
 	//void setBasePath(std::string path) { basePath_ = path; }

@@ -9,6 +9,8 @@
 #define CODE_PHEROMONES_HH_
 
 #include <iostream>
+#include <string.h>
+#include <stdio.h>
 
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
@@ -83,7 +85,6 @@ public:
 
 		std::vector<std::string> message;
 
-	private:
 		friend class boost::serialization::access;
 
 		template<class Archive>
@@ -105,13 +106,20 @@ public:
 	//int recvMessage(signed int senderID, const int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage = true);
 	int recvMessage(signed int senderID, const int receiverID, int tag, bool block, swarmMsgHolder &messageHolder, bool eraseMessage = true, int messageID = -1);
 
+	int getRank();
+
 	std::vector<std::string> univMessageSender;
 	//std::vector<std::vector<std::string>> univMessageReceiver;
 	swarmMsgHolder univMessageReceiver;
 
+
 private:
 	friend class Swarm;
 	friend class Particle;
+
+	void clearSwarmMessage(swarmMessage& sm);
+	std::string serializeSwarmMessage(swarmMessage sm);
+	swarmMessage deserializeSwarmMessage(std::string sm);
 
 	Swarm *swarm_;
 

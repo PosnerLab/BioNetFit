@@ -15,6 +15,7 @@ Swarm::Swarm(bool master) {
 	// Whether or not we are master
 	isMaster = master;
 	isClusterInit = false;
+	sConf_ = "";
 
 	if (isMaster) {
 		currentGeneration = 1;
@@ -64,6 +65,7 @@ Swarm::Swarm() {
 	}
 
 	isClusterInit = false;
+	sConf_ = "";
 
 	options.simPath = "";
 	options.maxGenerations = 10;
@@ -139,6 +141,11 @@ void Swarm::setSwarmSize(int size) {
 
 void Swarm::setSwarmType(string type) {
 	this->options.swarmType = type;
+
+	if (options.swarmType == "swarm") {
+		setParallelCount(options.swarmSize);
+		cout << "setting parallelCount to swarmSize" << endl;
+	}
 }
 
 void Swarm::setSwarmSynchronicity(int synchronicity) {
@@ -212,7 +219,7 @@ void Swarm::doSwarm() {
 	if (options.synchronicity == 1) {
 
 		// TODO: Error checking. Make particles check and create next gen dir
-		string createDirCmd = "mkdir " + options.jobOutputDir + "/1";
+		string createDirCmd = "mkdir " + options.jobOutputDir + "1";
 		system(createDirCmd.c_str());
 
 		while (currentGeneration < options.maxGenerations){
@@ -289,34 +296,20 @@ void Swarm::launchParticle(int pID) {
 
 	if (currentGeneration == 1 && !options.useCluster) {
 
-		string command = exePath_ + " particle " + to_string(static_cast<long long int>(pID)) + " run " + to_string(static_cast<long long int>(currentGeneration)) + " " + "swarm_conf.txt";
-		command = command + ">> pOUT 2>&1";
+		string command = exePath_ + " particle " + to_string(static_cast<long long int>(pID)) + " run " + to_string(static_cast<long long int>(currentGeneration)) + " " + sConf_;
+		command = command + " >> pOUT 2>&1";
 		command = command + " &";
-
-		// TODO: Create function pointer to proper cluster command
-		if (options.useCluster) {
-			command = generateSlurmCommand(command);
-		}
-
-		if (options.verbosity >= 3) {
-			cout << "Running Particle " << pID << " with command: " << command << endl;
-		}
 
 		// TODO: Check system return value for success
 		int i = system(command.c_str());
-		runningParticles_.insert(pID);
 	}
-	else if (currentGeneration == 1 && options.useCluster) {
-		runningParticles_.insert(pID);
-		cout << "launching " << pID	 << endl;
-	}
-	else if (currentGeneration > 1){
-		cout << "Launching particle " << pID << endl;
-		swarmComm->sendToSwarm(0, pID, NEXT_GENERATION, false, swarmComm->univMessageSender);
-		runningParticles_.insert(pID);
+
+	if (options.verbosity >= 3) {
+		cout << "Running Particle " << pID << endl;
 	}
 
 	runningParticles_.insert(pID);
+	swarmComm->sendToSwarm(0, pID, NEXT_GENERATION, false, swarmComm->univMessageSender);
 }
 
 void Swarm::setCurrentGen(int gen) {
@@ -336,21 +329,25 @@ void Swarm::runGeneration () {
 	std::map<int,Particle*>::iterator p = allParticles_.begin();
 
 	while (numFinishedParticles < options.swarmSize) {
+
 		// If we're running on a cluster and submitting all particles at once
-		if (options.useCluster && options.parallelCount == options.swarmSize) {
+		/*if (options.useCluster && options.parallelCount == options.swarmSize) {
+			cout << "3" << endl;
 			while (p != allParticles_.end()) {
 				launchParticle(p->first);
 				numLaunchedParticles += 1;
 				++p;
 			}
 		}
-		else {
-			if (runningParticles_.size() < options.parallelCount && numLaunchedParticles < options.swarmSize) {
-				launchParticle(p->first);
-				numLaunchedParticles += 1;
-				++p;
-			}
+		else {*/
+
+		if (runningParticles_.size() < options.parallelCount && numLaunchedParticles < options.swarmSize) {
+			cout << "rp: " << runningParticles_.size() << " pc: " << options.parallelCount << endl;
+			launchParticle(p->first);
+			numLaunchedParticles += 1;
+			++p;
 		}
+		//}
 
 		// Check for any messages from particles
 		usleep(10000);
@@ -710,14 +707,16 @@ string Swarm::generateSlurmCommand(string cmd, bool multiProg) {
 		command += " -o /dev/null";
 	}
 
-	if (!multiProg) {
-		command += " -c 1";
-		command+= " " + cmd;
+	cout << "pc is: " << options.parallelCount;
+	command += " -c" + to_string(static_cast<long long int>(options.parallelCount));
+	command += " -l";
+
+
+	if (multiProg) {
+		command += " --multi-prog " + cmd;
 	}
 	else {
-		command += " -n " + options.swarmSize;
-		command += " -l";
-		command += " --multi-prog " + cmd;
+		command+= " " + cmd;
 	}
 
 	return command;
@@ -760,6 +759,7 @@ void Swarm::initFit () {
 vector<int> Swarm::checkMasterMessages() {
 	vector<int> finishedParticles;
 	//int numFinishedParticles = 0;
+	cout << "checking messages" << endl;
 	int numMessages = swarmComm->recvMessage(-1, 0, -1, false, swarmComm->univMessageReceiver);
 
 	if (numMessages >= 1) {
@@ -860,4 +860,50 @@ string Swarm::generateSlurmMultiProgCmd(string runCmd, string serializedSwarmPat
 
 
 	return generateSlurmCommand(multiProgConfPath);
+}
+
+string Swarm::generateSlurmBatchFile(string runCmd) {
+	string sbatchPath = options.jobOutputDir + "slurm_script.sh";
+	ofstream sbatch(sbatchPath, ios::out);
+
+	if (sbatch.is_open()) {
+		//TODO: Need to generate job submission name
+		//TODO: Need to display terminal output from cluster jobs
+
+		sbatch << "#!/bin/sh" << endl << endl;
+
+		// Add the job name
+		sbatch << "#SBATCH -J " + options.jobName << endl;
+
+		// Specify the cluster account if needed
+		if (!options.clusterAccount.empty()) {
+			sbatch << "#SBATCH -A " + options.clusterAccount << endl;
+		}
+
+		if (!options.clusterQueue.empty()) {
+			sbatch << "#SBATCH -p " + options.clusterQueue << endl;
+		}
+
+		// Specify output directory if needed
+		if (options.saveClusterOutput) {
+			sbatch << "#SBATCH -o " + options.outputDir + "/" + options.jobName + "_cluster_output/" + options.jobName << endl;
+		}
+		else {
+			sbatch << "#SBATCH -o /dev/null" << endl;
+		}
+
+		sbatch << "#SBATCH -n" + to_string(static_cast<long long int>(options.parallelCount)) << endl;
+
+		sbatch << endl;
+
+		sbatch << "module load openmpi" << endl;
+		sbatch << "mpirun --tag-output -np 1 " << runCmd << " load " << sConf_ << " : -np " << options.swarmSize << " " << runCmd << " particle 0 run " << sConf_ << endl;
+
+		sbatch.close();
+	}
+	//TODO: Error checking if file couldn't be opened
+
+	runCmd = "sbatch " + sbatchPath;
+
+	return runCmd;
 }

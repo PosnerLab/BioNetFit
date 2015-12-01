@@ -129,8 +129,6 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 			s->getClusterInformation();
 			cout << "setting useCluster to " << s->options.useCluster << endl;
 			// TODO: Set parallel count accordingly
-			s->setParallelCount(s->options.swarmSize);
-			cout << "setting parallelCount to swarmSize" << endl;
 		}
 	}
 
@@ -222,9 +220,9 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 	}
 
 	// Update the maximimum number of parallel threads (non-cluster only)
-	if(pairs.find("parallel_count") != pairs.end() && !s->getUseCluster()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setParallelCount(atoi(pairs.find("parallel_count")->second.c_str()));
+	if(pairs.find("parallel_count") != pairs.end()) {
+		cout << "Setting parallelCount: " << pairs.find("parallel_count")->second << endl;
+		s->setParallelCount(stoi(pairs.find("parallel_count")->second));
 	}
 	// Whether or not to divide by value at t=0
 	if(pairs.find("divide_by_init") != pairs.end()) {

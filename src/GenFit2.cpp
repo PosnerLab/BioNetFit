@@ -65,12 +65,18 @@ int main(int argc, char *argv[]) {
 		type = "master";
 
 	// Be sure action and type are valid
-	if (action != "run" && action != "cluster") {
+	if (action != "run" && action != "cluster" && action != "load") {
 		outputError("Error: Couldn't find a valid 'action' in your arguments.");
 	}
 	if (type != "master" && type != "particle") {
 		outputError("Error: Couldn't find a valid 'type' in your arguments.");
 	}
+
+	cout << "type: " << type << endl;
+	cout << "action: " << action << endl;
+	cout << "config: " << configFile << endl;
+	cout << "pID: " << pID << endl;
+	cout << "generation: " << generation << endl;
 
 	// Regardless of type or action, we need to set up the Swarm
 	//Timer tmr;
@@ -84,35 +90,41 @@ int main(int argc, char *argv[]) {
 	if (type == "master") {
 		Config myconfig(configFile);
 		//TODO: When rerunning BioNetFit master on cluster, let's not load parse config twice. Serialize.
-		s = myconfig.createSwarmFromConfig((type=="master") ? true : false);
 
-		//t = tmr.elapsed();
-		//cout << "Processing .conf took " << t << " seconds" << endl;
-		s->setType(type);
-		s->setExePath(argv[0]);
-		s->initComm();
+		if (action != "load") {
+			s = myconfig.createSwarmFromConfig((type=="master") ? true : false);
 
-		if (generation) {
-			cout << "setting gen to " << generation << endl;
-			s->currentGeneration = generation;
+			//t = tmr.elapsed();
+			//cout << "Processing .conf took " << t << " seconds" << endl;
+
+			if (generation) {
+				s->currentGeneration = generation;
+			}
+
+			s->setExePath(convertToAbsPath(argv[0]));
+			s->initComm();
 		}
-
-		cout << "trying to serialize swarm class" << endl;
-
-		string serializedSwarmPath = "swarm_conf.txt";
-		std::ofstream ofs(serializedSwarmPath);
-		if (ofs.is_open()) {
-			boost::archive::text_oarchive ar(ofs);
-			ar & s;
-			ofs.close();
-		}
-
-		s->setIsMaster(true);
 
 		if (action == "cluster") {
+
+			int randNum = rand();
+			string serializedSwarmPath = to_string(static_cast<long long int>(randNum)) + ".sconf";
+
+			std::ofstream ofs(serializedSwarmPath);
+			if (ofs.is_open()) {
+				s->setsConf(convertToAbsPath(serializedSwarmPath));
+				cout << "Path is: " << s->getsConf() << endl;
+
+				boost::archive::text_oarchive ar(ofs);
+				ar & s;
+				ofs.close();
+			}
+
+			s->setIsMaster(true);
 			s->setIsClusterInit(true);
-			string runCmd = string(argv[0]);
-			runCmd = s->generateSlurmMultiProgCmd(runCmd, serializedSwarmPath);
+
+			string runCmd = string(convertToAbsPath(argv[0]));
+			runCmd = s->generateSlurmBatchFile(runCmd);
 
 			cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
 
@@ -121,7 +133,23 @@ int main(int argc, char *argv[]) {
 
 			return 0;
 		}
+		else if (action == "load") {
+			cout << "master loading config file: " << configFile << endl;
+			std::ifstream ifs(configFile);
 
+			if (ifs.is_open()) {
+				boost::archive::text_iarchive ar(ifs);
+
+				// Load data
+				ar & s;
+				ifs.close();
+			}
+
+			s->setIsMaster(true);
+			s->setExePath(convertToAbsPath(argv[0]));
+			s->initComm();
+		}
+		cout << "doswarm" << endl;
 		s->doSwarm();
 	}
 
@@ -144,11 +172,16 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		cout << "useCluster is " << s->options.useCluster << endl;
-
+		cout << "setting master to false" << endl;
 		s->setIsMaster(false);
-		s->setExePath(argv[0]);
+		cout << "setting exe path to " << convertToAbsPath(argv[0]) << endl;
+		s->setExePath(convertToAbsPath(argv[0]));
+
 		s->initComm();
+		if (pID == 0) {
+			pID = s->swarmComm->getRank();
+		}
+
 		Particle *p = s->createParticle(pID);
 		p->setModel(s->getModel());
 

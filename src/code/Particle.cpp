@@ -92,6 +92,8 @@ void Particle::generateParams() {
 
 void Particle::doParticle() {
 
+	swarm_->swarmComm->recvMessage(0, id_, 18, true, swarm_->swarmComm->univMessageReceiver);
+
 	while(1) {
 		// First get our path and filename variables set up for use in model generation, sim command, etc
 		string bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
@@ -161,7 +163,7 @@ void Particle::doParticle() {
 
 			cout << "finished" << endl;
 			// Tell the swarm master that we're finished
-			swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, false, swarm_->swarmComm->univMessageSender);
+			swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, true, swarm_->swarmComm->univMessageSender);
 			cout << "finisheder" << endl;
 
 			// Reset the message vector
@@ -169,7 +171,7 @@ void Particle::doParticle() {
 		}
 		else {
 			// If our return code is not 0, tell the master that the simulation failed
-			swarm_->swarmComm->sendToSwarm(int(id_), 0, SIMULATION_FAIL, false, swarm_->swarmComm->univMessageSender);
+			swarm_->swarmComm->sendToSwarm(int(id_), 0, SIMULATION_FAIL, true, swarm_->swarmComm->univMessageSender);
 		}
 
 		// TODO: Breeding is still too slow. Need to speed things up here.
