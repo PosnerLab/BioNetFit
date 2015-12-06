@@ -153,7 +153,7 @@ void Swarm::setJobOutputDir(string path) {
 	if (!checkIfFileExists(options.outputDir)) {
 		string cmd = "mkdir " + options.outputDir;
 		//cout << "running: " << cmd << endl;
-		int ret = system(cmd.c_str());
+		int ret = runCommand(cmd);
 	}
 
 	if (checkIfFileExists(options.jobOutputDir)) {
@@ -168,7 +168,7 @@ void Swarm::setJobOutputDir(string path) {
 			if (answer == "Y" || answer == "y") {
 				string cmd = "rm -r " + options.jobOutputDir + "*";
 				//cout << "running: " << cmd << endl;
-				int ret = system(cmd.c_str());
+				int ret = runCommand(cmd);
 				break;
 			}
 			else if (answer == "N" || answer == "n") {
@@ -179,7 +179,8 @@ void Swarm::setJobOutputDir(string path) {
 	else {
 		string cmd = "mkdir " + options.jobOutputDir;
 		//cout << "else running: " << cmd << endl;
-		int ret = system(cmd.c_str());
+		//int ret = system(cmd.c_str());
+		int ret = runCommand(cmd);
 	}
 }
 
@@ -250,54 +251,63 @@ void Swarm::doSwarm() {
 	allParticles_ = generateInitParticles();
 	initFit();
 
-	// Main swarming loops
+	// Main fit loops
 	if (options.synchronicity == 1) {
+		// Synchronous genetic
+		if (options.swarmType == "genetic") {
+			// TODO: Error checking. Make particles check and create next gen dir
+			string createDirCmd = "mkdir " + options.jobOutputDir + "1";
+			runCommand(createDirCmd);
 
-		// TODO: Error checking. Make particles check and create next gen dir
-		string createDirCmd = "mkdir " + options.jobOutputDir + "1";
-		system(createDirCmd.c_str());
+			while (currentGeneration <= options.maxGenerations){
+				runGeneration();
 
-		while (currentGeneration <= options.maxGenerations){
-			runGeneration();
+				string currentDirectory = options.jobOutputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
+				if (options.deleteOldFiles) {
+					cleanupFiles(currentDirectory.c_str());
+				}
 
-			string currentDirectory = options.jobOutputDir + "/" + to_string(static_cast<long long int>(currentGeneration));
-			if (options.deleteOldFiles) {
-				cleanupFiles(currentDirectory.c_str());
+				if (currentGeneration <= options.maxGenerations) {
+					breedGeneration();
+				}
 			}
-
-			if (currentGeneration <= options.maxGenerations) {
-				breedGeneration();
-			}
+			cout << "fit finished " << endl;
+			finishFit();
 		}
-		cout << "fit finished " << endl;
-		finishFit();
 	}
+	// Asynchronous fit loops
 	else {
-		vector<int> finishedSimulations;
-		int numFinishedSimulations = options.swarmSize;
-		double totalFitTime;
+		if (options.swarmType == "genetic") {
+			vector<int> finishedSimulations;
+			int numFinishedSimulations = options.swarmSize;
+			double totalFitTime;
 
-		runGeneration();
-		while(1) {
-			finishedSimulations = checkMasterMessages();
-			numFinishedSimulations += finishedSimulations.size();
+			runGeneration();
+			while(1) {
+				finishedSimulations = checkMasterMessages();
+				numFinishedSimulations += finishedSimulations.size();
 
-			if (options.maxNumSimulations && numFinishedSimulations > options.maxNumSimulations) {
-				break;
-			}
-			if (options.maxFitTime && totalFitTime > options.maxFitTime) {
-				break;
-			}
-			if (options.minFit && allGenFits.begin()->first < options.maxFitTime) {
-				break;
-			}
+				if (options.maxNumSimulations && numFinishedSimulations > options.maxNumSimulations) {
+					break;
+				}
+				if (options.maxFitTime && totalFitTime > options.maxFitTime) {
+					break;
+				}
+				if (options.minFit && allGenFits.begin()->first < options.maxFitTime) {
+					break;
+				}
 
-			//for (auto pID: finishedSimulations) {
-			for (auto pID = finishedSimulations.begin(); pID != finishedSimulations.end(); ++pID) {
-				launchParticle(*pID);
+				//for (auto pID: finishedSimulations) {
+				for (auto pID = finishedSimulations.begin(); pID != finishedSimulations.end(); ++pID) {
+					launchParticle(*pID);
+				}
 			}
+			finishFit();
 		}
-		finishFit();
+		else if (options.swarmType == "pso") {
+			string createDirCmd = "mkdir " + options.jobOutputDir + "1";
+
+		}
 	}
 }
 
@@ -308,19 +318,291 @@ Particle * Swarm::createParticle(int pID) {
 	return p;
 }
 
-std::map<int,Particle*> Swarm::generateInitParticles(int pID) {
+vector<vector<int>> Swarm::generateInitParticles(int pID) {
 	Timer tmr;
 
-	map<int,Particle*> allParticles;
+	vector<vector<int>> allParticles (options.swarmSize+1);
 
-	// TODO: Do we really need to create particle objects if we're a master?
-	// Why not just keep track of them as integers? Maybe as backups in case
-	// any of them fail??
-	if (pID == -1) {
-		for (int i = 1; i <= options.swarmSize; i++) {
-			allParticles[i] = createParticle(i);
+	if (options.swarmType == "genetic") {
+		// TODO: Do we really need to create particle objects if we're a master?
+		// Why not just keep track of them as integers? Maybe as backups in case
+		// any of them fail??
+		if (pID == -1) {
+			for (int i = 1; i <= options.swarmSize; i++) {
+				allParticles[i] = vector<int>();
+			}
 		}
 	}
+	else if (options.swarmType == "pso") {
+		if (options.topology == "fullyconnected") {
+			for (int p = 1; p <= options.swarmSize; ++p) {
+				vector<int> connections;
+				for (int c = 1; c <= options.swarmSize; ++c) {
+					if (c != p) {
+						connections.push_back(c);
+					}
+				}
+				allParticles[p] = connections;
+			}
+		}
+		else if (options.topology == "ring") {
+			// Connect the first particle manually
+			int firstConnection[] = {2, options.swarmSize};
+			allParticles[1] = vector<int> (firstConnection, firstConnection + sizeof(firstConnection) / sizeof(firstConnection[0]));
+
+			vector<int> connections;
+			for (int p = 2; p <= options.swarmSize - 1; ++p) {
+				connections.clear();
+				// Connect to particle before, and particle after
+				connections.push_back(p-1);
+				connections.push_back(p+1);
+				allParticles[p] = connections;
+			}
+
+			// Connect the last particle manually
+			int lastConnection[] = {options.swarmSize - 1, 1};
+			allParticles[options.swarmSize + 1] = vector<int> (lastConnection, lastConnection + sizeof(lastConnection) / sizeof(lastConnection[0]));
+		}
+		else if (options.topology == "star") {
+			vector<int> connections;
+
+			// First connect the central particle to all others
+			for (int c = c; c <= options.swarmSize; ++c) {
+				connections.push_back(c);
+			}
+			allParticles[1] = connections;
+
+			// Then connect all particles to the central particles
+			for (int p = 2; p <= options.swarmSize; ++p) {
+				connections.clear();
+				connections.push_back(1);
+				allParticles[p] = connections;
+			}
+		}
+		else if (options.topology == "mesh") {
+			int desiredArea = options.swarmSize;
+			int length;
+			int width;
+
+			float root = sqrt(desiredArea);
+
+			// We have an integer. We will make a square.
+			if (floor(root) == root) {
+				length = root;
+				width = root;
+			}
+			// sqrt is not an integer. Let's find the rectangle with the
+			// least perimeter that will satisfy the area
+			else {
+				length = floor(root);
+				width = ceil(root);
+				float area = 0;
+
+				while(desiredArea != area) {
+					++length;
+					--width;
+					if (width == 0 || length == 0) {
+						outputError("Error: Length or width is 0 when calculating mesh size.");
+					}
+					area = length*width;
+				}
+			}
+
+			// Construct a matrix of dimenstion length x width
+			// and fill it with particles
+			int p = 0;
+			vector<vector<int>> matrix(length, vector<int>(width));
+			for (int x = 0; x < length; ++x) {
+				for (int y = 0; y < width; ++y) {
+					++p;
+					matrix[x][y] = p;
+				}
+			}
+
+			// Make our connections
+			vector<int> connections;
+			for (int x = 0; x < length; ++x) {
+				for (int y = 0; y < width; ++y) {
+					connections.clear();
+					p = matrix[x][y];
+
+					// If we're io the left bound
+					if (x == 0) {
+						// Add the particle to the right of us
+						connections.push_back(matrix[x+1][y]);
+					}
+					// If we're on the right bound
+					else if (x == length) {
+						// Add the particle to the left of us
+						connections.push_back(matrix[x-1][y]);
+					}
+					// If we're in a center
+					else {
+						// Add the particles on either side of us
+						connections.push_back(matrix[x-1][y]);
+						connections.push_back(matrix[x+1][y]);
+					}
+
+					if (y == 0) {
+						connections.push_back(matrix[x][y+1]);
+					}
+					else if (y == width) {
+						connections.push_back(matrix[x][y-1]);
+					}
+					else {
+						connections.push_back(matrix[x][y-1]);
+						connections.push_back(matrix[x][y+1]);
+					}
+					allParticles[p] = connections;
+				}
+			}
+		}
+		else if (options.topology == "toroidal") {
+			int desiredArea = options.swarmSize;
+			int length;
+			int width;
+
+			float root = sqrt(desiredArea);
+
+			// We have an integer. We will make a square.
+			if (floor(root) == root) {
+				length = root;
+				width = root;
+			}
+			// sqrt is not an integer. Let's find the rectangle with the
+			// least perimeter that will satisfy the area
+			else {
+				length = floor(root);
+				width = ceil(root);
+				float area = 0;
+
+				while(desiredArea != area) {
+					++length;
+					--width;
+					if (width == 0 || length == 0) {
+						outputError("Error: Length or width is 0 when calculating mesh size.");
+					}
+					area = length*width;
+				}
+			}
+
+			// Construct a matrix of dimenstion length x width
+			// and fill it with particles
+			int p = 0;
+			vector<vector<int>> matrix(length, vector<int>(width));
+			for (int x = 0; x < length; ++x) {
+				for (int y = 0; y < width; ++y) {
+					++p;
+					matrix[x][y] = p;
+				}
+			}
+
+			// Make our connections
+			vector<int> connections;
+			for (int x = 0; x < length; ++x) {
+				for (int y = 0; y < width; ++y) {
+					connections.clear();
+					p = matrix[x][y];
+
+					if (x == 0) {
+						connections.push_back(matrix[x+1][y]);
+						connections.push_back(matrix[length][y]);
+					}
+					else if (x == length) {
+						connections.push_back(matrix[x-1][y]);
+						connections.push_back(matrix[0][y]);
+					}
+					else {
+						connections.push_back(matrix[x-1][y]);
+						connections.push_back(matrix[x+1][y]);
+					}
+
+					if (y == 0) {
+						connections.push_back(matrix[x][y+1]);
+						connections.push_back(matrix[x][width]);
+					}
+					else if (y == width) {
+						connections.push_back(matrix[x][y-1]);
+						connections.push_back(matrix[x][0]);
+					}
+					else {
+						connections.push_back(matrix[x][y-1]);
+						connections.push_back(matrix[x][y+1]);
+					}
+					allParticles[p] = connections;
+				}
+			}
+		}
+		else if (options.topology == "tree") {
+			int usedParticles = 1;
+			int numLevels = 1;
+			int previousLevel = 1;
+			int currentLevel;
+
+			// Determine number of levels in tree
+			while (usedParticles < options.swarmSize) {
+				currentLevel = previousLevel*2;
+				usedParticles += currentLevel;
+				previousLevel = currentLevel;
+				++numLevels;
+			}
+
+			vector<vector<int>> tree(numLevels, vector<int>());
+			usedParticles = 1;
+			previousLevel = 1;
+			int currentParticle = 2;
+			bool doneFilling = false;
+
+			// Construct tree and fill it with particles
+			tree[0].push_back(1);
+
+			// For each level in tree
+			for (int level = 1; level <= numLevels; ++level) {
+				// Current level's particle count is double that of previous level
+				currentLevel = previousLevel * 2;
+
+				// For each slot in current level
+				for (int i = 0; i < currentLevel; ++i) {
+					// Fill slot with particle
+					tree[level].push_back(currentParticle);
+					++currentParticle;
+
+					// Make sure we're not filling past our swarm size
+					if (currentParticle == options.swarmSize) {
+						doneFilling = true;
+						break;
+					}
+				}
+				if (doneFilling) {
+					break;
+				}
+			}
+
+			// For each level in tree
+			for (int level = 2; level < numLevels; ++level) {
+				int prevGroupCounter = 0;
+				int particleCounter = 0;
+
+				// For each particle in level
+				for (int p = 0; p <= tree[level].size(); ++level) {
+
+					// Connect current particle (p) with proper particle in last level
+					allParticles[p].push_back(tree[level-1][prevGroupCounter]);
+
+					// Connect particle in last level to current particle (p)
+					allParticles[tree[level-1][prevGroupCounter]].push_back(p);
+
+					// If our particle counter reaches two, we're in a new pair in (or new particle
+					// in previous level)
+					if (++particleCounter == 2) {
+						particleCounter = 0;
+						++prevGroupCounter;
+					}
+				}
+			}
+		}
+	}
+
 	return allParticles;
 
 	double t = tmr.elapsed();
@@ -336,7 +618,7 @@ void Swarm::launchParticle(int pID) {
 		command = command + " &";
 
 		// TODO: Check system return value for success
-		int i = system(command.c_str());
+		int ret = runCommand(command);
 	}
 
 	if (options.verbosity >= 3) {
@@ -361,7 +643,7 @@ void Swarm::runGeneration () {
 	int numFinishedParticles = 0;
 
 	vector<int> finishedParticles;
-	std::map<int,Particle*>::iterator p = allParticles_.begin();
+	int p = 1;
 
 	while (numFinishedParticles < options.swarmSize) {
 
@@ -377,7 +659,7 @@ void Swarm::runGeneration () {
 		else {*/
 
 		if (runningParticles_.size() < options.parallelCount && numLaunchedParticles < options.swarmSize) {
-			launchParticle(p->first);
+			launchParticle(p);
 			numLaunchedParticles += 1;
 			++p;
 		}
@@ -442,7 +724,7 @@ void Swarm::breedGeneration() {
 
 	// TODO: Check ret
 	string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
-	int ret = system(createDirCmd.c_str());
+	int ret = runCommand(createDirCmd);
 
 	// We let particles do the actual breeding.  The master's role is to generate a breeding pattern and
 	// tell which particles to breed with which
@@ -598,7 +880,7 @@ void Swarm::finishFit() {
 	string outputDir = options.jobOutputDir + "/Results";
 	string command = "mkdir " + outputDir;
 
-	if (system(command.c_str())) {
+	if (runCommand(command)) {
 		string errMsg = "Error: Couldn't create directory: " + outputDir + " to contain final fitting results.";
 		outputError(errMsg);
 	}
@@ -658,9 +940,8 @@ void Swarm::outputRunSummary(string outputDir) {
 }
 
 void Swarm::killAllParticles(int tag) {
-	//for (auto p: allParticles_) {
-	for (auto p = allParticles_.begin(); p != allParticles_.end(); ++p) {
-		swarmComm->sendToSwarm(0, p->first, tag, false, swarmComm->univMessageSender);
+	for (int p = 1; p <= options.swarmSize; ++p) {
+		swarmComm->sendToSwarm(0, p, tag, false, swarmComm->univMessageSender);
 	}
 }
 
@@ -669,18 +950,33 @@ void Swarm::getClusterInformation() {
 	// If user didn't specify cluster platform, let's figure it out ourself
 	if (options.clusterSoftware.size() == 0) {
 		// Test for slurm
-		if (getOutputFromCommand("which srun").length() > 0) {
+		string output;
+		runCommand("which srun", output);
+		if (output.length() > 0) {
 			options.clusterSoftware = "slurm";
 		}
 		// Test for PBS-type
-		else if (getOutputFromCommand("which qsub").length() > 0) {
-			// Test for Torque/PBS
-			if(getOutputFromCommand("which maui").length() > 0 || getOutputFromCommand("which moab").length() > 0) {
-				options.clusterSoftware = "torque";
-			}
-			// Test for SGE
-			else if (getOutputFromCommand("which sge_execd").length() > 0 || getOutputFromCommand("which qconf").length() > 0 || getOutputFromCommand("which qmon").length() > 0) {
-				outputError("Error: BioNetFit doesn't support for GridEngine clusters. If you are not running on a GridEngine cluster, specify the cluster platform in the .conf file using the 'cluster_software' option.");
+
+		else{
+			runCommand("which qsub", output);
+			if(output.length() > 0) {
+				// Test for Torque/PBS
+				string output2;
+				runCommand("which maui", output);
+				runCommand("which moab", output2);
+				if(output.length() > 0 || output2.length() > 0) {
+					options.clusterSoftware = "torque";
+				}
+				// Test for SGE
+				else {
+					string output3;
+					runCommand("which sge_execd", output);
+					runCommand("which qconf", output);
+					runCommand("which qmon", output);
+					if (output.length() > 0 || output2.length() > 0 || output3.length() > 0) {
+						outputError("Error: BioNetFit doesn't support for GridEngine clusters. If you are not running on a GridEngine cluster, specify the cluster platform in the .conf file using the 'cluster_software' option.");
+					}
+				}
 			}
 		}
 	}
@@ -765,25 +1061,26 @@ void Swarm::initFit () {
 
 		// First create a particle which will generate the network
 		// and fill it with dummy params
-		allParticles_.at(1)->setModel(options.model);
-		allParticles_.at(1)->generateParams();
+		Particle p = Particle(this, 1);
+		p.setModel(options.model);
+		p.generateParams();
 
 		// Output model file with dummy parameters. This file will be used to generate
 		// our initial network
-		options.model->outputModelWithParams(allParticles_.at(1)->getParams(), options.jobOutputDir, "base.bngl", "", false, false, false, false, false);
+		options.model->outputModelWithParams(p.getParams(), options.jobOutputDir, "base.bngl", "", false, false, false, false, false);
 
 		// Construct our simulation command and run the network generator
 		string modelPath = options.jobOutputDir + "/base.bngl";
-		string command = options.simPath + "BNG2.pl --outdir " + options.jobOutputDir + " " + modelPath + " >> " + options.jobOutputDir + "/netgen_output 2>&1";
+		string command = options.simPath + "BNG2.pl --outdir " + options.jobOutputDir + " " + modelPath + " >> " + options.jobOutputDir + "netgen_output 2>&1";
 		cout << "Generating initial .net file with command: " << command << endl;
 
 		// TODO: Check this return
-		int ret = system(command.c_str());
+		int ret = runCommand(command);
 
 		// Now that we have a .net file, replace the full .bngl with a .bngl
 		// containing ONLY action commands and a .net file loader. This is
 		// used later to run our .net files.
-		options.model->outputModelWithParams(allParticles_.at(1)->getParams(), options.jobOutputDir, "base.bngl", "", false, true, false, false, false);
+		options.model->outputModelWithParams(p.getParams(), options.jobOutputDir, "base.bngl", "", false, true, false, false, false);
 
 		// Now store our .net file for later use
 		string netPath = options.jobOutputDir + "/base.net";
@@ -926,7 +1223,17 @@ string Swarm::generateSlurmBatchFile(string runCmd) {
 		sbatch << endl;
 
 		sbatch << "module load openmpi" << endl;
-		sbatch << "mpirun --tag-output -np 1 " << runCmd << " load " << sConf_ << " : -np " << options.swarmSize << " " << runCmd << " particle 0 run " << sConf_ << endl;
+		//sbatch << "module load intel << endl;"
+		sbatch << "echo LD_LIBRARY_PATH: $LD_LIBRARY_PATH" << endl;
+		sbatch << "echo PATH: $PATH" << endl;
+		sbatch << "echo which mpirun:" << endl;
+		sbatch << "which mpirun" << endl;
+		sbatch << "echo pwd:" << endl;
+		sbatch << "pwd"	<< endl;
+		sbatch << "echo ldd GenFit2:" << endl;
+		sbatch << "ldd /home/bt285/BioNetFit/bin/GenFit2" << endl;;
+		sbatch << "mpirun -mca mca_component_show_load_errors 10 -v --tag-output -np 1 " << runCmd << " load " << sConf_ << " : -np " << options.swarmSize << " " << runCmd << " particle 0 run " << sConf_ << endl;
+		//sbatch << "mpirun -prepend-rank -np 1 " << runCmd << " load " << sConf_ << " : -np " << options.swarmSize << " " << runCmd << " particle 0 run " << sConf_ << endl;
 
 		sbatch.close();
 	}

@@ -214,6 +214,7 @@ Swarm * Config::createSwarmFromConfig (bool isMaster) {
 
 	// Update the maximimum number of parallel threads (non-cluster only)
 	if(pairs.find("parallel_count") != pairs.end()) {
+		// TODO: Make sure PC isn't higher than swarm size
 		s->setParallelCount(stoi(pairs.find("parallel_count")->second));
 	}
 	// Whether or not to divide by value at t=0

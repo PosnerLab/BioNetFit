@@ -31,13 +31,15 @@ public:
 
 	void doParticle();
 	void calculateFit();
-	//void setBasePath(std::string path) { basePath_ = path; }
 	void generateParams();
 
-	std::map<int,double> fitCalcs;
+	std::map<double, int> fitCalcs;
 
 private:
 	friend class boost::serialization::access;
+
+	void runGenetic();
+	void runPSO();
 
 	double objFunc_chiSquare(double sim, double exp, double stdev);
 	double objFunc_sumOfSquares(double sim, double exp, double dummyvar);
@@ -56,8 +58,9 @@ private:
 	std::map<std::string,double> simParams_;
 	int id_;
 	std::map<std::string,Data*> dataFiles_;
-	std::string state_; // Stopped, running, simulating, analyzing, results, breeding, waiting
+	//std::string state_; // Stopped, running, simulating, analyzing, results, breeding, waiting
 	Swarm * swarm_;
+	std::map<std::string,double> bestParams_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
@@ -66,7 +69,7 @@ private:
 		ar & simParams_;
 		ar & id_;
 		ar & dataFiles_;
-		ar & state_;
+		//ar & state_;
 		ar & swarm_;
 	}
 };

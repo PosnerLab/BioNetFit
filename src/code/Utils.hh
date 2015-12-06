@@ -13,6 +13,9 @@
 #include <tr1/random>
 #include <sstream>
 
+#include <spawn.h>
+#include <sys/wait.h>
+
 #include <boost/filesystem.hpp>
 #include <sys/stat.h>
 
@@ -30,6 +33,7 @@ bool createParticlePipe(const char * path);
 double pickWeighted(double weightSum, std::multimap<double,double>& weights, int extraWeight, std::tr1::mt19937 &randNumEngine);
 bool isFloat(std::string number);
 double mutateParam(FreeParam* fp, double paramValue);
-std::string getOutputFromCommand(std::string cmd);
+int runCommand(std::string cmd, std::string &result);
+int runCommand(std::string cmd);
 
 #endif /* UTILS_HH_ */

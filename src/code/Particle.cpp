@@ -92,6 +92,15 @@ void Particle::generateParams() {
 
 void Particle::doParticle() {
 
+	if (swarm_->options.swarmType == "genetic") {
+		runGenetic();
+	}
+	else if (swarm_->options.swarmType == "pso") {
+		runPSO();
+	}
+}
+
+void Particle::runGenetic() {
 	//cout << "Particle " << id_ << " waiting to begin" << endl;
 	swarm_->swarmComm->recvMessage(0, id_, 18, true, swarm_->swarmComm->univMessageReceiver);
 	//cout << "Particle " << id_ << " starting" << endl;
@@ -162,9 +171,9 @@ void Particle::doParticle() {
 			}
 
 			// Tell the swarm master that we're finished
-			cout << id_ << " telling swarm we're finished" << endl;
+			//cout << id_ << " telling swarm we're finished" << endl;
 			swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, true, swarm_->swarmComm->univMessageSender);
-			cout << id_ << " done telling swarm" << endl;
+			//cout << id_ << " done telling swarm" << endl;
 			// Reset the message vector
 			swarm_->swarmComm->univMessageSender.clear();
 		}
@@ -337,149 +346,6 @@ void Particle::doParticle() {
 			}
 
 			swarm_->swarmComm->univMessageReceiver.clear();
-
-			/*
-				// First loop through individual messages
-				for (std::vector<std::vector<std::string>>::iterator m = messageReceiver.begin(); m != messageReceiver.end(); ++m) {
-
-					std::vector<std::string>::iterator o = (*m).begin();
-					int tag = stoi(*o);
-
-					//cout << id_ << " found tag: " << tag << endl;
-					if (tag == INIT_BREEDING) {
-						Timer tmr;
-
-						// Jump to the swapID
-						o+=4;
-
-						// Convert the swapID to a unique negative number less than 1000
-						int swapID = stoi(*o);
-						swapID = (swapID * -1) - 1000;
-
-						// Jump to particle with which to breed
-						o+=1;
-
-						// Store our swap id so we know which swap we're working within
-						swapTracker[swapID] = stoi(*o);
-
-						//cout << id_ << " init breeding with " << *o << ". SwapID: " << swapID << endl;
-
-						// Initiate breeding with that particle
-						initBreedWithParticle(stoi(*o), swapID);
-
-						double t = tmr.elapsed();
-						cout << "INIT_BREEDING took " << t << " seconds" << endl;
-					}
-
-					// Receive new params from parents
-					else if (tag == SEND_FINAL_PARAMS_TO_PARTICLE) {
-						//Timer tmr;
-						// Jump to the first parameter value
-						o+=4;
-
-						for (std::map<std::string,double>::iterator p = simParams_.begin(); p != simParams_.end(); ++p) {
-							//cout << id_ << " updating parameter " << p->first << " to " << *o << endl;
-							p->second = stod(*o);
-							o++;
-						}
-
-						// Construct our filenames
-						bnglFilename = to_string(id_) + ".bngl";
-						path = swarm_->options.outputDir + "/" + to_string(swarm_->currentGeneration + 1);
-						bnglFullPath = path + "/" + bnglFilename;
-
-						// And generate our models
-						if (swarm_->options.model->getHasGenerateNetwork()){
-							// If we're using ODE solver, output .net and .bngl
-							model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, true, false, false);
-						}
-						else {
-							// If we're using network free simulation, output .bngl
-							model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(id_), false, false, false, false, false);
-						}
-
-						// Tell the master we have our new params and are ready for the next generation
-						swarm_->swarmComm->sendToSwarm(id_, 0, DONE_BREEDING, false, swarm_->swarmComm->univMessageSender);
-
-						//double t = tmr.elapsed();
-						//cout << "SEND_FINAL_PARAMS took " << t << " seconds" << endl;
-					}
-					// We need to breed. Tag is equal to swap id.
-					else if (tag < -1000) {
-						//Timer tmr;
-
-						// Store our swapID
-						int swapID = tag;
-
-						// Jump to the sender
-						o+=2;
-						int reciprocateTo = stoi(*o);
-
-						// Jump to the parameter list and construct a parameter vector
-						o+=2;
-						vector<string> params;
-
-						// Store the parameters
-						while (o != (*m).end()) {
-							params.push_back(*o);
-							++o;
-						}
-
-						int pID;
-						// If we find our swapID in the swap tracker, it must mean that
-						// we are receiving params from parent #2
-
-						if (swapTracker.find(swapID) != swapTracker.end() && swapTracker.at(swapID) != id_) {
-							//cout << id_ << " found " << swapTracker[swapID] << " at " << swapID << endl;
-							//cout <<  id_ << " being given swapped parameters in swapID " << swapID << ". Receiving from the reciprocator: "<< reciprocateTo << endl;
-							// Convert swapID to pID. pID is the "child" who receives the final parameter set
-							pID = (swapID * - 1) - 1000;
-
-							// Parse the received particles and integrate them with our own
-							rcvBreedWithParticle(params, 0, swapID, pID);
-
-						}
-						// If we don't find our swapID in the swap tracker, it must mean that
-						// we are receiving params from parent #1
-						else {
-							// If we are here and find our swapID in the tracker, it means we are breeding
-							// with ourself. We must leave an entry in the swapTracker but change it from
-							// our pID to ensure that we can receive from ourself
-							if (swapTracker.find(swapID) != swapTracker.end()) {
-								//cout << id_ << " found " << swapTracker[swapID] << " at " << swapID << ", changing to 0" <<  endl;
-								swapTracker[swapID] = 0;
-							}
-
-							//cout << id_  << " being given swapped parameters in swapID " << swapID << ". Receiving from the initiator: "<< reciprocateTo << endl;
-							// Convert swapID to pID. pID is the "child" who receives the final parameter set
-							pID = (swapID * - 1) - 999;
-
-							// Parse the received particles and integrate them with our own
-							rcvBreedWithParticle(params, reciprocateTo, swapID, pID);
-						}
-						//cout << id_ << " is done breeding" << endl;
-						//double t = tmr.elapsed();
-						//cout << "RECEIVE_BREED took " << t << " seconds" << endl;
-					}
-					else if (tag == NEXT_GENERATION) {
-						// We can begin next generation now
-						doContinue = true;
-					}
-					else if (tag == FIT_FINISHED) {
-						// Fit is finished. Quit.
-						return;
-					}
-				}
-				// Always reset message vectors
-				messageReceiver.clear();
-			}
-
-				// Reset the swapTracker so it is ready for the next generation
-				swapTracker.clear();
-
-				// Next generation
-				swarm_->currentGeneration++;
-			}*/
 		}
 		// Reset the swapTracker so it is ready for the next generation
 		swapTracker.clear();
@@ -487,6 +353,10 @@ void Particle::doParticle() {
 		// Next generation
 		swarm_->currentGeneration++;
 	}
+}
+
+void Particle::runPSO() {
+
 }
 
 void Particle::calculateFit() {

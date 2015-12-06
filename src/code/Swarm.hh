@@ -124,7 +124,7 @@ public:
 
 	Particle *createParticle(int pID);
 	std::string recvFromParticle(Particle *p);
-	std::map<int,Particle*> generateInitParticles(int numParticles = -1);
+	std::vector<std::vector<int>> generateInitParticles(int numParticles = -1);
 	std::vector<int> checkMasterMessages();
 
 	void getClusterInformation();
@@ -138,6 +138,7 @@ public:
 	Pheromones *swarmComm;
 
 	std::multimap<double,std::string> allGenFits;
+
 	bool isMaster;
 	bool isClusterInit;
 	std::tr1::mt19937 randNumEngine;
@@ -175,12 +176,24 @@ public:
 		bool deleteOldFiles; // whether or not to delete unneeded files during the fitting run
 
 		int objFunc;		// which objective function to use
+
+		// Genetic algorithm options
 		int extraWeight;	// how much extra weight to add while breeding in genetic algorithm
 		float swapRate;	// the rate at which to swap parent parameters during breeding
 		bool forceDifferentParents;// whether or not to force difference parents when breeding
 		int maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
-		long maxFitTime;
-		long maxNumSimulations;
+
+		// PSO options
+		float intertia;
+		float cognitive;
+		float social;
+		std::string topology;
+
+		long maxFitTime;	// Maximum amount of time to let the fit run
+		long maxNumSimulations; // Maximum number of simulations to run
+		long maxNumIterations; // Maximum number of iterations a particle can run // TODO: Implement
+
+
 
 		int verbosity;		// terminal output verbosity
 
@@ -266,10 +279,9 @@ private:
 
 	std::string exePath_;
 	std::string configPath_;
-	//const char * particleBasePath_ = "";
 	std::string sConf_;
 
-	std::map<int,Particle*> allParticles_;
+	std::vector<std::vector<int>> allParticles_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

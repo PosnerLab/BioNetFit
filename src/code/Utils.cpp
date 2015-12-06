@@ -100,15 +100,6 @@ double pickWeighted(double weightSum, multimap<double,double> &weights, int extr
 	return weights.rbegin()->first;
 }
 
-/*
-void saveParticle(const Particle &p, const char * filename) {
-    // make an archive
-    std::ofstream ofs(filename);
-    boost::archive::text_oarchive oa(ofs);
-    oa << p;
-}
- */
-
 bool isFloat(string number) {
 	istringstream iss(number);
 	float f;
@@ -117,19 +108,59 @@ bool isFloat(string number) {
 	return iss.eof() && !iss.fail();
 }
 
-std::string getOutputFromCommand(string cmd) {
+int runCommand(string cmd, string &result) {
 
 	std::shared_ptr<FILE> pipe(popen(cmd.c_str(), "r"), pclose);
 
-	if (!pipe) return "ERROR";
+	if (!pipe) {
+		return 1;
+	}
 
 	char buffer[128];
-	std::string result = "";
+	result.clear();
 
 	while (!feof(pipe.get())) {
 		if (fgets(buffer, 128, pipe.get()) != NULL)
 			result += buffer;
 	}
 
-	return result;
+	return 0;
+}
+
+int runCommand(string cmd) {
+
+	FILE *in;
+
+	//cout << "Running command: " << cmd << endl;
+
+	if(!(in = popen(cmd.c_str(), "r"))){
+		return 1;
+	}
+	int status = pclose(in);
+	printf("Exit code: %d\n", WEXITSTATUS(status));
+
+	return 0;
+
+	/*
+	char *c_cmd = new char[cmd.length()+1];
+	std::strcpy(c_cmd, cmd.c_str());
+
+	pid_t pid;
+	char *argv[] = {"bash", "-c", c_cmd, NULL};
+	int status;
+	printf("Run command: %s\n", c_cmd);
+	status = posix_spawn(&pid, "/bin/bash", NULL, NULL, argv, environ);
+	if (status == 0) {
+		printf("Child pid: %i\n", pid);
+		if (waitpid(pid, &status, 0) != -1) {
+			printf("Child exited with status %i\n", status);
+		} else {
+			perror("waitpid");
+		}
+	} else {
+		printf("posix_spawn: %s\n", strerror(status));
+	}
+
+	return status;
+	*/
 }

@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
 	// Output help if we have too too few or too many arguments
 	else {
 		outputHelp();
+		return 0;
 	}
 
 	// Default action is to 'run'
@@ -131,7 +132,9 @@ int main(int argc, char *argv[]) {
 			cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
 
 			// TODO: Check return
-			int ret = system(runCmd.c_str());
+			//int ret = system(runCmd.c_str());
+			runCmd = "exec bash -c '" + runCmd + "'";
+			int ret = runCommand(runCmd);
 
 			return 0;
 		}
@@ -144,6 +147,9 @@ int main(int argc, char *argv[]) {
 				// Load data
 				ar & s;
 				ifs.close();
+			}
+			else {
+				outputError("Error: Couldn't load config file: " + configFile + ".");
 			}
 
 			s->setIsMaster(true);
