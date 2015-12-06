@@ -122,11 +122,6 @@ public:
 	void doParticle(int pID);
 	void launchParticle(int pID);
 
-	Particle *createParticle(int pID);
-	std::string recvFromParticle(Particle *p);
-	std::vector<std::vector<int>> generateInitParticles(int numParticles = -1);
-	std::vector<int> checkMasterMessages();
-
 	void getClusterInformation();
 	std::string generateSlurmCommand(std::string cmd, bool multiProg = true);
 	std::string generateSlurmMultiProgCmd(std::string runCmd, std::string serializedSwarmPath);
@@ -270,6 +265,12 @@ private:
 	void getAllParticleParams();
 	void outputRunSummary(std::string outputDir);
 	void killAllParticles(int tag);
+	std::vector<int> checkMasterMessages();
+	void processParticlesPSO(std::vector<int> particles);
+
+	Particle *createParticle(int pID);
+	std::string recvFromParticle(Particle *p);
+	std::vector<std::vector<int>> generateInitParticles(int numParticles = -1);
 
 	std::set<int> runningParticles_;
 	std::set<int>::iterator runningParticlesIterator_;
@@ -281,7 +282,9 @@ private:
 	std::string configPath_;
 	std::string sConf_;
 
-	std::vector<std::vector<int>> allParticles_;
+	std::vector<std::vector<int> > allParticles_;
+	std::map<int, double> particleBestFits_;
+	std::map<int, double> particleVelocities_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
@@ -290,8 +293,9 @@ private:
 		ar & allGenFits;
 		ar & configPath_;
 		ar & currentGeneration;
-	    ar & exePath_;
-	    ar & options;
+		ar & exePath_;
+		ar & options;
+		ar & particleBestFits_;
 	}
 
 	Timer tmr_;

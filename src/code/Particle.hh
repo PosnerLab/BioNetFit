@@ -38,8 +38,9 @@ public:
 private:
 	friend class boost::serialization::access;
 
-	void runGenetic();
-	void runPSO();
+	void runModel();
+	void checkMasterMessages();
+	void checkMessagesPSO();
 
 	double objFunc_chiSquare(double sim, double exp, double stdev);
 	double objFunc_sumOfSquares(double sim, double exp, double dummyvar);

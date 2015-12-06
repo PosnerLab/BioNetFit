@@ -247,8 +247,6 @@ void Swarm::doSwarm() {
 	//system ("exec rm -r /home/brandon/projects/GenFit2/Debug/output/*");
 	system ("exec rm /home/brandon/projects/GenFit2/Debug/pOUT");
 
-	// Generate all particles that will be present in the swarm
-	allParticles_ = generateInitParticles();
 	initFit();
 
 	// Main fit loops
@@ -305,8 +303,28 @@ void Swarm::doSwarm() {
 			finishFit();
 		}
 		else if (options.swarmType == "pso") {
+			// Generate all particles that will be present in the swarm
+			allParticles_ = generateInitParticles();
 			string createDirCmd = "mkdir " + options.jobOutputDir + "1";
 
+			bool stopCriteria = false;
+			int clusterCheckCounter = 0;
+			vector<int> finishedParticles;
+
+			while (!stopCriteria) {
+				usleep(250000);
+				finishedParticles = checkMasterMessages();
+
+				if (finishedParticles.size()) {
+					processParticlesPSO(finishedParticles);
+				}
+
+				++clusterCheckCounter;
+				if (clusterCheckCounter >= 240) {
+					//checkClusterQueue();
+					clusterCheckCounter = 0;
+				}
+			}
 		}
 	}
 }
@@ -323,17 +341,7 @@ vector<vector<int>> Swarm::generateInitParticles(int pID) {
 
 	vector<vector<int>> allParticles (options.swarmSize+1);
 
-	if (options.swarmType == "genetic") {
-		// TODO: Do we really need to create particle objects if we're a master?
-		// Why not just keep track of them as integers? Maybe as backups in case
-		// any of them fail??
-		if (pID == -1) {
-			for (int i = 1; i <= options.swarmSize; i++) {
-				allParticles[i] = vector<int>();
-			}
-		}
-	}
-	else if (options.swarmType == "pso") {
+	if (options.swarmType == "pso") {
 		if (options.topology == "fullyconnected") {
 			for (int p = 1; p <= options.swarmSize; ++p) {
 				vector<int> connections;
@@ -486,7 +494,7 @@ vector<vector<int>> Swarm::generateInitParticles(int pID) {
 				}
 			}
 
-			// Construct a matrix of dimenstion length x width
+			// Construct a matrix of dimensions length x width
 			// and fill it with particles
 			int p = 0;
 			vector<vector<int>> matrix(length, vector<int>(width));
@@ -609,6 +617,12 @@ vector<vector<int>> Swarm::generateInitParticles(int pID) {
 	cout << "Particle creation took " << t << " seconds" << endl;
 }
 
+void Swarm::processParticlesPSO(vector<int> particles) {
+	for (auto p = particles.begin(); p != particles.end(); ++p) {
+		// We need to already have particle best position updated by the time we get here
+	}
+}
+
 void Swarm::launchParticle(int pID) {
 
 	if (currentGeneration == 1 && !options.useCluster) {
@@ -636,7 +650,7 @@ void Swarm::setCurrentGen(int gen) {
 void Swarm::runGeneration () {
 	// TODO: Implement walltime
 	if(options.verbosity >= 1) {
-		cout << "Running generation " << currentGeneration << " with " << allParticles_.size() << " particles..." << endl;
+		cout << "Running generation " << currentGeneration << " with " << options.swarmSize << " particles..." << endl;
 	}
 
 	int numLaunchedParticles = 0;
