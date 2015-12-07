@@ -120,6 +120,7 @@ public:
 	void runGeneration();
 	void breedGeneration();
 	void doParticle(int pID);
+	Particle *createParticle(int pID);
 	void launchParticle(int pID);
 
 	void getClusterInformation();
@@ -183,6 +184,7 @@ public:
 		float cognitive;
 		float social;
 		std::string topology;
+		std::string psoType;
 
 		long maxFitTime;	// Maximum amount of time to let the fit run
 		long maxNumSimulations; // Maximum number of simulations to run
@@ -268,7 +270,10 @@ private:
 	std::vector<int> checkMasterMessages();
 	void processParticlesPSO(std::vector<int> particles);
 
-	Particle *createParticle(int pID);
+	std::vector<double> calcParticlePosPSO(int particle);
+	std::vector<double> calcParticlePosBBPSO(int particle, bool exp = false);
+	std::vector<double> getNeighborhoodBestPositions(int particle);
+
 	std::string recvFromParticle(Particle *p);
 	std::vector<std::vector<int>> generateInitParticles(int numParticles = -1);
 
@@ -283,8 +288,11 @@ private:
 	std::string sConf_;
 
 	std::vector<std::vector<int> > allParticles_;
+
 	std::map<int, double> particleBestFits_;
-	std::map<int, double> particleVelocities_;
+	std::map<int, std::vector<double>> particleParamVelocities_;
+	std::map<int, std::vector<double>> particleBestParamSets_;
+	std::map<int, std::vector<double>> particleCurrParamSets_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

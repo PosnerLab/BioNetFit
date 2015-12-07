@@ -618,9 +618,126 @@ vector<vector<int>> Swarm::generateInitParticles(int pID) {
 }
 
 void Swarm::processParticlesPSO(vector<int> particles) {
-	for (auto p = particles.begin(); p != particles.end(); ++p) {
+	// For each particle in our particle set
+	for (auto particle = particles.begin(); particle != particles.end(); ++particle) {
 		// We need to already have particle best position updated by the time we get here
+
+		// Will hold positions for next iteration
+		vector<double> nextPositions;
+
+		// Calculate the next iteration positions according
+		// to user preference
+		if (options.psoType == "pso") {
+			nextPositions = calcParticlePosPSO(*particle);
+		}
+		else if (options.psoType == "bbpso") {
+			nextPositions = calcParticlePosBBPSO(*particle);
+		}
+		else if (options.psoType == "bbpsoexp") {
+			nextPositions = calcParticlePosBBPSO(*particle, true);
+		}
+
+		// Convert positions to string so they can be sent to the particle
+		vector<string> nextPositionsStr;
+		for (auto param = nextPositions.begin(); param != nextPositions.end(); ++param) {
+			nextPositionsStr.push_back(to_string(static_cast<long double>(*param)));
+		}
+		// Finally, send the parameters
+		swarmComm->sendToSwarm(0, *particle, SEND_FINAL_PARAMS_TO_PARTICLE, false, nextPositionsStr);
 	}
+}
+
+vector<double> Swarm::calcParticlePosPSO(int particle) {
+	int i = 0;
+
+	// This vector holds the new positions to be sent to the particle
+	vector<double> nextPositions(particleCurrParamSets_.size());
+
+	// Get the best positions for particle's neighborhood
+	vector<double> neighborhoodBestPositions = getNeighborhoodBestPositions(particle);
+
+	// For each parameter in the current parameter set
+	for (auto param = particleCurrParamSets_.begin(); param != particleCurrParamSets_.end(); ++param) {
+
+		// Set up formula variables
+		double currVelocity = options.intertia*particleParamVelocities_.at(particle)[i];
+		double r1 = ((double) rand() / (RAND_MAX));
+		double r2 = ((double) rand() / (RAND_MAX));
+		double personalBestPos = particleBestParamSets_.at(particle)[i];
+		double currPos = particleCurrParamSets_.at(particle)[i];
+
+		// Set velocity
+		double nextVelocity = (options.intertia*currVelocity) + options.cognitive*r1*(personalBestPos - currPos) + options.social*r2*(neighborhoodBestPositions[i] - currPos);
+
+		// Set position
+		nextPositions[i] = currPos + nextVelocity;
+		++i;
+	}
+
+	return nextPositions;
+}
+
+vector<double> Swarm::calcParticlePosBBPSO(int particle, bool exp) {
+	// Get the best positions for particle's neighborhood
+	vector<double> neighborhoodBestPositions = getNeighborhoodBestPositions(particle);
+
+	// This vector holds the new positions to be sent to the particle
+	vector<double> nextPositions(particleCurrParamSets_.size());
+
+	bool usePersonalBest = false;
+
+	// For each parameter in the current parameter set
+	int i = 0;
+	for (auto param = particleCurrParamSets_.begin(); param != particleCurrParamSets_.end(); ++param) {
+		if (exp) {
+			if ( ((float) rand() / (RAND_MAX)) < 0.5 ) {
+				usePersonalBest = true;
+			}
+		}
+
+		double personalBestPos = particleBestParamSets_.at(particle)[i];
+
+		if (usePersonalBest) {
+			nextPositions[i] = personalBestPos;
+			usePersonalBest = false;
+		}
+		else {
+			// Calculate our mean and std
+			double mean = (personalBestPos + neighborhoodBestPositions[i]) / 2;
+			double std = personalBestPos + neighborhoodBestPositions[i];
+
+			// Create the gaussian distribution
+			std::tr1::normal_distribution<double> dist(mean, std);
+
+			// Pick our next position randomly from distribution
+			nextPositions[i] = dist(randNumEngine);
+		}
+		++i;
+	}
+
+	return nextPositions;
+}
+
+vector<double> Swarm::getNeighborhoodBestPositions(int particle) {
+
+	// Set the current best fit to our own best fit
+	double currBestFit = particleBestFits_.at(particle);
+	int currentBestNeighbor = particle;
+
+	// For every neighbor in this particle's neighborhood
+	for (auto neighbor = allParticles_[particle].begin(); neighbor != allParticles_[particle].end(); ++neighbor) {
+		// Set best fit of neighbor being tested
+		double neighborBestFit = particleBestFits_.at(*neighbor);
+
+		// If Neighbor's best fit is better than ours, update the best
+		// neighbor. Also, update the current best fit value
+		if (neighborBestFit < currBestFit) {
+			currentBestNeighbor = *neighbor;
+			currBestFit = neighborBestFit;
+		}
+	}
+
+	return particleBestParamSets_.at(currentBestNeighbor);
 }
 
 void Swarm::launchParticle(int pID) {
