@@ -117,9 +117,16 @@ void Particle::runModel() {
 
 	// First get our path and filename variables set up for use in model generation, sim command, etc
 	string bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
-	string path = swarm_->options.jobOutputDir + "" + to_string(static_cast<long long int>(swarm_->currentGeneration)) + "/";
-	string bnglFullPath = path + bnglFilename;
 
+	string path;
+	if (swarm_->options.swarmType == "genetic") {
+		path = swarm_->options.jobOutputDir + to_string(static_cast<long long int>(swarm_->currentGeneration)) + "/";
+	}
+	else if (swarm_->options.swarmType == "swarm") {
+		path = "swarm_->options.jobOutputDir";
+	}
+
+	string bnglFullPath = path + bnglFilename;
 	string pipePath;
 
 	// Only need to generate files if we're in the first generation. In subsequent generations

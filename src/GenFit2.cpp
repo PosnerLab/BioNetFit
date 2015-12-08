@@ -98,12 +98,11 @@ int main(int argc, char *argv[]) {
 			//t = tmr.elapsed();
 			//cout << "Processing .conf took " << t << " seconds" << endl;
 
-			if (generation) {
-				s->currentGeneration = generation;
-			}
-
+			s->currentGeneration = 1;
 			s->setExePath(convertToAbsPath(argv[0]));
+			s->setIsMaster(true);
 			s->initComm();
+			s->setIsMaster(false);
 		}
 
 		if (action == "cluster" || action == "run") {
@@ -154,6 +153,7 @@ int main(int argc, char *argv[]) {
 			s->setExePath(convertToAbsPath(argv[0]));
 			s->initComm();
 		}
+
 		s->doSwarm();
 	}
 

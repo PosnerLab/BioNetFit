@@ -180,19 +180,21 @@ public:
 		long maxNumIterations; // Maximum number of iterations a particle can run // TODO: Implement
 
 		// PSO options
-		float intertia; // 0.72
+		float inertia; // 0.72
 		float cognitive; // 1.49
 		float social; // 1.49
-		std::string topology; // fullyconnected
-		std::string psoType; // bbpso
 		int nmax; // 20
 		int nmin; // 80
-		bool enhancedStop; // true
-		bool enhancedInertia; // true
 		float inertiaInit; // 1
 		float inertiaFinal; // 0.1
 		float absTolerance; // 10E-4
 		float relTolerance; // 10E-4
+
+		std::string topology; // fullyconnected
+		std::string psoType; // bbpso
+
+		bool enhancedStop; // true
+		bool enhancedInertia; // true
 
 		int verbosity;		// terminal output verbosity
 
@@ -244,6 +246,17 @@ public:
 			ar & swapRate;	// the rate at which to swap parent parameters during breeding
 			ar & forceDifferentParents;// whether or not to force difference parents when breeding
 			ar & maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
+
+			// PSO options
+			ar & inertia; // 0.72
+			ar & cognitive; // 1.49
+			ar & social; // 1.49
+			ar & nmax; // 20
+			ar & nmin; // 80
+			ar & inertiaInit; // 1
+			ar & inertiaFinal; // 0.1
+			ar & absTolerance; // 10E-4
+			ar & relTolerance; // 10E-4
 
 			ar & verbosity;		// terminal output verbosity
 

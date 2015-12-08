@@ -26,14 +26,15 @@ void Pheromones::init(Swarm *s) {
 	// Using IPC
 	else {
 
-		//std::cout << "init ipc" << std::endl;
+		std::cout << "init ipc" << std::endl;
 		if (s->getIsMaster()) {
 			for (int i = 0; i <= swarm_->options.swarmSize; ++i) {
 				// TODO: The type conversion here is horrible
+
+				std::cout << "creating: " << std::to_string(static_cast<long long int>(i)) << std::endl;
 				message_queue::remove(std::to_string(static_cast<long long int>(i)).c_str());
 				message_queue *smq = new message_queue(create_only, std::to_string(static_cast<long long int>(i)).c_str(), 10, 1000);
 				smq_.push_back(smq);
-				//std::cout << "creating: " << std::to_string(static_cast<long long int>(i)) << std::endl;
 			}
 		}
 		else {

@@ -247,6 +247,77 @@ Swarm * Config::createSwarmFromConfig () {
 		s->setSosCalc((atoi(pairs.find("objfunc")->second.c_str())));
 	}
 
+
+	//////////////////////////////////////////////////////////////////
+	// PSO STUFF
+	//////////////////////////////////////////////////////////////////
+
+	if (pairs.find("inertia") != pairs.end()) {
+		s->options.inertia = stof(pairs.find("inertia")->second);
+	}
+
+	if (pairs.find("conginitive") != pairs.end()) {
+		s->options.cognitive = stof(pairs.find("cognitive")->second);
+	}
+
+	if (pairs.find("social") != pairs.end()) {
+		s->options.social = stof(pairs.find("social")->second);
+	}
+
+	if (pairs.find("inertia") != pairs.end()) {
+		s->options.inertia = stof(pairs.find("inertia")->second);
+	}
+
+	if (pairs.find("inertia") != pairs.end()) {
+		s->options.inertia = stof(pairs.find("inertia")->second);
+	}
+
+	if (pairs.find("inertia") != pairs.end()) {
+		s->options.inertia = stof(pairs.find("inertia")->second);
+	}
+
+	if (pairs.find("nmin") != pairs.end()) {
+		s->options.nmin = stoi(pairs.find("nmin")->second);
+	}
+
+	if (pairs.find("nmax") != pairs.end()) {
+		s->options.nmax = stoi(pairs.find("nmax")->second);
+	}
+
+	if (pairs.find("inertia_init") != pairs.end()) {
+		s->options.inertiaInit = stof(pairs.find("inertia_init")->second);
+	}
+
+	if (pairs.find("inertia_final") != pairs.end()) {
+		s->options.inertiaFinal = stof(pairs.find("inertia_final")->second);
+	}
+
+	if (pairs.find("abs_tolerance") != pairs.end()) {
+		s->options.absTolerance = stof(pairs.find("abs_tolerance")->second);
+	}
+
+	if (pairs.find("rel_tolerance") != pairs.end()) {
+		s->options.relTolerance = stof(pairs.find("rel_tolerance")->second);
+	}
+
+	if (pairs.find("topology") != pairs.end()) {
+		s->options.topology = pairs.find("topology")->second;
+	}
+
+	if (pairs.find("pso_type") != pairs.end()) {
+		s->options.psoType = pairs.find("pso_type")->second;
+	}
+
+	if(pairs.find("enhanced_stop") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->options.enhancedStop = (stoi(pairs.find("enhanced_stop")->second) == 1) ? true : false;
+	}
+
+	if(pairs.find("enhanced_inertia") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->options.enhancedInertia = (stoi(pairs.find("enhanced_inertia")->second) == 1) ? true : false;
+	}
+
 	// Add any init param generation options
 	//for (auto pair: pairs) {
 	for (unordered_multimap<string, string>::iterator pair = pairs.begin(); pair != pairs.end(); ++pair) {
@@ -312,15 +383,6 @@ Swarm * Config::createSwarmFromConfig () {
 		}
 	}
 
-	/*
-	for (auto pair : pairs) {
-		if (pair->first == "exp") {
-			//cout << "Adding exp file: " << pair->second << endl;
-			s->addExp(pair->second);
-		}
-	}
-	 */
-
 	// Link all model actions with their corresponding data sets (.exp files)
 	// Remove any .exp files that aren't pointed to in the model file
 	// And Remove any Model::actions without corresponding .exp files specified in the .conf file
@@ -330,9 +392,6 @@ Swarm * Config::createSwarmFromConfig () {
 	for (map<string, Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
 		//for (vector<Model::action>::iterator i = s->options.model->actions.begin(); i != s->options.model->actions.end();)
 	{
-		//if (!i->prefix.empty()) {
-		//	prefixedActions.push_back(i->prefix);
-		//}
 		prefixedActions.push_back(i->first);
 
 		if (s->options.expFiles.count(i->first) == 1) {

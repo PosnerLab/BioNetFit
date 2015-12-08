@@ -16,10 +16,6 @@ Swarm::Swarm() {
 	isMaster = false;
 	sConf_ = "";
 
-	if (isMaster) {
-		currentGeneration = 1;
-	}
-
 	options.simPath = "";
 	options.maxGenerations = 10;
 	options.swarmSize = 10;
@@ -46,8 +42,40 @@ Swarm::Swarm() {
 	options.maxFitTime = MAX_LONG;
 	options.maxNumSimulations = MAX_LONG;
 
+	// PSO options
+	options.inertia = 0.72; // 0.72
+	options.cognitive = 1.49; // 1.49
+	options.social = 1.49; // 1.49
+	options.nmax = 20; // 20
+	options.nmin = 80; // 80
+	options.inertiaInit = 1; // 1
+	options.inertiaFinal = 0.1; // 0.1
+	options.absTolerance = 10e-4; // 10E-4
+	options.relTolerance = 10e-4; // 10E-4
+
+	options.topology = "fullyconnected"; // fullyconnected
+	options.psoType = "pso"; // pso
+
+	options.enhancedStop = true; // true
+	options.enhancedInertia = true; // true
+
 	options.verbosity = 1;
 	options.hasMutate = false;
+
+	/*
+	std::map<int, double> particleBestFits_;
+	std::map<int, std::vector<double>> particleParamVelocities_;
+	std::map<int, std::vector<double>> particleBestParamSets_;
+	std::map<int, std::vector<double>> particleCurrParamSets_;
+	std::map<int, double> particleWeights_;
+	std::map<double, int> particleBestFitsByFit_;
+	 */
+
+	int permanenceCounter_ = 0; // 0
+	int flightCounter_ = 0; // 0
+	double weightedAvgPos_ = 0; // 0
+	double optimum_ = 0; // 0
+	int inertiaUpdateCounter_ = 0; // 0;
 
 	// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
 	// Seed our random number engine
@@ -347,17 +375,20 @@ bool Swarm::checkStopCriteria() {
 		}
 	}
 
-	if (flightCounter_ > options.maxNumSimulations) {
+	// If we've run more than the maximum number of simulations
+	if (flightCounter_ >= options.maxNumSimulations) {
 		return true;
 	}
 
-	if (permanenceCounter_ > options.maxNumSimulations) {
+	if (permanenceCounter_ >= options.maxNumSimulations) {
 		return true;
 	}
 
-	if (//TIME)
-
-
+	/*
+	// TIME
+	if () {
+	}
+	*/
 }
 
 void Swarm::updateEnhancedStop() {
@@ -762,14 +793,14 @@ vector<double> Swarm::calcParticlePosPSO(int particle) {
 	for (auto param = particleCurrParamSets_.begin(); param != particleCurrParamSets_.end(); ++param) {
 
 		// Set up formula variables
-		double currVelocity = options.intertia*particleParamVelocities_.at(particle)[i];
+		double currVelocity = options.inertia * particleParamVelocities_.at(particle)[i];
 		double r1 = ((double) rand() / (RAND_MAX)); // TODO: These need to be inclusive
 		double r2 = ((double) rand() / (RAND_MAX));
 		double personalBestPos = particleBestParamSets_.at(particle)[i];
 		double currPos = particleCurrParamSets_.at(particle)[i];
 
 		// Set velocity
-		double nextVelocity = (options.intertia*currVelocity) + options.cognitive*r1*(personalBestPos - currPos) + options.social*r2*(neighborhoodBestPositions[i] - currPos);
+		double nextVelocity = (options.inertia * currVelocity) + options.cognitive * r1 * (personalBestPos - currPos) + options.social * r2 * (neighborhoodBestPositions[i] - currPos);
 
 		// Set position
 		nextPositions[i] = currPos + nextVelocity;
@@ -823,7 +854,7 @@ vector<double> Swarm::calcParticlePosBBPSO(int particle, bool exp) {
 
 void Swarm::updateInertia() {
 	// Eq 3 from Moraes et al
-	options.intertia = options.inertiaInit + (options.inertiaFinal - options.inertiaInit) * (inertiaUpdateCounter_/ options.nmax + inertiaUpdateCounter_);
+	options.inertia = options.inertiaInit + (options.inertiaFinal - options.inertiaInit) * (inertiaUpdateCounter_ / options.nmax + inertiaUpdateCounter_);
 }
 
 vector<double> Swarm::getNeighborhoodBestPositions(int particle) {
@@ -859,7 +890,7 @@ void Swarm::processParamsPSO(vector<double> &params, int pID, double fit) {
 
 	// The the fit value of this param set is less than the particles best fit
 	// we should update the particle's best fit, then store the best fit params
-	if (fit < particleBestFits_[pID]) {
+	if (fit < particleBestFits_.at(pID)) {
 		particleBestFits_[pID] = fit;
 
 		i = 0;
@@ -881,6 +912,8 @@ void Swarm::launchParticle(int pID) {
 
 		// TODO: Check system return value for success
 		int ret = runCommand(command);
+
+		cout << "Command: " << command << endl;
 	}
 
 	if (options.verbosity >= 3) {

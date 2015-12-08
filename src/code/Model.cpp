@@ -118,7 +118,7 @@ void Model::parseModel() {
 			}
 
 			// Remove any suffixes from the command
-			*i = boost::regex_replace(*i,boost::regex("suffix=>('|\")\\w+('|\")"), string(""));
+			*i = boost::regex_replace(*i,boost::regex(",suffix=>('|\")\\w+('|\")"), string(""));
 
 			// Find any prefixes and store them
 			if (boost::regex_search(*i, smatches, boost::regex("prefix=>('|\")(\\w+)('|\")"))) {
@@ -209,7 +209,7 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 			else {
 				if (onlyActions) {
 					filename = boost::regex_replace(filename, boost::regex("bngl$"), string("net"));
-					string line = "readFile({file=>\"" + path + "/" + filename + "\"})\n";
+					string line = "readFile({file=>\"" + path + filename + "\"})\n";
 					outFile << line;
 				}
 				//for (string line : fullContents_){
