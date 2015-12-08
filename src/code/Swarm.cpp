@@ -279,10 +279,18 @@ void Swarm::doSwarm() {
 			// Send all pID's in for processing (update velocities and positions)
 			processParticlesPSO(allParticles, false);
 
+			// Set our optimum
+			optimum_ = particleBestFitsByFit_.begin()->first;
+
 			// If we're using enhanced stop criteria, update the enhanced stop variables
 			if (options.enhancedStop) {
 				// Initialize our particle weights and weighted average position
 				updateEnhancedStop();
+			}
+
+			// Re-launch the particles in to the Swarm proper
+			for (int p = 1; p <= options.swarmSize; ++p) {
+				launchParticle(p);
 			}
 
 			while (!stopCriteria) {
@@ -290,11 +298,12 @@ void Swarm::doSwarm() {
 				finishedParticles = checkMasterMessages();
 
 				if (finishedParticles.size()) {
+					// Process finished particles
 					processParticlesPSO(finishedParticles, true);
-				}
 
-				// Check for stop criteria
-				stopCriteria = checkStopCriteria();
+					// Check for stop criteria
+					stopCriteria = checkStopCriteria();
+				}
 
 				// Only check cluster queue every minute
 				++clusterCheckCounter;
@@ -311,6 +320,43 @@ void Swarm::doSwarm() {
 }
 
 bool Swarm::checkStopCriteria() {
+	if (options.enhancedStop) {
+
+		// Eq 4 from Moraes et al
+		// Algorithm 1 from Moraes et al
+		if (abs(particleBestFitsByFit_.begin()->first - optimum_) < options.absTolerance + (options.absTolerance * particleBestFitsByFit_.begin()->first) ) {
+			++permanenceCounter_;
+			++inertiaUpdateCounter_;
+
+			double quotient = permanenceCounter_ / options.nmin;
+			if (floor(quotient) == quotient) {
+				double oldAvgPos = weightedAvgPos_;
+				updateEnhancedStop();
+
+				if ( getEuclidianNorm(weightedAvgPos_ - oldAvgPos, options.model->getNumFreeParams()) < options.absTolerance ) {
+					// Fit finished!
+					return true;
+				}
+			}
+		}
+		else {
+			permanenceCounter_ = 0;
+			if (particleBestFitsByFit_.begin()->first < optimum_) {
+				optimum_ = particleBestFitsByFit_.begin()->first;
+			}
+		}
+	}
+
+	if (flightCounter_ > options.maxNumSimulations) {
+		return true;
+	}
+
+	if (permanenceCounter_ > options.maxNumSimulations) {
+		return true;
+	}
+
+	if (//TIME)
+
 
 }
 
@@ -677,6 +723,9 @@ void Swarm::processParticlesPSO(vector<int> particles, bool newFlight) {
 		// Calculate the next iteration positions according
 		// to user preference
 		if (options.psoType == "pso") {
+			if (options.enhancedInertia) {
+				updateInertia();
+			}
 			nextPositions = calcParticlePosPSO(*particle);
 		}
 		else if (options.psoType == "bbpso") {
@@ -691,6 +740,9 @@ void Swarm::processParticlesPSO(vector<int> particles, bool newFlight) {
 		for (auto param = nextPositions.begin(); param != nextPositions.end(); ++param) {
 			nextPositionsStr.push_back(to_string(static_cast<long double>(*param)));
 		}
+
+		// Increment our flight counter
+		++flightCounter_;
 
 		// Finally, send the parameters
 		swarmComm->sendToSwarm(0, *particle, SEND_FINAL_PARAMS_TO_PARTICLE, false, nextPositionsStr);
@@ -767,6 +819,11 @@ vector<double> Swarm::calcParticlePosBBPSO(int particle, bool exp) {
 	}
 
 	return nextPositions;
+}
+
+void Swarm::updateInertia() {
+	// Eq 3 from Moraes et al
+	options.intertia = options.inertiaInit + (options.inertiaFinal - options.inertiaInit) * (inertiaUpdateCounter_/ options.nmax + inertiaUpdateCounter_);
 }
 
 vector<double> Swarm::getNeighborhoodBestPositions(int particle) {

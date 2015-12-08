@@ -188,6 +188,7 @@ public:
 		int nmax; // 20
 		int nmin; // 80
 		bool enhancedStop; // true
+		bool enhancedInertia; // true
 		float inertiaInit; // 1
 		float inertiaFinal; // 0.1
 		float absTolerance; // 10E-4
@@ -276,6 +277,7 @@ private:
 	double calcWeightedAveragePosition();
 	void processParamsPSO(std::vector<double> &params, int pID, double fit);
 	bool checkStopCriteria();
+	void updateInertia();
 
 	std::vector<double> calcParticlePosPSO(int particle);
 	std::vector<double> calcParticlePosBBPSO(int particle, bool exp = false);
@@ -305,8 +307,11 @@ private:
 	std::map<int, double> particleWeights_;
 	std::map<double, int> particleBestFitsByFit_;
 
-	int flightCounter_; // Need to implement this
-	double weightedAvgPos_;
+	int permanenceCounter_; // 0
+	int flightCounter_; // 0
+	double weightedAvgPos_; // 0
+	double optimum_; // 0
+	int inertiaUpdateCounter_; // 0;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

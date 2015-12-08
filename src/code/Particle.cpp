@@ -96,12 +96,13 @@ void Particle::doParticle() {
 	swarm_->swarmComm->recvMessage(0, id_, 18, true, swarm_->swarmComm->univMessageReceiver);
 	//cout << "Particle " << id_ << " starting" << endl;
 
-	while(1) {
+	bool doContinue = true;
+	while(doContinue) {
 
 		runModel();
 
 		if (swarm_->options.swarmType == "genetic") {
-			checkMasterMessages();
+			checkMessagesGenetic();
 		}
 		else if (swarm_->options.swarmType == "pso") {
 			checkMessagesPSO();
@@ -191,10 +192,9 @@ void Particle::runModel() {
 	}
 }
 
-void Particle::checkMasterMessages() {
+void Particle::checkMessagesGenetic() {
 	// TODO: Breeding is still too slow. Need to speed things up here.
 	// Wait for message from master telling us who to breed with
-	bool doContinue = false;
 
 	// swapTracker holds swapIDs and pIDs to keep track of who is breeding with who,
 	// and which swaps are completed
@@ -203,7 +203,7 @@ void Particle::checkMasterMessages() {
 	// Holds iterator ranges when finding items in the message holder
 	pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
 
-	while (!doContinue) {
+	while (1) {
 		// Retrieve any messages
 		int numCheckedMessages = 0;
 		int numMessages = swarm_->swarmComm->recvMessage(-1, id_, -1, true, swarm_->swarmComm->univMessageReceiver, true);
@@ -348,11 +348,11 @@ void Particle::checkMasterMessages() {
 
 		if (swarm_->swarmComm->univMessageReceiver.find(FIT_FINISHED) != swarm_->swarmComm->univMessageReceiver.end()) {
 			//cout << id_ << " exiting " << endl;
-			return;
+			exit(0);
 		}
 
 		if (swarm_->swarmComm->univMessageReceiver.find(NEXT_GENERATION) != swarm_->swarmComm->univMessageReceiver.end()) {
-			doContinue = true;
+			return;
 		}
 
 		swarm_->swarmComm->univMessageReceiver.clear();
@@ -361,38 +361,42 @@ void Particle::checkMasterMessages() {
 
 void Particle::checkMessagesPSO() {
 
-	int numCheckedMessages = 0;
-	int numMessages = swarm_->swarmComm->recvMessage(-1, id_, -1, true, swarm_->swarmComm->univMessageReceiver, true);
+	while(1) {
+		int numCheckedMessages = 0;
+		int numMessages = swarm_->swarmComm->recvMessage(-1, id_, -1, true, swarm_->swarmComm->univMessageReceiver, true);
 
-	// Holds iterator ranges when finding items in the message holder
-	pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
+		// Holds iterator ranges when finding items in the message holder
+		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
 
-	while (numCheckedMessages < numMessages) {
-		smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEXT_GENERATION);
+		while (numCheckedMessages < numMessages) {
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(SEND_FINAL_PARAMS_TO_PARTICLE);
+			if (smhRange.first != smhRange.second) {
+				cout << id_ << "found final " << endl;
+				for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 
-		smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(SEND_FINAL_PARAMS_TO_PARTICLE);
-		if (smhRange.first != smhRange.second) {
-			cout << id_ << "found final " << endl;
-			for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
+					int messageIndex = 0;
+					for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
+						cout << id_ << " updating parameter " << p->first << " to " << sm->second.message[messageIndex] << endl;
+						p->second = stod(sm->second.message[messageIndex]);
+						++messageIndex;
+					}
 
-				int messageIndex = 0;
-				for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
-					cout << id_ << " updating parameter " << p->first << " to " << sm->second.message[messageIndex] << endl;
-					p->second = stod(sm->second.message[messageIndex]);
-					++messageIndex;
-				}
-
-				if (smhRange.first != smhRange.second) {
-					++numCheckedMessages;
-					continue;
+					if (smhRange.first != smhRange.second) {
+						++numCheckedMessages;
+						continue;
+					}
 				}
 			}
-		}
 
-		smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(FIT_FINISHED);
-		if (smhRange.first != smhRange.second) {
-			++numCheckedMessages;
-			return;
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(FIT_FINISHED);
+			if (smhRange.first != smhRange.second) {
+				exit(0);
+			}
+
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEXT_GENERATION);
+			if (smhRange.first != smhRange.second) {
+				return;
+			}
 		}
 	}
 }

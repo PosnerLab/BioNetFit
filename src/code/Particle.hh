@@ -39,7 +39,7 @@ private:
 	friend class boost::serialization::access;
 
 	void runModel();
-	void checkMasterMessages();
+	void checkMessagesGenetic();
 	void checkMessagesPSO();
 
 	double objFunc_chiSquare(double sim, double exp, double stdev);
