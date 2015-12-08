@@ -20,7 +20,7 @@ public:
 
 	std::string getLocation();
 	int makeCopy(std::string newLocation);
-	Swarm * createSwarmFromConfig(bool isMaster);
+	Swarm * createSwarmFromConfig();
 	void createConfigFromSwarm ();
 
 private:

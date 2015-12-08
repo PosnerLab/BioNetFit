@@ -15,8 +15,8 @@ Config::Config(string configFile) {
 	configPath_ = convertToAbsPath(configFile);
 }
 
-Swarm * Config::createSwarmFromConfig (bool isMaster) {
-	Swarm *s = new Swarm(isMaster);
+Swarm * Config::createSwarmFromConfig () {
+	Swarm *s = new Swarm();
 
 	string line;
 	ifstream confFile(configPath_);

@@ -46,20 +46,18 @@ class access;
 
 class Swarm {
 public:
-	Swarm(bool isMaster);
 	Swarm();
+
 	void addExp(std::string path);
 
 	void setModel(std::string path);
 	Model * getModel() { return options.model; };
 
-	void setSwarmSize(int size);
+	void setSwarmSize(int size) { options.swarmSize = size; }
 	int getSwarmSize() { return options.swarmSize; }
 
 	void setIsMaster(bool master) { isMaster = master; }
 	bool getIsMaster() { return isMaster; }
-
-	void setIsClusterInit(bool clusterInit) { isClusterInit = clusterInit; }
 
 	void setExePath(std::string path) { exePath_ = path; }
 	void setConfigPath(std::string path) { configPath_ = path; }
@@ -68,10 +66,9 @@ public:
 
 	// TODO: Make get/set methods inline
 	void setSwarmType(std::string type);
-	void setSwarmSynchronicity(int synchronicity);
-	void setSwarmGenerations(int generations);
-	void setSwarmMinFit(float minfit);
-	bool checkSwarmConsistency();
+	void setSwarmSynchronicity(int synchronicity) { options.synchronicity = synchronicity; }
+	void setSwarmGenerations(int generations) { this->options.maxGenerations = generations; }
+	void setSwarmMinFit(float minfit) { this->options.minFit = minfit; }
 
 	void setVerbosity(int verbosity) { options.verbosity = verbosity; }
 	int getVerbosity() { return options.verbosity; }
@@ -136,7 +133,6 @@ public:
 	std::multimap<double,std::string> allGenFits;
 
 	bool isMaster;
-	bool isClusterInit;
 	std::tr1::mt19937 randNumEngine;
 	int currentGeneration;
 
@@ -179,18 +175,23 @@ public:
 		bool forceDifferentParents;// whether or not to force difference parents when breeding
 		int maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
 
-		// PSO options
-		float intertia;
-		float cognitive;
-		float social;
-		std::string topology;
-		std::string psoType;
-
 		long maxFitTime;	// Maximum amount of time to let the fit run
 		long maxNumSimulations; // Maximum number of simulations to run
 		long maxNumIterations; // Maximum number of iterations a particle can run // TODO: Implement
 
-
+		// PSO options
+		float intertia; // 0.72
+		float cognitive; // 1.49
+		float social; // 1.49
+		std::string topology; // fullyconnected
+		std::string psoType; // bbpso
+		int nmax; // 20
+		int nmin; // 80
+		bool enhancedStop; // true
+		float inertiaInit; // 1
+		float inertiaFinal; // 0.1
+		float absTolerance; // 10E-4
+		float relTolerance; // 10E-4
 
 		int verbosity;		// terminal output verbosity
 
@@ -253,7 +254,6 @@ public:
 			ar & clusterQueue;	// The cluster queue to submit to // TODO: Parse
 
 			ar & expFiles; // experimental data file
-
 		}
 	};
 	SwarmOpts options;
@@ -268,7 +268,14 @@ private:
 	void outputRunSummary(std::string outputDir);
 	void killAllParticles(int tag);
 	std::vector<int> checkMasterMessages();
-	void processParticlesPSO(std::vector<int> particles);
+	void processParticlesPSO(std::vector<int> particles, bool nextFlight = false);
+	void updateEnhancedStop();
+	double getEuclidianNorm(double y, int n);
+	void updateParticleWeights();
+	double calcParticleWeight(int particle);
+	double calcWeightedAveragePosition();
+	void processParamsPSO(std::vector<double> &params, int pID, double fit);
+	bool checkStopCriteria();
 
 	std::vector<double> calcParticlePosPSO(int particle);
 	std::vector<double> calcParticlePosBBPSO(int particle, bool exp = false);
@@ -289,10 +296,17 @@ private:
 
 	std::vector<std::vector<int> > allParticles_;
 
+	// TODO: These need to be initialized with 0s
+	// Maybe we can change them to vectors, too
 	std::map<int, double> particleBestFits_;
 	std::map<int, std::vector<double>> particleParamVelocities_;
 	std::map<int, std::vector<double>> particleBestParamSets_;
 	std::map<int, std::vector<double>> particleCurrParamSets_;
+	std::map<int, double> particleWeights_;
+	std::map<double, int> particleBestFitsByFit_;
+
+	int flightCounter_; // Need to implement this
+	double weightedAvgPos_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

@@ -10,11 +10,10 @@
 using namespace std;
 using namespace std::chrono;
 
-Swarm::Swarm(bool master) {
+Swarm::Swarm() {
 
 	// Whether or not we are master
-	isMaster = master;
-	isClusterInit = false;
+	isMaster = false;
 	sConf_ = "";
 
 	if (isMaster) {
@@ -58,45 +57,6 @@ Swarm::Swarm(bool master) {
 	srand (std::tr1::random_device{}());
 }
 
-Swarm::Swarm() {
-
-	if (isMaster) {
-		currentGeneration = 1;
-	}
-
-	isClusterInit = false;
-	sConf_ = "";
-
-	options.simPath = "";
-	options.maxGenerations = 10;
-	options.swarmSize = 10;
-	options.minFit = -1;
-	options.maxFit = 0;
-	options.boostrap = 0;
-	options.parallelCount = 0;
-	options.useCluster = false;
-	options.saveClusterOutput = false;
-	options.usePipes = false;
-
-	options.divideByInit = false;
-	options.logTransformSimData = false;
-	options.standardizeSimData = false;
-	options.standardizeExpData = false;
-
-	options.deleteOldFiles = true;
-	options.objFunc = 1;
-	options.extraWeight = 0;
-	options.swapRate = 0.5;
-	options.forceDifferentParents = true;
-	options.maxRetryDifferentParents = 100;
-
-	options.maxFitTime = MAX_LONG;
-	options.maxNumSimulations = MAX_LONG;
-
-	options.verbosity = 1;
-	options.hasMutate = false;
-}
-
 void Swarm::initComm() {
 	// Create the comunication class
 	Pheromones *ph = new Pheromones();
@@ -132,10 +92,6 @@ void Swarm::setModel(string path) {
 
 	double t = tmr.elapsed();
 	cout << "Adding .bngl took " << t << " seconds" << endl;
-}
-
-void Swarm::setSwarmSize(int size) {
-	this->options.swarmSize = size;
 }
 
 void Swarm::setSwarmType(string type) {
@@ -182,22 +138,6 @@ void Swarm::setJobOutputDir(string path) {
 		//int ret = system(cmd.c_str());
 		int ret = runCommand(cmd);
 	}
-}
-
-void Swarm::setSwarmSynchronicity(int synchronicity) {
-	this->options.synchronicity = synchronicity;
-}
-
-void Swarm::setSwarmGenerations(int generations) {
-	this->options.maxGenerations = generations;
-}
-
-void Swarm::setSwarmMinFit(float minfit) {
-	this->options.minFit = minfit;
-}
-
-bool Swarm::checkSwarmConsistency() {
-	return true;
 }
 
 void Swarm::addMutate(std::string mutateString) {
@@ -275,6 +215,7 @@ void Swarm::doSwarm() {
 	}
 	// Asynchronous fit loops
 	else {
+		// Genetic fit
 		if (options.swarmType == "genetic") {
 			vector<int> finishedSimulations;
 			int numFinishedSimulations = options.swarmSize;
@@ -302,31 +243,139 @@ void Swarm::doSwarm() {
 			}
 			finishFit();
 		}
+		// PSO fit
 		else if (options.swarmType == "pso") {
 			// Generate all particles that will be present in the swarm
 			allParticles_ = generateInitParticles();
-			string createDirCmd = "mkdir " + options.jobOutputDir + "1";
+			string createDirCmd = "mkdir " + options.jobOutputDir;
 
 			bool stopCriteria = false;
 			int clusterCheckCounter = 0;
 			vector<int> finishedParticles;
+			int numFinishedParticles;
+
+			// Launch all particles
+			for (int p = 1; p <= allParticles_.size(); ++p) {
+				launchParticle(p);
+			}
+
+			// Wait until they are all finished so we can initialize
+			// stuff for subsequent iterations
+			while(numFinishedParticles < options.swarmSize) {
+				// Check for our finished particles
+				finishedParticles = checkMasterMessages();
+				numFinishedParticles += finishedParticles.size();
+
+				// Sleep for a second
+				usleep(1000000);
+			}
+
+			// Fill a vector with all pID's
+			vector<int> allParticles;
+			for (int p = 1; p < options.swarmSize; ++p) {
+				allParticles.push_back(p);
+			}
+
+			// Send all pID's in for processing (update velocities and positions)
+			processParticlesPSO(allParticles, false);
+
+			// If we're using enhanced stop criteria, update the enhanced stop variables
+			if (options.enhancedStop) {
+				// Initialize our particle weights and weighted average position
+				updateEnhancedStop();
+			}
 
 			while (!stopCriteria) {
 				usleep(250000);
 				finishedParticles = checkMasterMessages();
 
 				if (finishedParticles.size()) {
-					processParticlesPSO(finishedParticles);
+					processParticlesPSO(finishedParticles, true);
 				}
 
+				// Check for stop criteria
+				stopCriteria = checkStopCriteria();
+
+				// Only check cluster queue every minute
 				++clusterCheckCounter;
 				if (clusterCheckCounter >= 240) {
 					//checkClusterQueue();
 					clusterCheckCounter = 0;
 				}
 			}
+
+			// If we're out of the loop, we've finished the fit
+			finishFit();
 		}
 	}
+}
+
+bool Swarm::checkStopCriteria() {
+
+}
+
+void Swarm::updateEnhancedStop() {
+	// First calculate particle weights
+	vector<float> particleWeights;
+
+	updateParticleWeights();
+	weightedAvgPos_ = calcWeightedAveragePosition();
+}
+
+double Swarm::getEuclidianNorm(double y, int n) {
+
+	// Eq 10 in Moraes at al
+	double sum;
+	for (int i = 1; i <= n; ++i) {
+		sum += pow(y, 2);
+	}
+
+	double norm = sqrt( (1/n) * sum);
+
+	return norm;
+}
+
+void Swarm::updateParticleWeights() {
+	for (int p = 1; p <= allParticles_.size(); ++p) {
+		particleWeights_.at(p) = calcParticleWeight(p);
+	}
+}
+
+double Swarm::calcWeightedAveragePosition() {
+
+	double sum;
+	for (int p = 1; p <= allParticles_.size(); ++p) {
+
+		if (p == particleBestFitsByFit_.begin()->second) {
+			continue;
+		}
+
+		sum += particleWeights_.at(p) * particleBestFits_[p];
+	}
+
+	return sum;
+}
+
+double Swarm::calcParticleWeight(int particle) {
+	// Get reciprocal of euclidian norm of the difference between swarm best fit and particle best fit
+	double numerator = 1 / getEuclidianNorm( (particleBestFits_.at(particle) - particleBestFitsByFit_.begin()->first), options.model->getNumFreeParams());
+
+	// Eq 8 in Moraes et al
+	double sum;
+	for (int i = 1; i <= options.swarmSize; ++i) {
+		// Make sure we're not using the particle with the best fit -- it will
+		// result in a div_by_0
+		if (i == particleBestFitsByFit_.begin()->second) {
+			continue;
+		}
+
+		// Add 1/euclidian
+		sum += 1 / numerator;
+	}
+
+	double weight = numerator / sum;
+
+	return weight;
 }
 
 Particle * Swarm::createParticle(int pID) {
@@ -617,7 +666,7 @@ vector<vector<int>> Swarm::generateInitParticles(int pID) {
 	cout << "Particle creation took " << t << " seconds" << endl;
 }
 
-void Swarm::processParticlesPSO(vector<int> particles) {
+void Swarm::processParticlesPSO(vector<int> particles, bool newFlight) {
 	// For each particle in our particle set
 	for (auto particle = particles.begin(); particle != particles.end(); ++particle) {
 		// We need to already have particle best position updated by the time we get here
@@ -642,6 +691,7 @@ void Swarm::processParticlesPSO(vector<int> particles) {
 		for (auto param = nextPositions.begin(); param != nextPositions.end(); ++param) {
 			nextPositionsStr.push_back(to_string(static_cast<long double>(*param)));
 		}
+
 		// Finally, send the parameters
 		swarmComm->sendToSwarm(0, *particle, SEND_FINAL_PARAMS_TO_PARTICLE, false, nextPositionsStr);
 	}
@@ -661,7 +711,7 @@ vector<double> Swarm::calcParticlePosPSO(int particle) {
 
 		// Set up formula variables
 		double currVelocity = options.intertia*particleParamVelocities_.at(particle)[i];
-		double r1 = ((double) rand() / (RAND_MAX));
+		double r1 = ((double) rand() / (RAND_MAX)); // TODO: These need to be inclusive
 		double r2 = ((double) rand() / (RAND_MAX));
 		double personalBestPos = particleBestParamSets_.at(particle)[i];
 		double currPos = particleCurrParamSets_.at(particle)[i];
@@ -690,6 +740,7 @@ vector<double> Swarm::calcParticlePosBBPSO(int particle, bool exp) {
 	int i = 0;
 	for (auto param = particleCurrParamSets_.begin(); param != particleCurrParamSets_.end(); ++param) {
 		if (exp) {
+			// TODO: Does this need to be inclusive?
 			if ( ((float) rand() / (RAND_MAX)) < 0.5 ) {
 				usePersonalBest = true;
 			}
@@ -740,10 +791,33 @@ vector<double> Swarm::getNeighborhoodBestPositions(int particle) {
 	return particleBestParamSets_.at(currentBestNeighbor);
 }
 
+void Swarm::processParamsPSO(vector<double> &params, int pID, double fit) {
+
+	// First update the particles current parameter set
+	int i = 0;
+	for (auto param = params.begin(); param != params.end(); ++param) {
+		particleCurrParamSets_.at(pID)[i] = *param;
+		++i;
+	}
+
+	// The the fit value of this param set is less than the particles best fit
+	// we should update the particle's best fit, then store the best fit params
+	if (fit < particleBestFits_[pID]) {
+		particleBestFits_[pID] = fit;
+
+		i = 0;
+		for (auto param = params.begin(); param != params.end(); ++param) {
+			particleBestParamSets_.at(pID)[i] = *param;
+			++i;
+		}
+	}
+}
+
 void Swarm::launchParticle(int pID) {
 
 	if (currentGeneration == 1 && !options.useCluster) {
 
+		// Construct command needed to run the particle
 		string command = exePath_ + " particle " + to_string(static_cast<long long int>(pID)) + " run " + to_string(static_cast<long long int>(currentGeneration)) + " " + sConf_;
 		command = command + " >> pOUT 2>&1";
 		command = command + " &";
@@ -1250,21 +1324,26 @@ vector<int> Swarm::checkMasterMessages() {
 			finishedParticles.push_back(pID);
 			//cout << "pushed pid" << endl;
 
-			string params = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(pID)) + " ";
+			string paramsString = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(pID)) + " ";
+			vector<double> paramsVec;
 
 			double fitCalc = stod(sm->second.message[0]);
 			//cout << "stored calc" << endl;
 
 			// Store the parameters given to us by the particle
 			for (vector<string>::iterator m = sm->second.message.begin()+1; m != sm->second.message.end(); ++m) {
-				params += *m + " ";
+				paramsString += *m + " ";
 			}
 			//cout << "stored params" << endl;
 
 			// Then store it
 			//cout << "saving fit for " << pID << " of " << fitCalc << endl;
-			allGenFits.insert(pair<double,string>(fitCalc,params));
+			allGenFits.insert(pair<double,string>(fitCalc,paramsString));
 			//cout << "saved fit" << endl;
+
+			if (options.swarmType == "pso") {
+				processParamsPSO(paramsVec, pID, fitCalc);
+			}
 		}
 
 		// TODO: When sending NEXT_GENERATION, make sure failed particles have actually run again. If not, they need re-launched.

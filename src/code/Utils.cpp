@@ -139,7 +139,7 @@ int runCommand(string cmd) {
 	int status = pclose(in);
 	printf("Exit code: %d\n", WEXITSTATUS(status));
 
-	return 0;
+	return status;
 
 	/*
 	char *c_cmd = new char[cmd.length()+1];

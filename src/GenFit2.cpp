@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
 		//TODO: When rerunning BioNetFit master on cluster, let's not load parse config twice. Serialize.
 
 		if (action != "load") {
-			s = myconfig.createSwarmFromConfig((type=="master") ? true : false);
+			s = myconfig.createSwarmFromConfig();
 
 			//t = tmr.elapsed();
 			//cout << "Processing .conf took " << t << " seconds" << endl;
@@ -124,8 +124,6 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (action == "cluster") {
-			s->setIsClusterInit(true);
-
 			string runCmd = string(convertToAbsPath(argv[0]));
 			runCmd = s->generateSlurmBatchFile(runCmd);
 
