@@ -122,7 +122,7 @@ public:
 
 	void getClusterInformation();
 	std::string generateSlurmCommand(std::string cmd, bool multiProg = true);
-	std::string generateSlurmMultiProgCmd(std::string runCmd, std::string serializedSwarmPath);
+	std::string generateSlurmMultiProgCmd(std::string runCmd);
 	std::string generateSlurmBatchFile(std::string runCmd);
 
 	void initComm();
@@ -314,11 +314,12 @@ private:
 	// TODO: These need to be initialized with 0s
 	// Maybe we can change them to vectors, too
 	std::map<int, double> particleBestFits_;
+	std::map<double, int> particleBestFitsByFit_;
 	std::map<int, std::vector<double>> particleParamVelocities_;
 	std::map<int, std::vector<double>> particleBestParamSets_;
 	std::map<int, std::vector<double>> particleCurrParamSets_;
 	std::map<int, double> particleWeights_;
-	std::map<double, int> particleBestFitsByFit_;
+
 
 	int permanenceCounter_; // 0
 	int flightCounter_; // 0
@@ -336,6 +337,21 @@ private:
 		ar & exePath_;
 		ar & options;
 		ar & particleBestFits_;
+		ar & sConf_;
+
+		ar & allParticles_;
+		ar & particleBestFitsByFit_;
+		ar & particleParamVelocities_;
+		ar & particleBestParamSets_;
+		ar & particleCurrParamSets_;
+		ar & particleWeights_;
+		ar & particleBestFits_;
+
+		ar & permanenceCounter_;
+		ar & flightCounter_;
+		ar & weightedAvgPos_;
+		ar & optimum_;
+		ar & inertiaUpdateCounter_;
 	}
 
 	Timer tmr_;

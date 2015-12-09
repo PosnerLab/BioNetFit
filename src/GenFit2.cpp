@@ -124,7 +124,8 @@ int main(int argc, char *argv[]) {
 
 		if (action == "cluster") {
 			string runCmd = string(convertToAbsPath(argv[0]));
-			runCmd = s->generateSlurmBatchFile(runCmd);
+			//runCmd = s->generateSlurmBatchFile(runCmd);
+			runCmd = s->generateSlurmMultiProgCmd(runCmd);
 
 			cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
 

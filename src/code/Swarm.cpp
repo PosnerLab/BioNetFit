@@ -1333,8 +1333,7 @@ string Swarm::generateSlurmCommand(string cmd, bool multiProg) {
 		command += " -o /dev/null";
 	}
 
-	cout << "pc is: " << options.parallelCount;
-	command += " -c" + to_string(static_cast<long long int>(options.parallelCount));
+	command += " -n" + to_string(static_cast<long long int>(options.parallelCount) + 1);
 	command += " -l";
 
 
@@ -1472,14 +1471,14 @@ vector<int> Swarm::checkMasterMessages() {
 	return finishedParticles;
 }
 
-string Swarm::generateSlurmMultiProgCmd(string runCmd, string serializedSwarmPath) {
+string Swarm::generateSlurmMultiProgCmd(string runCmd) {
 	string multiProgConfPath = options.jobOutputDir + "multiprog.conf";
 	ofstream multiprog(multiProgConfPath, ios::out);
 
 	if (multiprog.is_open()) {
-		multiprog << "0 " << runCmd << " " << configPath_ << endl;
+		multiprog << "0 " << runCmd << " " << sConf_ << endl;
 		for (int id = 1; id <= options.swarmSize; ++id) {
-			multiprog << to_string(static_cast<long long int>(id)) + " " << runCmd << " particle " << to_string(static_cast<long long int>(id)) << " run " << serializedSwarmPath << endl;
+			multiprog << to_string(static_cast<long long int>(id)) + " " << runCmd << " particle " << to_string(static_cast<long long int>(id)) << " run " << sConf_ << endl;
 		}
 		multiprog.close();
 	}
@@ -1518,7 +1517,7 @@ string Swarm::generateSlurmBatchFile(string runCmd) {
 			sbatch << "#SBATCH -o /dev/null" << endl;
 		}
 
-		sbatch << "#SBATCH -n" + to_string(static_cast<long long int>(options.parallelCount)) << endl;
+		sbatch << "#SBATCH -n" + to_string(static_cast<long long int>(options.parallelCount) + 1) << endl;
 
 		sbatch << endl;
 
