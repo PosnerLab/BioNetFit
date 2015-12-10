@@ -20,6 +20,7 @@
 
 class FreeParam;
 class Data;
+class Swarm;
 
 class Model {
 	friend class Config;
@@ -27,7 +28,7 @@ class Model {
 	friend class Particle;
 
 public:
-	Model(std::string path);
+	Model(Swarm *swarm, std::string path);
 	Model();
 
 	std::string getLocation();
@@ -73,6 +74,8 @@ private:
 
 	void parseModel();
 
+	Swarm *swarm_;
+
 	std::string modelPath_;
 	std::vector<std::string> fullContents_;
 	std::vector<std::string> netContents_;
@@ -84,6 +87,7 @@ private:
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
 		//std::cout << " serializing model" << std::endl;
+		ar & swarm_;
 
 		ar & freeParams_;
 

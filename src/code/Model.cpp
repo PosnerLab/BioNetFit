@@ -9,7 +9,10 @@
 
 using namespace std;
 
-Model::Model(string path) {
+Model::Model(Swarm * swarm, string path) {
+
+	swarm_ = swarm;
+
 	hasGenerateNetwork_ = false;
 
 	modelPath_ = convertToAbsPath(path);
@@ -19,6 +22,11 @@ Model::Model(string path) {
 Model::Model() {}
 
 void Model::parseNet(string path) {
+
+	if (swarm_->options.verbosity >= 3) {
+		cout << "Parsing .net file" << endl;
+	}
+
 	string line;
 	ifstream modelFile(path);
 
@@ -185,7 +193,7 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 						// Replace free param with generated param
 						//double tt = 0;
 						//for (auto p : params) { // TODO: Is there a faster way to do this than loop through params over and over? It's still too slow.
-							for (map<string, double>::iterator p = params.begin(); p != params.end(); ++p) {
+						for (map<string, double>::iterator p = params.begin(); p != params.end(); ++p) {
 							//cout << "p is " << p.first << endl;
 							//Timer tmr;
 							if(boost::regex_match(*line, matches, boost::regex("\\s+\\d+\\s+(\\w+)\\s+(.+)\\s+"))) {

@@ -92,9 +92,15 @@ void Particle::generateParams() {
 
 void Particle::doParticle() {
 
+	if (swarm_->options.verbosity >= 3) {
+		cout << "In doParticle(), waiting for message from master" << endl;
+	}
 	//cout << "Particle " << id_ << " waiting to begin" << endl;
 	swarm_->swarmComm->recvMessage(0, id_, 18, true, swarm_->swarmComm->univMessageReceiver);
 	//cout << "Particle " << id_ << " starting" << endl;
+	if (swarm_->options.verbosity >= 3) {
+		cout << "In doParticle(), entering main run loop" << endl;
+	}
 
 	bool doContinue = true;
 	while(doContinue) {
@@ -118,13 +124,7 @@ void Particle::runModel() {
 	// First get our path and filename variables set up for use in model generation, sim command, etc
 	string bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
 
-	string path;
-	if (swarm_->options.swarmType == "genetic") {
-		path = swarm_->options.jobOutputDir + to_string(static_cast<long long int>(swarm_->currentGeneration)) + "/";
-	}
-	else if (swarm_->options.swarmType == "swarm") {
-		path = "swarm_->options.jobOutputDir";
-	}
+	string path = swarm_->options.jobOutputDir + to_string(static_cast<long long int>(swarm_->currentGeneration)) + "/";
 
 	string bnglFullPath = path + bnglFilename;
 	string pipePath;
@@ -153,7 +153,7 @@ void Particle::runModel() {
 	}
 
 	// Construct our simulation command
-	string command = swarm_->options.simPath + "BNG2.pl --outdir " + path + " " + bnglFullPath + ">> " + path + "/" + to_string(static_cast<long long int>(id_)) + ".BNG_OUT 2>&1";
+	string command = swarm_->options.simPath + "BNG2.pl --outdir " + path + " " + bnglFullPath + ">> " + path + to_string(static_cast<long long int>(id_)) + ".BNG_OUT 2>&1";
 	if (swarm_->options.usePipes) {
 		command += " &";
 	}
@@ -175,6 +175,7 @@ void Particle::runModel() {
 			dataFiles_[i->first] = new Data(dataPath, swarm_, false);
 		}
 
+
 		// Calculate our fit
 		calculateFit();
 
@@ -187,9 +188,11 @@ void Particle::runModel() {
 		}
 
 		// Tell the swarm master that we're finished
-		//cout << id_ << " telling swarm we're finished" << endl;
+		if (swarm_->options.verbosity >= 3) {
+			cout << "Telling master that my simulation is finished" << endl;
+		}
+
 		swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, true, swarm_->swarmComm->univMessageSender);
-		//cout << id_ << " done telling swarm" << endl;
 		// Reset the message vector
 		swarm_->swarmComm->univMessageSender.clear();
 	}
@@ -263,8 +266,9 @@ void Particle::checkMessagesGenetic() {
 
 				// Construct our filenames
 				string bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
-				string path = swarm_->options.jobOutputDir + "/" + to_string(static_cast<long long int>(swarm_->currentGeneration + 1));
-				string bnglFullPath = path + "/" + bnglFilename;
+				string path = swarm_->options.jobOutputDir + "/" + to_string(static_cast<long long int>(swarm_->currentGeneration + 1)) + "/";
+
+				string bnglFullPath = path + bnglFilename;
 
 				// And generate our models
 				if (swarm_->options.model->getHasGenerateNetwork()){
@@ -369,8 +373,18 @@ void Particle::checkMessagesGenetic() {
 void Particle::checkMessagesPSO() {
 
 	while(1) {
+
+		if (swarm_->options.verbosity >= 3) {
+			cout << "Checking for messages from master" << endl;
+		}
+
 		int numCheckedMessages = 0;
 		int numMessages = swarm_->swarmComm->recvMessage(-1, id_, -1, true, swarm_->swarmComm->univMessageReceiver, true);
+
+
+		if (swarm_->options.verbosity >= 3) {
+			cout << "Found " << numMessages << " messages" << endl;
+		}
 
 		// Holds iterator ranges when finding items in the message holder
 		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
@@ -378,7 +392,7 @@ void Particle::checkMessagesPSO() {
 		while (numCheckedMessages < numMessages) {
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(SEND_FINAL_PARAMS_TO_PARTICLE);
 			if (smhRange.first != smhRange.second) {
-				cout << id_ << "found final " << endl;
+				cout << "Receiving parameter list from master" << endl;
 				for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 
 					int messageIndex = 0;
@@ -388,20 +402,46 @@ void Particle::checkMessagesPSO() {
 						++messageIndex;
 					}
 
-					if (smhRange.first != smhRange.second) {
-						++numCheckedMessages;
-						continue;
+					// Construct our filenames
+					string bnglFilename = to_string(static_cast<long long int>(id_)) + ".bngl";
+					string path = swarm_->options.jobOutputDir + to_string(static_cast<long long int>(swarm_->currentGeneration + 1)) + "/";
+					if (!checkIfFileExists(path)) {
+						runCommand("mkdir " + path);
 					}
+
+					string bnglFullPath = path + bnglFilename;
+
+					// And generate our models
+					if (swarm_->options.model->getHasGenerateNetwork()){
+						// If we're using ODE solver, output .net and .bngl
+						model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(static_cast<long long int>(id_)), false, false, true, false, false);
+					}
+					else {
+						// If we're using network free simulation, output .bngl
+						model_->outputModelWithParams(simParams_, path, bnglFilename, to_string(static_cast<long long int>(id_)), false, false, false, false, false);
+					}
+
+					++numCheckedMessages;
 				}
 			}
 
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(FIT_FINISHED);
 			if (smhRange.first != smhRange.second) {
+
+				if (swarm_->options.verbosity >= 3) {
+					cout << "Master told me to die" << endl;
+				}
+
 				exit(0);
 			}
 
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEXT_GENERATION);
 			if (smhRange.first != smhRange.second) {
+
+				if (swarm_->options.verbosity >= 3) {
+					cout << "Master told me to move to the next iteration" << endl;
+				}
+
 				return;
 			}
 		}

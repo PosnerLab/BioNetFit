@@ -20,6 +20,8 @@
 #include <chrono>
 #include <cstdio>
 #include <set>
+#include <string>
+#include <map>
 
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
@@ -319,7 +321,6 @@ private:
 	std::map<int, std::vector<double>> particleBestParamSets_;
 	std::map<int, std::vector<double>> particleCurrParamSets_;
 	std::map<int, double> particleWeights_;
-
 
 	int permanenceCounter_; // 0
 	int flightCounter_; // 0

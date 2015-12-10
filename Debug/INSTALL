@@ -1,9 +1,0 @@
-The following libraries need statically linked:
-
-libboost_system
-libboost_filesystem
-libboost_mpi
-libboost_program_options
-libboost_serialization
-
-mpic++ -L/usr/lib -o "GenFit2"  ./src/code/Config.o ./src/code/Data.o ./src/code/FreeParam.o ./src/code/Model.o ./src/code/Parser.o ./src/code/Particle.o ./src/code/Pheromones.o ./src/code/Swarm.o ./src/code/Utils.o  ./src/GenFit2.o  /usr/lib/libboost_mpi.a /usr/lib/libboost_program_options.a /usr/lib/libboost_filesystem.a /usr/lib/libboost_system.a /usr/lib/libboost_serialization.a -lrt
