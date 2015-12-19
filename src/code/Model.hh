@@ -62,7 +62,7 @@ public:
 		}
 	};
 
-	const std::map<std::string, FreeParam*>& getfreeParams_() const {
+	const std::map<std::string, FreeParam*>& getFreeParams_() const {
 		return freeParams_;
 	}
 

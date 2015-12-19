@@ -26,14 +26,14 @@ void Pheromones::init(Swarm *s) {
 	// Using IPC
 	else {
 
-		std::cout << "init ipc" << std::endl;
+		//std::cout << "init ipc" << std::endl;
 		if (s->getIsMaster()) {
 			for (int i = 0; i <= swarm_->options.swarmSize; ++i) {
 				// TODO: The type conversion here is horrible
 
 				std::cout << "creating: " << std::to_string(static_cast<long long int>(i)) << std::endl;
 				message_queue::remove(std::to_string(static_cast<long long int>(i)).c_str());
-				message_queue *smq = new message_queue(create_only, std::to_string(static_cast<long long int>(i)).c_str(), 10, 1000);
+				message_queue *smq = new message_queue(create_only, std::to_string(static_cast<long long int>(i)).c_str(), 100, 1000);
 				smq_.push_back(smq);
 			}
 		}
@@ -408,24 +408,6 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 				//std::cout << "trying a blocking receive to " << receiverID << " from " << senderID << std::endl;
 				world_->recv(senderID, tag, smChar, *msgLength);
 				block = false;
-				//std::cout << "blocking receive to " << receiverID << " from " << senderID << " succeeded" << std::endl;
-				//}
-				/*
-				else {
-					std::cout << "trying a non-blocking receive to " << receiverID << " from " << senderID << std::endl;
-					recvRequest_ = world_->irecv(senderID, tag, smChar);
-					std::cout << "testing.." << std::endl;
-
-					if (recvRequest_.test()) {
-						std::cout << "non-blocking receive to " << receiverID << " from " << senderID << " succeeded: " << serializedMessage << std::endl;
-					}
-					else {
-						std::cout << "nonblock break" << std::endl;
-						recvRequest_.cancel();
-						break;
-					}
-				}
-				 */
 
 				swarmMessage smessage = deserializeSwarmMessage(std::string(smChar));
 				serializedMessage.clear();
@@ -440,16 +422,17 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 					messageHolder.insert(std::pair<int, swarmMessage>(stoi(smessage.tag), smessage));
 					++numMessages;
 
-					// Clear out the smessage for next use
-					clearSwarmMessage(smessage);
-
 					// If user doesn't want to erase the message, put it back in the queue
 					if (!eraseMessage) {
+						//std::cout << "Not erasing message" << std::endl;
 						sendToSwarm(senderID, receiverID, tag, false, smessage.message);
 					}
+
+					// Clear out the smessage for next use
+					clearSwarmMessage(smessage);
 				}
 				else {
-					//std::cout << "putting it back in the queue..." << std::endl;
+					std::cout << "putting it back in the queue..." << std::endl;
 					sendToSwarm(senderID, receiverID, tag, false, smessage.message);
 				}
 			}
@@ -501,7 +484,7 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 			std::cout << "tag: " << tag << ":" << smessage.tag << std::endl;
 			std::cout << "sender: " << tag << ":" << smessage.sender << std::endl;
 			std::cout << "id: " << tag << ":" << smessage.id << std::endl;
-			*/
+			 */
 			if ( (tag == -1 || stoi(smessage.tag) == tag) && (senderID == -1 || senderID == smessage.sender) && (messageID == -1 || messageID == smessage.id)) {
 				// Insert the message into our message holder and increment numMessages
 				messageHolder.insert(std::pair<int, swarmMessage>(stoi(smessage.tag), smessage));

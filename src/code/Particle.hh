@@ -38,7 +38,7 @@ public:
 private:
 	friend class boost::serialization::access;
 
-	void runModel();
+	void runModel(int id = 0);
 	void checkMessagesGenetic();
 	void checkMessagesPSO();
 
@@ -50,18 +50,20 @@ private:
 	void initBreedWithParticle(int pID, int swapID);
 	void rcvBreedWithParticle(std::vector<std::string>& params, int reciprocateTo, int swapID, int pID);
 	double mutateParam(FreeParam* fp, double paramValue);
+	void smoothRuns();
+	void finalizeSim();
 
 	typedef double (Particle::*objFunc)(double exp,double sim ,double stdev);
 
 	objFunc objFuncPtr;
 
 	Model * model_;
-	std::map<std::string,double> simParams_;
+	std::map<std::string, double> simParams_;
 	int id_;
-	std::map<std::string,Data*> dataFiles_;
+	std::map<std::string, std::map<int, Data*>> dataFiles_;
 	//std::string state_; // Stopped, running, simulating, analyzing, results, breeding, waiting
 	Swarm * swarm_;
-	std::map<std::string,double> bestParams_;
+	std::map<std::string, double> bestParams_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

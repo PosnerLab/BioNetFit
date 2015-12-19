@@ -11,6 +11,7 @@
 #include "Utils.hh"
 #include "Swarm.hh"
 
+// TODO: Is this acceptable?
 #define NaN 123456789
 
 class Swarm;
@@ -18,6 +19,7 @@ class Data {
 
 public:
 	Data(std::string path, Swarm * swarm, bool isExp);
+	Data(std::map<std::string, std::map<double, double>> &dataSet);
 	Data();
 
 	void parseData();
@@ -28,9 +30,10 @@ public:
 	void getColumnAverages();
 	void logTransformData();
 
-	std::map<std::string,std::map<double,double> > * dataCurrent; // This points to the most recently modified version of the data
-	std::map<std::string,std::map<double,double> > standardDeviations;
-	std::map<std::string,double> colAverages;
+	// Column->timepoint, value
+	std::map<std::string, std::map<double, double>> * dataCurrent; // This points to the most recently modified version of the data
+	std::map<std::string, std::map<double, double>> standardDeviations;
+	std::map<std::string, double> colAverages;
 
 private:
 	friend class boost::serialization::access;

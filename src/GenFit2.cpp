@@ -150,6 +150,10 @@ int main(int argc, char *argv[]) {
 				outputError("Error: Couldn't load config file: " + configFile + ".");
 			}
 
+			if (s->options.useCluster) {
+				setenv("OMPI_MCA_mpi_warn_on_fork","0",1);
+			}
+
 			s->setIsMaster(true);
 			s->setExePath(convertToAbsPath(argv[0]));
 			s->initComm();
@@ -189,6 +193,11 @@ int main(int argc, char *argv[]) {
 		if (s->currentGeneration == 1) {
 			p->generateParams();
 		}
+
+		if (s->options.useCluster) {
+			setenv("OMPI_MCA_mpi_warn_on_fork","0",1);
+		}
+
 		p->doParticle();
 	}
 

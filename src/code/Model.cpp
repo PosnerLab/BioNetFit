@@ -143,11 +143,13 @@ void Model::parseModel() {
 				actions.insert(pair<string,action>(prefix,newAction));
 			}
 		}
+		// Save any free parameters
 		else if (boost::regex_search(*i, smatches, boost::regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
 			//freeParams_.insert(pair<string,string>(smatches[2],""));
 			FreeParam * fp = new FreeParam(smatches[2]);
 			freeParams_.insert(pair<string,FreeParam*>(smatches[2],fp));
 		}
+		// Make sure we know if we need to do network generation
 		else if (boost::regex_search(*i, smatches, boost::regex("^generate_network"))) {
 			hasGenerateNetwork_ = true;
 		}
@@ -202,7 +204,7 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 								//tt += t;
 								if (matches[1] == p->first) {
 									string match = p->first + "\\s+.+";
-									string replacement = p->first + " " + to_string(static_cast<long double>(p->second)) + "\n";
+									string replacement = p->first + " " + to_string(static_cast<long double>(abs(p->second))) + "\n";
 									*line = boost::regex_replace(*line, boost::regex(match), replacement);
 									numReplacedParams++;
 								}
@@ -223,16 +225,17 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 				//for (string line : fullContents_){
 				for (auto line = fullContents_.begin(); line != fullContents_.end(); ++line) {
 					if (onlyActions) {
+						string actionLine = *line;
 						if (boost::regex_search(*line, boost::regex("^simulate|^simulate_nf|^simulate_ode|^simulate_ssa|^simulate_pla|^parameter_scan|^setConcentration|^addConcentration|^saveConcentration|^resetConcentrations|^setParameter|^saveParameters|^resetParameters|^quit|^substanceUnits|^version|^setOption"))) {
 							if (!suffix.empty()) {
 								string suffixLine = ",suffix=>\"" + suffix + "\"})";
-								*line = boost::regex_replace(*line, boost::regex("\\}\\)"), suffixLine);
+								actionLine = boost::regex_replace(actionLine, boost::regex("\\}\\)"), suffixLine);
 							}
 						}
 						else {
 							continue;
 						}
-						outFile << *line;
+						outFile << actionLine;
 					}
 					else {
 						// Skip line if it's empty or if it is a comment
@@ -249,8 +252,10 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 							if (boost::regex_search(*line, boost::regex("^simulate|^simulate_nf|^simulate_ode|^simulate_ssa|^simulate_pla|^parameter_scan"))) {
 								string suffixLine = ",suffix=>\"" + suffix + "\"})";
 								*line = boost::regex_replace(*line, boost::regex("\\}\\)"), suffixLine);
+								*line = *line + "\n";
 							}
 						}
+
 						outFile << *line;
 						if (stopAtNetGen) {
 							if (boost::regex_search(*line,matches,boost::regex("^generate_network"))) {

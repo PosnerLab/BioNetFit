@@ -78,28 +78,6 @@ bool createParticlePipe(const char * path) {
 	}
 }
 
-double pickWeighted(double weightSum, multimap<double,double> &weights, int extraWeight, tr1::mt19937 &randNumEngine) {
-	double lowerBound = 0;
-	double upperBound = weightSum;
-
-	tr1::uniform_real<double> unif(lowerBound,upperBound);
-
-	double random = unif(randNumEngine);
-	double chosen = random * ( 1 - (extraWeight / 10 ));
-
-	//cout << "random: " << random << " chosen: " << chosen << endl;
-	double currentSum = 0;
-	for (map<double,double>::iterator w = weights.begin(); w != weights.end(); ++w) {
-		currentSum += w->second;
-
-		if (currentSum >= chosen) {
-			return w->first;
-		}
-	}
-	//cout << "fell off the end" << endl;
-	return weights.rbegin()->first;
-}
-
 bool isFloat(string number) {
 	istringstream iss(number);
 	float f;
@@ -129,11 +107,14 @@ int runCommand(string cmd, string &result) {
 
 int runCommand(string cmd) {
 
-	cout << "Running command: " << endl;
-	int ret = system(cmd.c_str());
-	return ret;
+	//cout << "Running command: " << cmd << endl;
 
 	/*
+	int ret = system(cmd.c_str());
+	return ret;
+	*/
+
+
 	FILE *in;
 
 	//cout << "Running command: " << cmd << endl;
@@ -142,10 +123,9 @@ int runCommand(string cmd) {
 		return 1;
 	}
 	int status = pclose(in);
-	printf("Exit code: %d\n", WEXITSTATUS(status));
+	//printf("Exit code: %d\n", WEXITSTATUS(status));
 
 	return status;
-	*/
 
 	/*
 	char *c_cmd = new char[cmd.length()+1];

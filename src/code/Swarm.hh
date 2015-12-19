@@ -23,6 +23,11 @@
 #include <string>
 #include <map>
 
+#include <boost/random/random_device.hpp>
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
+#include <boost/random/uniform_real_distribution.hpp>
+#include <boost/random/normal_distribution.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
 
@@ -135,7 +140,7 @@ public:
 	std::multimap<double,std::string> allGenFits;
 
 	bool isMaster;
-	std::tr1::mt19937 randNumEngine;
+	boost::random::mt19937 randNumEngine;
 	int currentGeneration;
 
 	//std::string type;
@@ -176,6 +181,7 @@ public:
 		float swapRate;	// the rate at which to swap parent parameters during breeding
 		bool forceDifferentParents;// whether or not to force difference parents when breeding
 		int maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
+		int smoothing;
 
 		long maxFitTime;	// Maximum amount of time to let the fit run
 		long maxNumSimulations; // Maximum number of simulations to run
@@ -248,6 +254,10 @@ public:
 			ar & swapRate;	// the rate at which to swap parent parameters during breeding
 			ar & forceDifferentParents;// whether or not to force difference parents when breeding
 			ar & maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
+			ar & smoothing;		// How many simulations to average
+
+			ar & maxNumSimulations;
+			ar & maxNumIterations;
 
 			// PSO options
 			ar & inertia; // 0.72
@@ -259,6 +269,10 @@ public:
 			ar & inertiaFinal; // 0.1
 			ar & absTolerance; // 10E-4
 			ar & relTolerance; // 10E-4
+			ar & topology;
+			ar & psoType;
+			ar & enhancedStop;
+			ar & enhancedInertia;
 
 			ar & verbosity;		// terminal output verbosity
 
@@ -301,6 +315,11 @@ private:
 	std::string recvFromParticle(Particle *p);
 	std::vector<std::vector<int>> generateInitParticles(int numParticles = -1);
 
+	int pickWeighted(double weightSum, std::multimap<double, int> &weights, int extraWeight);
+	double mutateParam(FreeParam* fp, double paramValue);
+
+	void insertKeyByValue(std::map<double, int> &theMap, double key, int value);
+
 	std::set<int> runningParticles_;
 	std::set<int>::iterator runningParticlesIterator_;
 
@@ -316,11 +335,12 @@ private:
 	// TODO: These need to be initialized with 0s
 	// Maybe we can change them to vectors, too
 	std::map<int, double> particleBestFits_;
-	std::map<double, int> particleBestFitsByFit_;
+	std::multimap<double, int> particleBestFitsByFit_;
 	std::map<int, std::vector<double>> particleParamVelocities_;
 	std::map<int, std::vector<double>> particleBestParamSets_;
 	std::map<int, std::vector<double>> particleCurrParamSets_;
 	std::map<int, double> particleWeights_;
+	std::map<int, int> particleIterationCounter_;
 
 	int permanenceCounter_; // 0
 	int flightCounter_; // 0

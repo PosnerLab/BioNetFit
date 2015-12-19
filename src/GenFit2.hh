@@ -9,6 +9,7 @@
 #define GENFIT2_HH_
 
 #include <iostream>
+#include <stdlib.h>
 
 #include "code/Config.hh"
 #include "code/Swarm.hh"

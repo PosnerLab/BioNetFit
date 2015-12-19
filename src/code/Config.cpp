@@ -68,14 +68,20 @@ Swarm * Config::createSwarmFromConfig () {
 		s->setModel(pairs.find("model")->second);
 	}
 
+	// Update the swarm type
+	if(pairs.find("swarm_type") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->setSwarmType(pairs.find("swarm_type")->second);
+	}
+
 	// Update the swarm size
 	if(pairs.find("swarm_size") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
 		int swarmSize = atoi(pairs.find("swarm_size")->second.c_str());
 
 		// If the swarm size isn't even, make it even by adding a particle
-		if (swarmSize % 2 != 0) {
-			swarmSize++;
+		if (swarmSize % 2 != 0 && s->options.swarmType == "genetic") {
+			++swarmSize;
 		}
 		s->setSwarmSize(swarmSize);
 	}
@@ -84,12 +90,6 @@ Swarm * Config::createSwarmFromConfig () {
 	if(pairs.find("sim_path") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
 		s->setSimPath(pairs.find("sim_path")->second);
-	}
-
-	// Update the swarm type
-	if(pairs.find("swarm_type") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setSwarmType(pairs.find("swarm_type")->second);
 	}
 
 	// Update the synchronicity
@@ -163,6 +163,12 @@ Swarm * Config::createSwarmFromConfig () {
 		s->setMaxRetryDifferentParents(atoi(pairs.find("max_breeding_retries")->second.c_str()));
 	}
 
+	// Set fit value that will cause fit to end
+	if(pairs.find("smoothing") != pairs.end()) {
+		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+		s->options.smoothing = stod(pairs.find("smoothing")->second);
+	}
+
 	// Set output directory
 	if(pairs.find("output_dir") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
@@ -199,7 +205,7 @@ Swarm * Config::createSwarmFromConfig () {
 	}
 
 	// Set maximum number of simulations in an asynchronous genetic fit
-	if(pairs.find("maxNumSimulations") != pairs.end()) {
+	if(pairs.find("max_num_simulations") != pairs.end()) {
 		s->options.maxNumSimulations = stol(pairs.find("max_num_simulations")->second);
 	}
 
@@ -209,13 +215,19 @@ Swarm * Config::createSwarmFromConfig () {
 		vector<string> timeElements;
 		split(pairs.find("max_fit_time")->second, timeElements, ":");
 		long timeInSeconds = (stol(timeElements[0]) * 3600) + (stol(timeElements[1]) * 60) + stol(timeElements[2]);
-		s->options.maxFit = timeInSeconds;
+		s->options.maxFitTime = timeInSeconds;
 	}
 
-	// Update the maximimum number of parallel threads (non-cluster only)
+	// Update the maximum number of parallel threads (non-cluster only)
 	if(pairs.find("parallel_count") != pairs.end()) {
 		// TODO: Make sure PC isn't higher than swarm size
-		s->setParallelCount(stoi(pairs.find("parallel_count")->second));
+		if (s->options.useCluster) {
+			s->setParallelCount(s->options.swarmSize);
+		}
+		else {
+			s->setParallelCount(stoi(pairs.find("parallel_count")->second));
+		}
+
 	}
 	// Whether or not to divide by value at t=0
 	if(pairs.find("divide_by_init") != pairs.end()) {
@@ -316,6 +328,7 @@ Swarm * Config::createSwarmFromConfig () {
 	if(pairs.find("enhanced_inertia") != pairs.end()) {
 		//cout << "Adding model file: " << pairs.find("model")->second << endl;
 		s->options.enhancedInertia = (stoi(pairs.find("enhanced_inertia")->second) == 1) ? true : false;
+		cout << "enhanced inertia set to " << s->options.enhancedInertia << endl;
 	}
 
 	// Add any init param generation options
@@ -419,6 +432,7 @@ Swarm * Config::createSwarmFromConfig () {
 		}
 	}
 
+	/*
 	// TODO: Make sure we have either min fit, max time, or max sims when doing an asynchronous fit
 	// This whole checker needs to be much more complex
 	if (!s->options.synchronicity) {
@@ -426,6 +440,7 @@ Swarm * Config::createSwarmFromConfig () {
 			outputError("Error: You are running an asynchronous fit, but failed to specify either a minimum fitting value, maximum fit time, or maximum number of simulations in the .conf file.");
 		}
 	}
+	 */
 
 	/*
 	for (auto i : s->options.expFiles){

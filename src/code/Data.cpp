@@ -16,8 +16,8 @@ using namespace std;
 Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	swarm_ = swarm;
 	isExp_ = isExp;
-	dataPath = convertToAbsPath(path);
 
+	dataPath = convertToAbsPath(path);
 	Data::parseData();
 
 	if ( (swarm_->options.objFunc == 4 && isExp)) {
@@ -58,6 +58,11 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	}
 }
 
+Data::Data(map<string, map<double, double>> &dataSet) {
+	dataOrig_ = dataSet;
+	dataCurrent = &dataOrig_;
+}
+
 Data::Data() {}
 
 std::string Data::getPath() {
@@ -73,6 +78,7 @@ void Data::parseData(){
 	if (swarm_->options.usePipes){
 		char buf[5120];
 		string line;
+
 		int fd = open(dataPath.c_str(), O_RDONLY);
 
 		if (fd < 0) {
@@ -103,6 +109,7 @@ void Data::parseData(){
 		if (dataFile.is_open()) {
 			while (getline(dataFile, line)) {
 				allLines.push_back(line);
+				//cout << "line: " << line << endl;
 			}
 		}
 		else {
@@ -113,7 +120,7 @@ void Data::parseData(){
 	}
 
 	string replacement = "";
-	string basename = boost::regex_replace(getFilename(dataPath),boost::regex("_\\d+$"),replacement);
+	string basename = boost::regex_replace(getFilename(dataPath),boost::regex("_\\d+_\\d+$"),replacement);
 
 	if(allLines[0].at(0) != '#') {
 		string errMsg = "Error: Your data file (" + dataPath + ") doesn't contain (#) as the first value.";
