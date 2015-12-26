@@ -30,7 +30,6 @@ public:
 	int getID() { return id_; }
 
 	void doParticle();
-	void calculateFit();
 	void generateParams();
 
 	std::map<int, double> fitCalcs;
@@ -42,14 +41,15 @@ private:
 	void checkMessagesGenetic();
 	void checkMessagesPSO();
 
+	void calculateFit();
 	double objFunc_chiSquare(double sim, double exp, double stdev);
 	double objFunc_sumOfSquares(double sim, double exp, double dummyvar);
 	double objFunc_divByMeasured(double sim, double exp, double dummyvar);
 	double objFunc_divByMean(double sim, double exp, double mean);
 
 	void initBreedWithParticle(int pID, int swapID);
-	void rcvBreedWithParticle(std::vector<std::string>& params, int reciprocateTo, int swapID, int pID);
-	double mutateParam(FreeParam* fp, double paramValue);
+	//void rcvBreedWithParticle(std::vector<std::string>& params, int reciprocateTo, int swapID, int pID);
+	//double mutateParam(FreeParam* fp, double paramValue);
 	void smoothRuns();
 	void finalizeSim();
 

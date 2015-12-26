@@ -344,7 +344,7 @@ void Particle::checkMessagesGenetic() {
 					pID = swapID - 1000;
 
 					// Parse the received particles and integrate them with our own
-					rcvBreedWithParticle(params, 0, swapID, pID);
+					//rcvBreedWithParticle(params, 0, swapID, pID);
 
 				}
 				// If we don't find our swapID in the swap tracker, it must mean that
@@ -363,7 +363,7 @@ void Particle::checkMessagesGenetic() {
 					pID = swapID - 999;
 
 					// Parse the received particles and integrate them with our own
-					rcvBreedWithParticle(params, reciprocateTo, swapID, pID);
+					//rcvBreedWithParticle(params, reciprocateTo, swapID, pID);
 				}
 				cout << id_ << " is done breeding" << endl;
 				//double t = tmr.elapsed();
@@ -535,7 +535,7 @@ void Particle::calculateFit() {
 				// TODO: Need to handle missing points
 
 				double exp = timepoint->second;
-				cout << id_ << " exp: " << exp << endl;
+				//cout << id_ << " exp: " << exp << endl;
 				double sim;
 
 				if (swarm_->options.smoothing == 1) {
@@ -544,12 +544,12 @@ void Particle::calculateFit() {
 				else {
 					sim = dataFiles_.at(e->first).at(swarm_->options.smoothing + 1)->dataCurrent->at(exp_col->first).at(timepoint->first);
 				}
-				std::cout.precision(10);
-				cout << id_ << " sim: " << sim << endl;
+				//std::cout.precision(10);
+				//cout << id_ << " sim: " << sim << endl;
 
 				if (usingSD) {
 					divisor = e->second->standardDeviations.at(exp_col->first).at(timepoint->first);
-					cout << "divisor: " << divisor << endl;
+					//cout << "divisor: " << divisor << endl;
 				}
 
 				// TODO: Output error if we can't find .exp timepoint in simulation output
@@ -624,6 +624,7 @@ void Particle::initBreedWithParticle(int pID, int swapID) {
 	//cout << "Init took " << t << " seconds" << endl;
 }
 
+/*
 void Particle::rcvBreedWithParticle(vector<string>& params, int reciprocateTo, int swapID, int pID) {
 	//Timer tmr;
 
@@ -702,7 +703,9 @@ void Particle::rcvBreedWithParticle(vector<string>& params, int reciprocateTo, i
 	//double t = tmr.elapsed();
 	//cout << "Rcv took " << t << " seconds" << endl;
 }
+*/
 
+/*
 double Particle::mutateParam(FreeParam* fp, double paramValue) {
 	//Timer tmr;
 	//uniform_real_distribution<double> unif(0,1);
@@ -731,6 +734,7 @@ double Particle::mutateParam(FreeParam* fp, double paramValue) {
 	//cout << "Mutate took " << t << " seconds" << endl;
 	return paramValue;
 }
+*/
 
 void Particle::finalizeSim() {
 
@@ -771,23 +775,23 @@ void Particle::smoothRuns() {
 	for (auto action = dataFiles_.begin(); action != dataFiles_.end(); ++action) {
 		// For each column
 		// Insert a new iteration into the prefix set
-		cout << "action loop " << action->first << endl;
+		//cout << "action loop " << action->first << endl;
 		for (auto col = action->second.at(1)->dataCurrent->begin(); col != action->second.at(1)->dataCurrent->end(); ++col) {
 			// For each timepoint
 			// This map holds time/param value pairs
-			cout << "col loop " << col->first << endl;
+			//cout << "col loop " << col->first << endl;
 			map<double, double> timePairs;
 			for (auto time = col->second.begin(); time != col->second.end(); ++time) {
 				double sum = 0;
 				int i = 0;
 				// For each iteration
 				for (unsigned int iteration = 1; iteration <= swarm_->options.smoothing; ++iteration) {
-					cout << "it loop " << iteration << endl;
+					//cout << "it loop " << iteration << endl;
 					sum += dataFiles_.at(action->first).at(iteration)->dataCurrent->at(col->first).at(time->first);
 					++i;
 				}
 				double average = sum / (double)i;
-				cout << "average: " << average << endl;
+				//cout << "average: " << average << endl;
 				pair<double, double> timePair;
 				timePair = make_pair(time->first, average);
 				timePairs.insert(timePair);
@@ -797,6 +801,7 @@ void Particle::smoothRuns() {
 		action->second.insert(pair<int, Data*>(swarm_->options.smoothing + 1, new Data(dataSet)));
 		dataSet.clear();
 	}
+
 
 	/*
 	std::cout.precision(18);
@@ -811,6 +816,6 @@ void Particle::smoothRuns() {
 			}
 		}
 	}
-	cout << id_ << " done smoothing" << endl;
 	*/
+	cout << id_ << " done smoothing" << endl;
 }

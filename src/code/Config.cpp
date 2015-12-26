@@ -26,8 +26,6 @@ Swarm * Config::createSwarmFromConfig () {
 
 	s->setConfigPath(configPath_);
 
-	//TODO: Why are we using atoi with c_str when we could go straight to stoi?
-
 	// TODO: We really should be assigning iterators inside the conditional
 	// statements to avoid the extra map find() each time we find a match
 	if (confFile.is_open()) {
@@ -77,47 +75,41 @@ Swarm * Config::createSwarmFromConfig () {
 	// Update the swarm size
 	if(pairs.find("swarm_size") != pairs.end()) {
 
-		int swarmSize = atoi(pairs.find("swarm_size")->second.c_str());
+		int swarmSize = stoi(pairs.find("swarm_size")->second);
 
 		// If the swarm size isn't even, make it even by adding a particle
-		if (swarmSize % 2 != 0 && s->options.fitType == "genetic") {
-			++swarmSize;
-		}
+		//if (swarmSize % 2 != 0 && s->options.fitType == "genetic") {
+		//	++swarmSize;
+		//}
 		s->options.swarmSize = swarmSize;
 	}
 
 	// Update the sim path
 	if(pairs.find("bng_command") != pairs.end()) {
-
 		s->options.bngCommand = pairs.find("bng_command")->second;
 	}
 
 	// Update the synchronicity
 	if(pairs.find("synchronicity") != pairs.end()) {
-
 		s->options.synchronicity = (stoi(pairs.find("synchronicity")->second));
 	}
 
 	// Update the maximum number of generations
 	if(pairs.find("max_generations") != pairs.end()) {
-
 		s->options.maxGenerations = (stoi(pairs.find("max_generations")->second));
 	}
 
 	if(pairs.find("output_every") != pairs.end()) {
-
 		s->options.outputEvery = stoi(pairs.find("output_every")->second.c_str());
 	}
 
 	// Tell the swarm if we're using pipes
 	if(pairs.find("use_pipes") != pairs.end()) {
-
 		s->options.usePipes = (stoi(pairs.find("use_pipes")->second) == 1) ? true : false;
 	}
 
 	// Tell the swarm if we should delete old files
 	if(pairs.find("delete_old_files") != pairs.end()) {
-
 		s->options.deleteOldFiles = (stoi(pairs.find("delete_old_files")->second) == 1) ? true : false;
 	}
 

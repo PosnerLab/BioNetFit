@@ -25,7 +25,7 @@ Swarm::Swarm() {
 	options.synchronicity = 0;
 	options.maxGenerations = 10;
 	options.swarmSize = 10;
-	options.minFit = -1;
+	options.minFit = 0;
 	options.maxFit = 0;
 	options.boostrap = 0;
 	options.parallelCount = 0;
@@ -1192,7 +1192,7 @@ void Swarm::breedGeneration() {
 	multimap<double, unsigned int>::iterator w = particleBestFitsByFit_.begin();
 	advance(w, options.swarmSize - 1);
 	double maxWeight = w->first;
-	advance(w, 0 - (options.swarmSize - 1));
+	w = particleBestFitsByFit_.begin();
 
 	// Fill the second element of the weight map with difference between maxWeight and fit value
 	multimap<double, unsigned int> weightDiffs;
@@ -1205,33 +1205,33 @@ void Swarm::breedGeneration() {
 		++w;
 	}
 
-	//cout << "max: " << maxWeight << endl;
-
-
 	/*
+	cout << "max: " << maxWeight << endl;
 	for (auto i: weightDiffs) {
 		cout << "weight diff: " << i.first << " " << i.second << endl;
 	}
-	 */
-
-	//cout << "weight sum: " << weightSum << endl;
+	cout << "weight sum: " << weightSum << endl;
+	*/
 
 	// If we want to keep any parents unchanged, send unchanged param sets to children.
 	// We start with the global best fit params and iterate through the fit list from there.
 	unsigned int childCounter = 1;
 	for (unsigned int p = 1; p <= options.keepParents; ++p) {
+
 		vector<string> params;
 		auto parent = particleBestFitsByFit_.begin();
+
 		for (auto param = particleCurrParamSets_.at(parent->second).begin(); param != particleCurrParamSets_.at(parent->second).end(); ++param) {
 			params.push_back(to_string(*param));
 		}
 
+		//cout << "Sending unchanged params to " << childCounter << endl;
 		swarmComm->sendToSwarm(0, childCounter, SEND_FINAL_PARAMS_TO_PARTICLE, false, params);
 		++parent;
 		++childCounter;
 	}
 
-	float parentPairs = parentPoolSize / 2;
+	float parentPairs = (float)parentPoolSize / 2;
 
 	//cout << "we have " << parentPairs << " parent pairs" << endl;
 
@@ -1251,7 +1251,7 @@ void Swarm::breedGeneration() {
 				outputError("Error: Tried too many times to select parents that didn't exceed the specified max_fit value of " + to_string(options.maxFit) + ". Quitting.");
 			}
 			// Make sure we don't exceed max_fit
-		} while (particleBestFits_.at(p1) <= options.maxFit && particleBestFits_.at(p2) <= options.maxFit);
+		} while (options.maxFit != 0 && particleBestFits_.at(p1) >= options.maxFit && particleBestFits_.at(p2) >= options.maxFit);
 
 		// If we want different parents used in breeding, make sure that happens
 		unsigned int retryCount = 0;
@@ -1309,9 +1309,10 @@ void Swarm::breedGeneration() {
 		//cout << "sending to " << childCounter << endl;
 		swarmComm->sendToSwarm(0, childCounter, SEND_FINAL_PARAMS_TO_PARTICLE, false, c1Vec);
 		++childCounter;
-		//cout << "sending to " << childCounter << endl;
+
 		// Make sure we don't send to too many parents (only relevant in last breeding with odd number of parents)
 		if ( !( (fmod(parentPairs * 2, 2)) == 1 && parentPairs - i == 0.5 ) ) {
+			//cout << "sending to " << childCounter << endl;
 			swarmComm->sendToSwarm(0, childCounter, SEND_FINAL_PARAMS_TO_PARTICLE, false, c2Vec);
 			++childCounter;
 		}
@@ -1492,7 +1493,7 @@ void Swarm::finishFit() {
 	string command = "mkdir " + outputDir + " && cp " + configPath_ + " " + outputDir;
 
 	int errorCounter = 0;
-	while (!runCommand(command) && errorCounter < 10) {
+	while (runCommand(command) != 0 && errorCounter < 10) {
 		sleep(1);
 		++errorCounter;
 	}
@@ -1844,7 +1845,8 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 			//cout << "saving fit with: "	<< paramsString << endl;
 			allGenFits.insert(pair<double,string>(fitCalc, paramsString));
 			//insertKeyByValue(particleBestFitsByFit_, fitCalc, pID);
-			particleBestFitsByFit_.insert(pair<double, int>(fitCalc, pID));
+			particleBestFitsByFit_.insert(pair<double, unsigned int>(fitCalc, pID));
+			particleBestFits_.insert(pair<unsigned int, double>(pID, fitCalc));
 
 			//particleBestFits_[pID] = fitCalc;
 			//cout << "saved fit" << endl;
