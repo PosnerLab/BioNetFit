@@ -36,7 +36,7 @@ public:
 	void outputModelWithParams(std::map<std::string,double> params, std::string path, std::string filename, std::string suffix, bool stopAtNetGen, bool onlyActions, bool netAndBngl, bool usePipe, bool isNetFile);
 	void parseNet(std::string path);
 	bool getHasGenerateNetwork() {return hasGenerateNetwork_;}
-	int getNumFreeParams() { return freeParams_.size(); }
+	unsigned int getNumFreeParams() { return freeParams_.size(); }
 
 	struct action {
 		std::string full;

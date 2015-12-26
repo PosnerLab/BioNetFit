@@ -65,19 +65,14 @@ public:
 	std::string getsConf() { return sConf_; }
 	void setJobOutputDir(std::string dir);
 
+	void initComm();
 	void doSwarm();
-	void runGeneration();
-	void breedGeneration();
 	Particle *createParticle(unsigned int pID);
-	void launchParticle(unsigned int pID);
 
 	void getClusterInformation();
 	std::string generateSlurmCommand(std::string cmd, bool multiProg = true);
 	std::string generateSlurmMultiProgCmd(std::string runCmd);
 	std::string generateSlurmBatchFile(std::string runCmd);
-
-	void initComm();
-	void initFit();
 
 	Pheromones *swarmComm;
 
@@ -85,9 +80,7 @@ public:
 
 	bool isMaster;
 	boost::random::mt19937 randNumEngine;
-	int currentGeneration;
-
-	//std::string type;
+	unsigned int currentGeneration;
 
 	struct SwarmOpts {
 		// TODO: Need to define defaults AND check for required variables
@@ -97,12 +90,12 @@ public:
 		std::string jobOutputDir;// outputDir + jobName
 		std::string bngCommand;	// Path to simulators
 
-		int outputEvery;
+		unsigned int outputEvery;
 
 		Model * model; 			// the model file
 
 		bool synchronicity;		// 1 for synchronous
-		int maxGenerations;// maximum number of generations
+		unsigned int maxGenerations;// maximum number of generations
 		unsigned int swarmSize;		// how many particles in the swarm
 		float minFit;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
 		float maxFit;		// we stop fitting if we reach this value // TODO: Implement this
@@ -122,22 +115,23 @@ public:
 		unsigned int objFunc;		// which objective function to use
 
 		// Genetic algorithm options
-		int extraWeight;	// how much extra weight to add while breeding in genetic algorithm
+		unsigned int extraWeight;	// how much extra weight to add while breeding in genetic algorithm
 		float swapRate;	// the rate at which to swap parent parameters during breeding
 		bool forceDifferentParents;// whether or not to force difference parents when breeding
 		unsigned int maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
 		unsigned int smoothing;
+		unsigned int keepParents;
 
-		long maxFitTime;	// Maximum amount of time to let the fit run
-		long maxNumSimulations; // Maximum number of simulations to run
-		long maxNumIterations; // Maximum number of iterations a particle can run // TODO: Implement
+		unsigned long maxFitTime;	// Maximum amount of time to let the fit run
+		unsigned long maxNumSimulations; // Maximum number of simulations to run
+		unsigned long maxNumIterations; // Maximum number of iterations a particle can run // TODO: Implement
 
 		// PSO options
 		float inertia; // 0.72
 		float cognitive; // 1.49
 		float social; // 1.49
-		int nmax; // 20
-		int nmin; // 80
+		unsigned int nmax; // 20
+		unsigned int nmin; // 80
 		float inertiaInit; // 1
 		float inertiaFinal; // 0.1
 		float absTolerance; // 10E-4
@@ -149,7 +143,7 @@ public:
 		bool enhancedStop; // true
 		bool enhancedInertia; // true
 
-		int verbosity;		// terminal output verbosity
+		unsigned int verbosity;		// terminal output verbosity
 
 		bool hasMutate; // whether or not we should be mutating parameters during breeding in genetic algorithm
 
@@ -236,33 +230,36 @@ public:
 private:
 	friend class boost::serialization::access;
 
+	void initFit();
+	std::vector<std::vector<unsigned int>> generateInitParticles();
+	void launchParticle(unsigned int pID);
+	void runGeneration();
+	void breedGeneration();
+
 	void cleanupFiles(const char * path);
-	bool sortFits(Particle * a, Particle * b);
 	void finishFit();
 	void getAllParticleParams();
 	void outputRunSummary(std::string outputDir);
 	void outputRunSummary();
 	void killAllParticles(int tag);
-	std::vector<int> checkMasterMessages();
+	std::vector<unsigned int> checkMasterMessages();
 	void checkExternalMessages();
-	void processParticlesPSO(std::vector<int> particles, bool nextFlight = false);
+
+	void processParticlesPSO(std::vector<unsigned int> particles, bool nextFlight = false);
 	void updateEnhancedStop();
 	double getEuclidianNorm(double y, unsigned int n);
 	void updateParticleWeights();
-	double calcParticleWeight(int particle);
+	double calcParticleWeight(unsigned int particle);
 	double calcWeightedAveragePosition();
-	void processParamsPSO(std::vector<double> &params, int pID, double fit);
+	void processParamsPSO(std::vector<double> &params, unsigned int pID, double fit);
 	bool checkStopCriteria();
 	void updateInertia();
 
-	std::vector<double> calcParticlePosPSO(int particle);
-	std::vector<double> calcParticlePosBBPSO(int particle, bool exp = false);
-	std::vector<double> getNeighborhoodBestPositions(int particle);
+	std::vector<double> calcParticlePosPSO(unsigned int particle);
+	std::vector<double> calcParticlePosBBPSO(unsigned int particle, bool exp = false);
+	std::vector<double> getNeighborhoodBestPositions(unsigned int particle);
 
-	std::string recvFromParticle(Particle *p);
-	std::vector<std::vector<unsigned int>> generateInitParticles();
-
-	int pickWeighted(double weightSum, std::multimap<double, int> &weights, int extraWeight);
+	unsigned int pickWeighted(double weightSum, std::multimap<double, unsigned int> &weights, unsigned int extraWeight);
 	double mutateParam(FreeParam* fp, double paramValue);
 
 	void insertKeyByValue(std::map<double, int> &theMap, double key, int value);
@@ -287,13 +284,13 @@ private:
 	std::map<unsigned int, std::vector<double>> particleBestParamSets_;
 	std::map<unsigned int, std::vector<double>> particleCurrParamSets_;
 	std::map<unsigned int, double> particleWeights_;
-	std::map<unsigned int, int> particleIterationCounter_;
+	std::map<unsigned int, unsigned int> particleIterationCounter_;
 
-	int permanenceCounter_; // 0
-	int flightCounter_; // 0
+	unsigned int permanenceCounter_; // 0
+	unsigned int flightCounter_; // 0
 	double weightedAvgPos_; // 0
 	double optimum_; // 0
-	int inertiaUpdateCounter_; // 0;
+	unsigned int inertiaUpdateCounter_; // 0;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

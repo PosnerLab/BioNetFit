@@ -45,6 +45,7 @@ Swarm::Swarm() {
 	options.forceDifferentParents = true;
 	options.maxRetryDifferentParents = 100;
 	options.smoothing = 1;
+	options.keepParents = 0;
 
 	options.maxFitTime = MAX_LONG;
 	options.maxNumSimulations = MAX_LONG;
@@ -93,13 +94,13 @@ Swarm::Swarm() {
 }
 
 void Swarm::initComm() {
-	// Create the comunication class
+	// Create the communication class
 	Pheromones *ph = new Pheromones();
 
 	// Initialize the communication class
 	ph->init(this);
 
-	// Set our communication class
+	// Store our communication class
 	swarmComm = ph;
 }
 
@@ -143,7 +144,9 @@ void Swarm::setJobOutputDir(string path) {
 	if (!checkIfFileExists(options.outputDir)) {
 		string cmd = "mkdir " + options.outputDir;
 		//cout << "running: " << cmd << endl;
-		int ret = runCommand(cmd);
+		if(runCommand(cmd) != 0) {
+			outputError("ErrorL Couldn't create base output directory with command: " + cmd + ". Quitting.");
+		}
 	}
 
 	if (checkIfFileExists(options.jobOutputDir)) {
@@ -161,7 +164,9 @@ void Swarm::setJobOutputDir(string path) {
 					cout << "Deleting old output directory, this may take a minute..." << endl;
 				}
 
-				int ret = runCommand(cmd);
+				if(runCommand(cmd) != 0) {
+					outputError("Error: Couldn't create output directory with command: " + cmd + ". Quitting.");
+				}
 				break;
 			}
 			else if (answer == "N" || answer == "n") {
@@ -173,7 +178,9 @@ void Swarm::setJobOutputDir(string path) {
 		string cmd = "mkdir " + options.jobOutputDir;
 		//cout << "else running: " << cmd << endl;
 		//int ret = system(cmd.c_str());
-		int ret = runCommand(cmd);
+		if(runCommand(cmd) != 0) {
+			outputError("Error: Couldn't create output directory with command: " + cmd + ". Quitting.");
+		}
 	}
 }
 
@@ -231,9 +238,11 @@ void Swarm::doSwarm() {
 		cout << "synchronous" << endl;
 		// Synchronous genetic
 		if (options.fitType == "genetic") {
-			// TODO: Error checking. Make particles check and create next gen dir
+
 			string createDirCmd = "mkdir " + options.jobOutputDir + "1";
-			runCommand(createDirCmd);
+			if (runCommand(createDirCmd) != 0) {
+				outputError("Error: Couldn't create first generation output directory with command: " + createDirCmd + ". Quitting.");
+			}
 
 			while (currentGeneration <= options.maxGenerations){
 				runGeneration();
@@ -259,8 +268,8 @@ void Swarm::doSwarm() {
 	else {
 		// Genetic fit
 		if (options.fitType == "genetic") {
-			vector<int> finishedSimulations;
-			int numFinishedSimulations = options.swarmSize;
+			vector<unsigned int> finishedSimulations;
+			unsigned int numFinishedSimulations = options.swarmSize;
 			double totalFitTime;
 
 			runGeneration();
@@ -299,8 +308,8 @@ void Swarm::doSwarm() {
 			runCommand(createDirCmd);
 
 			bool stopCriteria = false;
-			int clusterCheckCounter = 0;
-			vector<int> finishedParticles;
+			unsigned int clusterCheckCounter = 0;
+			vector<unsigned int> finishedParticles;
 			unsigned int numFinishedParticles = 0;
 
 			if (options.verbosity >= 3) {
@@ -328,7 +337,7 @@ void Swarm::doSwarm() {
 			}
 
 			// Fill a vector with all pID's to send for processing
-			vector<int> allParticles;
+			vector<unsigned int> allParticles;
 			for (unsigned int p = 1; p <= options.swarmSize; ++p) {
 				allParticles.push_back(p);
 			}
@@ -537,7 +546,7 @@ double Swarm::calcWeightedAveragePosition() {
 	return sum;
 }
 
-double Swarm::calcParticleWeight(int particle) {
+double Swarm::calcParticleWeight(unsigned int particle) {
 	// Get reciprocal of euclidian norm of the difference between swarm best fit and particle best fit
 	double numerator = 1 / getEuclidianNorm( (particleBestFits_[particle] - particleBestFitsByFit_.begin()->first), options.model->getNumFreeParams());
 
@@ -684,17 +693,17 @@ vector<vector<unsigned int>> Swarm::generateInitParticles() {
 			}
 		}
 		else if (options.topology == "toroidal") {
-			int desiredArea = options.swarmSize;
-			int divisor = ceil(sqrt(desiredArea));
+			unsigned int desiredArea = options.swarmSize;
+			unsigned int divisor = ceil(sqrt(desiredArea));
 			while(desiredArea % divisor != 0) {
 				++divisor;
 			}
-			int length = divisor;
-			int width = desiredArea / divisor;
+			unsigned int length = divisor;
+			unsigned int width = desiredArea / divisor;
 
 			// Construct a matrix of dimensions length x width
 			// and fill it with particles
-			int p = 0;
+			unsigned int p = 0;
 			vector<vector<unsigned int>> matrix(length, vector<unsigned int>(width));
 			for (unsigned int x = 0; x < length; ++x) {
 				for (unsigned int y = 0; y < width; ++y) {
@@ -739,10 +748,10 @@ vector<vector<unsigned int>> Swarm::generateInitParticles() {
 			}
 		}
 		else if (options.topology == "tree") {
-			int usedParticles = 1;
-			int numLevels = 1;
-			int previousLevel = 1;
-			int currentLevel;
+			unsigned int usedParticles = 1;
+			unsigned int numLevels = 1;
+			unsigned int previousLevel = 1;
+			unsigned int currentLevel;
 
 			// Determine number of levels in tree
 			while (usedParticles < options.swarmSize) {
@@ -825,7 +834,7 @@ vector<vector<unsigned int>> Swarm::generateInitParticles() {
 	cout << "Particle creation took " << t << " seconds" << endl;
 }
 
-void Swarm::processParticlesPSO(vector<int> particles, bool newFlight) {
+void Swarm::processParticlesPSO(vector<unsigned int> particles, bool newFlight) {
 
 	if (options.verbosity >= 3) {
 		cout << "Processing " << particles.size() << " particles" << endl;
@@ -876,7 +885,7 @@ void Swarm::processParticlesPSO(vector<int> particles, bool newFlight) {
 	}
 }
 
-vector<double> Swarm::calcParticlePosPSO(int particle) {
+vector<double> Swarm::calcParticlePosPSO(unsigned int particle) {
 
 	if (options.verbosity >= 3) {
 		cout << "Calculating velocity and position of particle " << particle << endl;
@@ -935,7 +944,7 @@ vector<double> Swarm::calcParticlePosPSO(int particle) {
 	return nextPositions;
 }
 
-vector<double> Swarm::calcParticlePosBBPSO(int particle, bool exp) {
+vector<double> Swarm::calcParticlePosBBPSO(unsigned int particle, bool exp) {
 	// Get the best positions for particle's neighborhood
 	vector<double> neighborhoodBestPositions = getNeighborhoodBestPositions(particle);
 
@@ -982,7 +991,7 @@ void Swarm::updateInertia() {
 	options.inertia = options.inertiaInit + (options.inertiaFinal - options.inertiaInit) * (inertiaUpdateCounter_ / (float)(options.nmax + inertiaUpdateCounter_));
 }
 
-vector<double> Swarm::getNeighborhoodBestPositions(int particle) {
+vector<double> Swarm::getNeighborhoodBestPositions(unsigned int particle) {
 
 	if (options.verbosity >= 3) {
 		cout << "Getting neighborhood best for particle " << particle << endl;
@@ -1014,14 +1023,14 @@ vector<double> Swarm::getNeighborhoodBestPositions(int particle) {
 	return particleBestParamSets_.at(currentBestNeighbor);
 }
 
-void Swarm::processParamsPSO(vector<double> &params, int pID, double fit) {
+void Swarm::processParamsPSO(vector<double> &params, unsigned int pID, double fit) {
 
 	if (options.verbosity >= 3) {
 		cout << "Processing finished params for particle " << pID << " with fit of " << fit << endl;
 	}
 
 	// First update the particles current parameter set
-	int i = 0;
+	unsigned int i = 0;
 	for (auto param = params.begin(); param != params.end(); ++param) {
 		//cout << pID << " " << *param << endl;
 		particleCurrParamSets_[pID][i] = *param;
@@ -1068,9 +1077,11 @@ void Swarm::launchParticle(unsigned int pID) {
 		command = command + " >> pOUT 2>&1";
 		command = command + " &";
 
-		// TODO: Check system return value for success
-		int ret = runCommand(command);
-
+		if (runCommand(command) != 0) {
+			cout << "Warning: Couldn't launch particle " << pID << " with command: " << command <<  endl;
+			failedParticles_.insert(pID);
+			return;
+		}
 		//cout << "Command: " << command << endl;
 	}
 
@@ -1088,11 +1099,11 @@ void Swarm::runGeneration () {
 		cout << "Running generation " << currentGeneration << " with " << options.swarmSize << " particles..." << endl;
 	}
 
-	int numLaunchedParticles = 0;
-	int numFinishedParticles = 0;
+	unsigned int numLaunchedParticles = 0;
+	unsigned int numFinishedParticles = 0;
 
-	vector<int> finishedParticles;
-	int p = 1;
+	vector<unsigned int> finishedParticles;
+	unsigned int p = 1;
 
 	while (numFinishedParticles < options.swarmSize) {
 
@@ -1121,8 +1132,8 @@ void Swarm::runGeneration () {
 		finishedParticles.clear();
 	}
 	if (failedParticles_.size() > (options.swarmSize - 3) ) {
-		outputError("Error: You had too many failed runs. Check simulation output or adjust walltime.");
-		//TODO: Cleanup and exit
+		finishFit();
+		outputError("Error: You had too many failed runs. Check simulation output (.BNG_OUT files) or adjust walltime.");
 	}
 	currentGeneration += 1;
 }
@@ -1163,41 +1174,34 @@ void Swarm::cleanupFiles(const char * path) {
 	}
 }
 
-bool Swarm::sortFits(Particle * a, Particle * b) {
-	return a->fitCalcs.at(currentGeneration) < b->fitCalcs.at(currentGeneration);
-}
-
-
 void Swarm::breedGeneration() {
 	if (options.verbosity >= 3) {
 		cout << "Breeding generation" << endl;
 	}
-	// TODO: Check ret
+
+	// Create the output directory for the next generation
 	string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
-	int ret = runCommand(createDirCmd);
-
-	//cout << "copied" << endl;
-	/*
-	// Fill in the weight map with fit values
-	for (multimap<double, int>::iterator f = particleBestFitsByFit_.begin(); f != particleBestFitsByFit_.end(); ++f) {
-		weights.insert(pair<double, int>(f->first, f->second));
-		//cout << "f: " << f->first << endl;
+	if (runCommand(createDirCmd) != 0) {
+		outputError("Error: Couldn't create " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)) + " to hold next generation's output.");
 	}
-	 */
 
+	unsigned int parentPoolSize = options.swarmSize;
+	parentPoolSize = parentPoolSize - options.keepParents;
+
+	// Create an iterator to our fit list, use it to get our maximum fit value, then reset the iterator to the beginning of the list
 	multimap<double, unsigned int>::iterator w = particleBestFitsByFit_.begin();
 	advance(w, options.swarmSize - 1);
 	double maxWeight = w->first;
 	advance(w, 0 - (options.swarmSize - 1));
 
 	// Fill the second element of the weight map with difference between maxWeight and fit value
-	multimap<double, int> weightDiffs;
+	multimap<double, unsigned int> weightDiffs;
 	double diff;
 	double weightSum = 0;
 	for (unsigned int i = 0; i < options.swarmSize; ++i) {
 		diff = maxWeight - w->first;
 		weightSum += diff;
-		weightDiffs.insert(pair<double, int>(diff, w->second));
+		weightDiffs.insert(pair<double, unsigned int>(diff, w->second));
 		++w;
 	}
 
@@ -1211,20 +1215,46 @@ void Swarm::breedGeneration() {
 	 */
 
 	//cout << "weight sum: " << weightSum << endl;
-	int parentPairs = options.swarmSize / 2;
+
+	// If we want to keep any parents unchanged, send unchanged param sets to children.
+	// We start with the global best fit params and iterate through the fit list from there.
+	unsigned int childCounter = 1;
+	for (unsigned int p = 1; p <= options.keepParents; ++p) {
+		vector<string> params;
+		auto parent = particleBestFitsByFit_.begin();
+		for (auto param = particleCurrParamSets_.at(parent->second).begin(); param != particleCurrParamSets_.at(parent->second).end(); ++param) {
+			params.push_back(to_string(*param));
+		}
+
+		swarmComm->sendToSwarm(0, childCounter, SEND_FINAL_PARAMS_TO_PARTICLE, false, params);
+		++parent;
+		++childCounter;
+	}
+
+	float parentPairs = parentPoolSize / 2;
 
 	//cout << "we have " << parentPairs << " parent pairs" << endl;
 
 	boost::random::uniform_int_distribution<int> unif(1, 100);
-	int childCounter = 1;
 	for (unsigned int i = 0; i < parentPairs; ++i) {
 
+		unsigned int p1;
+		unsigned int p2;
+		unsigned int maxFitCounter = 0;
 		// Pick the fit values (particle parents) used in breeding
-		int p1 = pickWeighted(weightSum, weightDiffs, options.extraWeight);
-		int p2 = pickWeighted(weightSum, weightDiffs, options.extraWeight);
+		do {
+			p1 = pickWeighted(weightSum, weightDiffs, options.extraWeight);
+			p2 = pickWeighted(weightSum, weightDiffs, options.extraWeight);
+
+			// Quit if we try to many times to select suitable parents
+			if (++maxFitCounter >= 10000) {
+				outputError("Error: Tried too many times to select parents that didn't exceed the specified max_fit value of " + to_string(options.maxFit) + ". Quitting.");
+			}
+			// Make sure we don't exceed max_fit
+		} while (particleBestFits_.at(p1) <= options.maxFit && particleBestFits_.at(p2) <= options.maxFit);
 
 		// If we want different parents used in breeding, make sure that happens
-		int retryCount = 0;
+		unsigned int retryCount = 0;
 		while (p1 == p2 && options.forceDifferentParents) {
 			retryCount++;
 			if (retryCount > options.maxRetryDifferentParents) {
@@ -1233,7 +1263,7 @@ void Swarm::breedGeneration() {
 				}
 
 				// Get iterator to the weight map
-				multimap<double, int>::reverse_iterator w = weightDiffs.rbegin();
+				multimap<double, unsigned int>::reverse_iterator w = weightDiffs.rbegin();
 
 				// The weight map is sorted, so the first element will be the best fit
 				p1 = w->second;
@@ -1253,7 +1283,7 @@ void Swarm::breedGeneration() {
 
 		vector<string> c1Vec;
 		vector<string> c2Vec;
-		int pi = 0;
+		unsigned int pi = 0;
 		for (auto p = options.model->getFreeParams_().begin(); p != options.model->getFreeParams_().end(); ++p) {
 			if (unif(randNumEngine) < (options.swapRate * 100) ) {
 				double p1Param = particleCurrParamSets_.at(p1)[pi];
@@ -1280,13 +1310,16 @@ void Swarm::breedGeneration() {
 		swarmComm->sendToSwarm(0, childCounter, SEND_FINAL_PARAMS_TO_PARTICLE, false, c1Vec);
 		++childCounter;
 		//cout << "sending to " << childCounter << endl;
-		swarmComm->sendToSwarm(0, childCounter, SEND_FINAL_PARAMS_TO_PARTICLE, false, c2Vec);
-		++childCounter;
+		// Make sure we don't send to too many parents (only relevant in last breeding with odd number of parents)
+		if ( !( (fmod(parentPairs * 2, 2)) == 1 && parentPairs - i == 0.5 ) ) {
+			swarmComm->sendToSwarm(0, childCounter, SEND_FINAL_PARAMS_TO_PARTICLE, false, c2Vec);
+			++childCounter;
+		}
 	}
 
-	int numFinishedBreeding = 0;
+	unsigned int numFinishedBreeding = 0;
 	while (numFinishedBreeding < options.swarmSize) {
-		int numMessages = swarmComm->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm->univMessageReceiver, true);
+		unsigned int numMessages = swarmComm->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm->univMessageReceiver, true);
 		numFinishedBreeding+=numMessages;
 	}
 }
@@ -1295,7 +1328,6 @@ void Swarm::breedGeneration() {
 void Swarm::breedGeneration() {
 	//Timer tmr;
 
-	// TODO: Check ret
 	string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
 	int ret = runCommand(createDirCmd);
 
@@ -1468,7 +1500,6 @@ void Swarm::finishFit() {
 	if (errorCounter > 10) {
 		cout << "Error: Couldn't create directory: " + outputDir + " to contain final fitting results. Outputting results to screen.";
 		outputRunSummary();
-		// TODO: Can we do anything else if results dir can't be created? Maybe do a few retries, and output results to screen?
 	}
 
 	string outputFilePath = outputDir + "all_fits.txt";
@@ -1702,8 +1733,9 @@ void Swarm::initFit () {
 		string command = options.bngCommand + "BNG2.pl --outdir " + options.jobOutputDir + " " + modelPath + " >> " + options.jobOutputDir + "netgen_output 2>&1";
 		cout << "Generating initial .net file with command: " << command << endl;
 
-		// TODO: Check this return
-		int ret = runCommand(command);
+		if (runCommand(command) != 0) {
+			outputError("Error: Couldn't generate initial .net file with command: " + command + ". Quitting.");
+		}
 
 		// Now that we have a .net file, replace the full .bngl with a .bngl
 		// containing ONLY action commands and a .net file loader. This is
@@ -1732,8 +1764,8 @@ void Swarm::initFit () {
 	}
 }
 
-vector<int> Swarm::checkMasterMessages() {
-	vector<int> finishedParticles;
+vector<unsigned int> Swarm::checkMasterMessages() {
+	vector<unsigned int> finishedParticles;
 
 	if (options.verbosity >= 3) {
 		//cout << "Checking messages" << endl;
@@ -1888,7 +1920,6 @@ void Swarm::checkExternalMessages() {
 					if (errorCounter > 10) {
 						cout << "Error: Couldn't create directory: " + outputDir + " to contain final fitting results. Outputting results to screen.";
 						outputRunSummary();
-						// TODO: Can we do anything else if results dir can't be created? Maybe do a few retries, and output results to screen?
 					}
 
 					outputRunSummary(outputDir);
@@ -1971,14 +2002,16 @@ string Swarm::generateSlurmBatchFile(string runCmd) {
 
 		sbatch.close();
 	}
-	//TODO: Error checking if file couldn't be opened
+	else {
+		outputError("Error: Couldn't generate slurm batch file: " + sbatchPath + ". Quitting.");
+	}
 
 	runCmd = "sbatch " + sbatchPath;
 
 	return runCmd;
 }
 
-int Swarm::pickWeighted(double weightSum, multimap<double, int> &weights, int extraWeight) {
+unsigned int Swarm::pickWeighted(double weightSum, multimap<double, unsigned int> &weights, unsigned int extraWeight) {
 	double lowerBound = 0;
 	double upperBound = weightSum;
 
@@ -1990,7 +2023,7 @@ int Swarm::pickWeighted(double weightSum, multimap<double, int> &weights, int ex
 	//cout << "chosen: " << chosen << endl;
 
 	double currentSum = 0;
-	for (multimap<double, int>::reverse_iterator w = weights.rbegin(); w != weights.rend(); ++w) {
+	for (multimap<double, unsigned int>::reverse_iterator w = weights.rbegin(); w != weights.rend(); ++w) {
 		currentSum += w->first;
 		//cout << "adding " << w->first << endl;
 

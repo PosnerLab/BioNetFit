@@ -123,25 +123,27 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (action == "cluster") {
-			string runCmd = string(convertToAbsPath(argv[0]));
-			//runCmd = s->generateSlurmBatchFile(runCmd);
-			runCmd = s->generateSlurmMultiProgCmd(runCmd);
+			string runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
 
 			if (s->options.saveClusterOutput) {
 				string outputPath = s->options.outputDir + "/" + s->options.jobName + "_cluster_output";
 				cout << "string: " << outputPath << endl;
 				if (!checkIfFileExists(outputPath)) {
 					string makeClusterOutputDirCmd = "mkdir " + outputPath;
-					runCommand(makeClusterOutputDirCmd);
+					if (runCommand(makeClusterOutputDirCmd) != 0) {
+						cout << "Warning: Couldn't create cluster output directory with command: " << makeClusterOutputDirCmd << ". Turning off save_cluster_output" << endl;
+						s->options.saveClusterOutput = false;
+						runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
+					}
 				}
 			}
 
 			cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
 
-			// TODO: Check return
-			//int ret = system(runCmd.c_str());
-			runCmd = "exec bash -c '" + runCmd + "'";
-			int ret = runCommand(runCmd);
+			//runCmd = "exec bash -c '" + runCmd + "'";
+			if(runCommand(runCmd) != 0) {
+				outputError("Error: Couldn't launch BioNetFit on cluster with command: " + runCmd + ". Quitting.");
+			}
 
 			return 0;
 		}

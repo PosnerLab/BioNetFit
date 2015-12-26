@@ -5,10 +5,7 @@
  *      Author: brandon
  */
 
-
-//TODO: Add checks for sim length equality
 //TODO: Test all these methods
-//TODO: Is sos correct terminology? Maybe objFunc would be better
 #include "Data.hh"
 
 using namespace std;
@@ -23,18 +20,15 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	dataCurrent = &dataOrig_;
 
 	if ( (swarm_->options.objFunc == 4 && isExp)) {
-		//cout << "soscalc is 4" << endl;
 		getColumnAverages();
 	}
 
 	if (swarm_->options.divideByInit && !isExp) {
-		//cout << "div by init" << endl;
 		divideByInit();
 		dataCurrent = &dataDividedByInit_;
 	}
 
 	if (swarm_->options.logTransformSimData > 0 && !isExp) {
-		//cout << "logsim" << endl;
 		logTransformData();
 		dataCurrent = &dataLogTransformed_;
 	}
@@ -42,7 +36,6 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	if (swarm_->options.standardizeSimData && !isExp) {
 		cout << "stand sim" << endl;
 		if (swarm_->options.objFunc != 4) {
-			//cout << "gca sim" << endl;
 			getColumnAverages();
 		}
 		standardizeData();
@@ -52,7 +45,6 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	if (swarm_->options.standardizeExpData && isExp) {
 		cout << "stand exp" << endl;
 		if (swarm_->options.objFunc != 4) {
-			//cout << "gca exp" << endl;
 			getColumnAverages();
 		}
 		standardizeData();

@@ -221,7 +221,6 @@ void Particle::runModel(int iteration) {
 }
 
 void Particle::checkMessagesGenetic() {
-	// TODO: Breeding is still too slow. Need to speed things up here.
 	// Wait for message from master telling us who to breed with
 
 	// swapTracker holds swapIDs and pIDs to keep track of who is breeding with who,
@@ -537,15 +536,20 @@ void Particle::calculateFit() {
 
 				double exp = timepoint->second;
 				cout << id_ << " exp: " << exp << endl;
-				double sim = dataFiles_.at(e->first).at(swarm_->options.smoothing)->dataCurrent->at(exp_col->first).at(timepoint->first);
+				double sim;
+
+				if (swarm_->options.smoothing == 1) {
+					sim = dataFiles_.at(e->first).at(swarm_->options.smoothing)->dataCurrent->at(exp_col->first).at(timepoint->first);
+				}
+				else {
+					sim = dataFiles_.at(e->first).at(swarm_->options.smoothing + 1)->dataCurrent->at(exp_col->first).at(timepoint->first);
+				}
 				std::cout.precision(10);
 				cout << id_ << " sim: " << sim << endl;
-				//float SD = e->second->standardDeviations.at(exp_col->first).at(timepoint->first);
-				//cout << "SD: " << SD << endl;
 
 				if (usingSD) {
-					//cout << "using sd" << endl;
 					divisor = e->second->standardDeviations.at(exp_col->first).at(timepoint->first);
+					cout << "divisor: " << divisor << endl;
 				}
 
 				// TODO: Output error if we can't find .exp timepoint in simulation output

@@ -148,6 +148,11 @@ Swarm * Config::createSwarmFromConfig () {
 		s->options.swapRate = stof(pairs.find("swap_rate")->second);
 	}
 
+	// Update number of parents to keep unchanged in breeding
+	if(pairs.find("keep_parents") != pairs.end()) {
+		s->options.keepParents = stoi(pairs.find("keep_parents")->second);
+	}
+
 	// Update extra weight
 	if(pairs.find("extra_weight") != pairs.end()) {
 		s->options.extraWeight = stoi(pairs.find("extra_weight")->second);
@@ -180,7 +185,6 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Set the job output directory
 	s->setJobOutputDir(s->options.outputDir + "/" + s->options.jobName + "/");
-	// TODO: Move directory creation to a swarm function.  Also need to check cmd success.
 
 	// Set verbosity
 	if(pairs.find("verbosity") != pairs.end()) {
@@ -193,7 +197,6 @@ Swarm * Config::createSwarmFromConfig () {
 	}
 
 	// Set the maximum fit value to consider in breeding
-	// TODO: Implement this
 	if(pairs.find("max_fit") != pairs.end()) {
 		s->options.maxFit = stod(pairs.find("max_fit")->second);
 	}
