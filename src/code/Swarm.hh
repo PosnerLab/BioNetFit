@@ -56,76 +56,20 @@ public:
 	Swarm();
 
 	void addExp(std::string path);
-
 	void setModel(std::string path);
-	Model * getModel() { return options.model; };
-
-	void setSwarmSize(int size) { options.swarmSize = size; }
-	int getSwarmSize() { return options.swarmSize; }
-
-	void setIsMaster(bool master) { isMaster = master; }
-	bool getIsMaster() { return isMaster; }
-
 	void setExePath(std::string path) { exePath_ = path; }
 	void setConfigPath(std::string path) { configPath_ = path; }
-
-	void setSimPath(std::string path) { options.simPath = path; }
-
-	// TODO: Make get/set methods inline
-	void setSwarmType(std::string type);
-	void setSwarmSynchronicity(int synchronicity) { options.synchronicity = synchronicity; }
-	void setSwarmGenerations(int generations) { this->options.maxGenerations = generations; }
-	void setSwarmMinFit(float minfit) { this->options.minFit = minfit; }
-
-	void setVerbosity(int verbosity) { options.verbosity = verbosity; }
-	int getVerbosity() { return options.verbosity; }
-
-	void setUsePipes(bool usePipes) { options.usePipes = usePipes; }
-	bool getUsePipes() { return options.usePipes; }
-
-	void setUseCluster(bool useCluster) { options.useCluster = useCluster; }
-	bool getUseCluster() { return options.useCluster; }
-
-	void setSaveClusterOutput(bool saveClusterOutput) { options.saveClusterOutput = saveClusterOutput; }
-
-	void setOutputDir(std::string path) { options.outputDir = path; }
-	std::string getOutputDir() { return options.outputDir; }
-
-	void setDivideByInit(bool divideByInit) { options.divideByInit = divideByInit; }
-	bool getDivideByInit() { return options.divideByInit; }
-
-	void setLogTransformSimData(bool logTransformSimData) { options.logTransformSimData = logTransformSimData; }
-	bool getLogTransformSimData() { return options.logTransformSimData; }
-
-	void setStandardizeSimData(bool standardizeSimData) { options.standardizeSimData = standardizeSimData; }
-	bool getStandardizeSimData() { return options.standardizeSimData; }
-
-	void setStandardizeExpData(bool standardizeExpData) { options.standardizeExpData = standardizeExpData; }
-	bool getStandardizeExpData() { return options.standardizeExpData; }
-
-	void setSosCalc(int objFunc) { options.objFunc = objFunc; }
-	int getSosCalc() { return options.objFunc; }
-
-	void setSwapRate(float swapRate) { options.swapRate = swapRate; }
-	void setExtraWeight(int extraWeight) { options.extraWeight = extraWeight; }
-	void setMaxRetryDifferentParents(int maxRetryDifferentParents) { options.maxRetryDifferentParents = maxRetryDifferentParents; }
-	void setForceDifferentParents(bool forceDifferentParents) { options.forceDifferentParents = forceDifferentParents; }
-	void setDeleteOldFiles(bool deleteOldFiles) { options.deleteOldFiles = deleteOldFiles; }
-	void setParallelCount(int parallelCount) { options.parallelCount = parallelCount; }
-	void setJobName(std::string jobName) { options.jobName = jobName; }
+	void setfitType(std::string type);
 	void addMutate(std::string mutateString);
-	void setsConf(std::string conf) { sConf_ = conf; }
+	void setsConf(std::string sConf) { sConf_ = sConf; }
 	std::string getsConf() { return sConf_; }
 	void setJobOutputDir(std::string dir);
-
-	void setCurrentGen(int gen);
 
 	void doSwarm();
 	void runGeneration();
 	void breedGeneration();
-	void doParticle(int pID);
-	Particle *createParticle(int pID);
-	void launchParticle(int pID);
+	Particle *createParticle(unsigned int pID);
+	void launchParticle(unsigned int pID);
 
 	void getClusterInformation();
 	std::string generateSlurmCommand(std::string cmd, bool multiProg = true);
@@ -137,7 +81,7 @@ public:
 
 	Pheromones *swarmComm;
 
-	std::multimap<double,std::string> allGenFits;
+	std::multimap<double, std::string> allGenFits;
 
 	bool isMaster;
 	boost::random::mt19937 randNumEngine;
@@ -148,21 +92,22 @@ public:
 	struct SwarmOpts {
 		// TODO: Need to define defaults AND check for required variables
 		std::string jobName;	// name of the job
-		std::string swarmType;	// genetic or swarm
+		std::string fitType;	// genetic or swarm
 		std::string outputDir;	// root directory to use for output
 		std::string jobOutputDir;// outputDir + jobName
-		std::string simPath;	// Path to simulators
+		std::string bngCommand;	// Path to simulators
 
-		bool synchronicity;		// 1 for synchronous
+		int outputEvery;
 
 		Model * model; 			// the model file
 
+		bool synchronicity;		// 1 for synchronous
 		int maxGenerations;// maximum number of generations
-		int swarmSize;		// how many particles in the swarm
+		unsigned int swarmSize;		// how many particles in the swarm
 		float minFit;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
 		float maxFit;		// we stop fitting if we reach this value // TODO: Implement this
-		int boostrap;		// how many times to bootstrap
-		int parallelCount;	// how many particles to run in parallel
+		unsigned int boostrap;		// how many times to bootstrap
+		unsigned int parallelCount;	// how many particles to run in parallel
 
 		bool usePipes;	// whether or not to use pipes to gather simulation output
 		bool useCluster;// whether or not we are running on a cluster
@@ -174,14 +119,14 @@ public:
 
 		bool deleteOldFiles; // whether or not to delete unneeded files during the fitting run
 
-		int objFunc;		// which objective function to use
+		unsigned int objFunc;		// which objective function to use
 
 		// Genetic algorithm options
 		int extraWeight;	// how much extra weight to add while breeding in genetic algorithm
 		float swapRate;	// the rate at which to swap parent parameters during breeding
 		bool forceDifferentParents;// whether or not to force difference parents when breeding
-		int maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
-		int smoothing;
+		unsigned int maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
+		unsigned int smoothing;
 
 		long maxFitTime;	// Maximum amount of time to let the fit run
 		long maxNumSimulations; // Maximum number of simulations to run
@@ -222,11 +167,11 @@ public:
 
 			ar & jobName;	// name of the job
 
-			ar & swarmType;	// genetic or swarm
+			ar & fitType;	// genetic or swarm
 
 			ar & outputDir;	// root directory to use for output
 			ar & jobOutputDir;// outputDir + jobName
-			ar & simPath;
+			ar & bngCommand;
 
 			ar & synchronicity;		// 1 for synchronous
 
@@ -296,11 +241,13 @@ private:
 	void finishFit();
 	void getAllParticleParams();
 	void outputRunSummary(std::string outputDir);
+	void outputRunSummary();
 	void killAllParticles(int tag);
 	std::vector<int> checkMasterMessages();
+	void checkExternalMessages();
 	void processParticlesPSO(std::vector<int> particles, bool nextFlight = false);
 	void updateEnhancedStop();
-	double getEuclidianNorm(double y, int n);
+	double getEuclidianNorm(double y, unsigned int n);
 	void updateParticleWeights();
 	double calcParticleWeight(int particle);
 	double calcWeightedAveragePosition();
@@ -313,7 +260,7 @@ private:
 	std::vector<double> getNeighborhoodBestPositions(int particle);
 
 	std::string recvFromParticle(Particle *p);
-	std::vector<std::vector<int>> generateInitParticles(int numParticles = -1);
+	std::vector<std::vector<unsigned int>> generateInitParticles();
 
 	int pickWeighted(double weightSum, std::multimap<double, int> &weights, int extraWeight);
 	double mutateParam(FreeParam* fp, double paramValue);
@@ -330,17 +277,17 @@ private:
 	std::string configPath_;
 	std::string sConf_;
 
-	std::vector<std::vector<int> > allParticles_;
+	std::vector<std::vector<unsigned int> > allParticles_;
 
 	// TODO: These need to be initialized with 0s
 	// Maybe we can change them to vectors, too
-	std::map<int, double> particleBestFits_;
-	std::multimap<double, int> particleBestFitsByFit_;
-	std::map<int, std::vector<double>> particleParamVelocities_;
-	std::map<int, std::vector<double>> particleBestParamSets_;
-	std::map<int, std::vector<double>> particleCurrParamSets_;
-	std::map<int, double> particleWeights_;
-	std::map<int, int> particleIterationCounter_;
+	std::map<unsigned int, double> particleBestFits_;
+	std::multimap<double, unsigned int> particleBestFitsByFit_;
+	std::map<unsigned int, std::vector<double>> particleParamVelocities_;
+	std::map<unsigned int, std::vector<double>> particleBestParamSets_;
+	std::map<unsigned int, std::vector<double>> particleCurrParamSets_;
+	std::map<unsigned int, double> particleWeights_;
+	std::map<unsigned int, int> particleIterationCounter_;
 
 	int permanenceCounter_; // 0
 	int flightCounter_; // 0

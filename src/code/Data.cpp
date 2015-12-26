@@ -20,6 +20,8 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	dataPath = convertToAbsPath(path);
 	Data::parseData();
 
+	dataCurrent = &dataOrig_;
+
 	if ( (swarm_->options.objFunc == 4 && isExp)) {
 		//cout << "soscalc is 4" << endl;
 		getColumnAverages();
@@ -61,9 +63,17 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 Data::Data(map<string, map<double, double>> &dataSet) {
 	dataOrig_ = dataSet;
 	dataCurrent = &dataOrig_;
+	isExp_ = false;
+	swarm_ = 0;
 }
 
-Data::Data() {}
+Data::Data() {
+	map<string, map<double, double>> dummySet;
+	dataOrig_ = dummySet;
+	dataCurrent = 0;
+	isExp_ = false;
+	swarm_ = 0;
+}
 
 std::string Data::getPath() {
 	if (!dataPath.empty())
@@ -162,9 +172,6 @@ void Data::parseData(){
 			i++;
 		}
 	}
-
-	// Always keep dataCurrent pointing to the most recent version of the data.
-	dataCurrent = &dataOrig_;
 }
 
 void Data::standardizeData() {

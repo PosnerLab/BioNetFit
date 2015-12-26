@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
 		type = "master";
 
 	// Be sure action and type are valid
-	if (action != "run" && action != "cluster" && action != "load") {
+	if (action != "run" && action != "cluster" && action != "load" && action != "results") {
 		outputError("Error: Couldn't find a valid 'action' in your arguments.");
 	}
 	if (type != "master" && type != "particle") {
@@ -100,9 +100,9 @@ int main(int argc, char *argv[]) {
 
 			s->currentGeneration = 1;
 			s->setExePath(convertToAbsPath(argv[0]));
-			s->setIsMaster(true);
+			s->isMaster = true;
 			s->initComm();
-			s->setIsMaster(false);
+			s->isMaster = false;
 		}
 
 		if (action == "cluster" || action == "run") {
@@ -119,13 +119,22 @@ int main(int argc, char *argv[]) {
 				ofs.close();
 			}
 
-			s->setIsMaster(true);
+			s->isMaster = true;
 		}
 
 		if (action == "cluster") {
 			string runCmd = string(convertToAbsPath(argv[0]));
 			//runCmd = s->generateSlurmBatchFile(runCmd);
 			runCmd = s->generateSlurmMultiProgCmd(runCmd);
+
+			if (s->options.saveClusterOutput) {
+				string outputPath = s->options.outputDir + "/" + s->options.jobName + "_cluster_output";
+				cout << "string: " << outputPath << endl;
+				if (!checkIfFileExists(outputPath)) {
+					string makeClusterOutputDirCmd = "mkdir " + outputPath;
+					runCommand(makeClusterOutputDirCmd);
+				}
+			}
 
 			cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
 
@@ -154,12 +163,29 @@ int main(int argc, char *argv[]) {
 				setenv("OMPI_MCA_mpi_warn_on_fork","0",1);
 			}
 
-			s->setIsMaster(true);
+			s->isMaster = true;
 			s->setExePath(convertToAbsPath(argv[0]));
 			s->initComm();
 		}
 
-		s->doSwarm();
+		if (action != "results") {
+			s->doSwarm();
+		}
+		else {
+			string messageFilePath = s->options.jobOutputDir + ".req";
+
+			ofstream outFile;
+			outFile.open(messageFilePath);
+
+			if (outFile.is_open()) {
+				outFile << "output results";
+				outFile.close();
+			}
+			else {
+				string errMsg = "Error: Couldn't open file " + messageFilePath + " to request results from the swarm master.";
+				outputError(errMsg);
+			}
+		}
 	}
 
 	// We are a particle
@@ -179,7 +205,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		s->setIsMaster(false);
+		s->isMaster = false;
 		s->setExePath(convertToAbsPath(argv[0]));
 
 		s->initComm();
@@ -188,7 +214,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		Particle *p = s->createParticle(pID);
-		p->setModel(s->getModel());
+		p->setModel(s->options.model);
 
 		if (s->currentGeneration == 1) {
 			p->generateParams();

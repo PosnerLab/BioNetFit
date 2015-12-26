@@ -27,8 +27,8 @@ void Pheromones::init(Swarm *s) {
 	else {
 
 		//std::cout << "init ipc" << std::endl;
-		if (s->getIsMaster()) {
-			for (int i = 0; i <= swarm_->options.swarmSize; ++i) {
+		if (s->isMaster) {
+			for (unsigned int i = 0; i <= swarm_->options.swarmSize; ++i) {
 				// TODO: The type conversion here is horrible
 
 				std::cout << "creating: " << std::to_string(static_cast<long long int>(i)) << std::endl;
@@ -38,7 +38,7 @@ void Pheromones::init(Swarm *s) {
 			}
 		}
 		else {
-			for (int i = 0; i <= swarm_->options.swarmSize; ++i) {
+			for (unsigned int i = 0; i <= swarm_->options.swarmSize; ++i) {
 				message_queue *smq = new message_queue(open_only, std::to_string(static_cast<long long int>(i)).c_str());
 				smq_.push_back(smq);
 				//std::cout << "opening: " << std::to_string(static_cast<long long int>(i)) << " with max size of " << smq_[i]->get_max_msg() << std::endl;
@@ -549,7 +549,7 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 								int size = lexical_cast<int>(*v);
 								//std::cout << "size is " << size << std::endl;
 
-								for (int i = 0; i < size; ++i) {
+								for (unsigned int i = 0; i < size; ++i) {
 									++v;
 									smessage.message.push_back(lexical_cast<std::string>(*v));
 								}
@@ -560,7 +560,7 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 								if (eraseMessage) {
 									// Jump to beginning of message
 									v -= (size+3);
-									for (int i = 0; i <= (size+3); ++i) {
+									for (unsigned int i = 0; i <= (size+3); ++i) {
 										//std::cout << "erasing: " << *v << std::endl;
 										//sleep(1);
 										v = s->second.erase(v);

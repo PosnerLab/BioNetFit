@@ -64,56 +64,61 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Add our model file to the swarm
 	if(pairs.find("model") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+
 		s->setModel(pairs.find("model")->second);
 	}
 
 	// Update the swarm type
-	if(pairs.find("swarm_type") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setSwarmType(pairs.find("swarm_type")->second);
+	if(pairs.find("fit_type") != pairs.end()) {
+
+		s->setfitType(pairs.find("fit_type")->second);
 	}
 
 	// Update the swarm size
 	if(pairs.find("swarm_size") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+
 		int swarmSize = atoi(pairs.find("swarm_size")->second.c_str());
 
 		// If the swarm size isn't even, make it even by adding a particle
-		if (swarmSize % 2 != 0 && s->options.swarmType == "genetic") {
+		if (swarmSize % 2 != 0 && s->options.fitType == "genetic") {
 			++swarmSize;
 		}
-		s->setSwarmSize(swarmSize);
+		s->options.swarmSize = swarmSize;
 	}
 
 	// Update the sim path
-	if(pairs.find("sim_path") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setSimPath(pairs.find("sim_path")->second);
+	if(pairs.find("bng_command") != pairs.end()) {
+
+		s->options.bngCommand = pairs.find("bng_command")->second;
 	}
 
 	// Update the synchronicity
 	if(pairs.find("synchronicity") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setSwarmSynchronicity(atoi(pairs.find("synchronicity")->second.c_str()));
+
+		s->options.synchronicity = (stoi(pairs.find("synchronicity")->second));
 	}
 
 	// Update the maximum number of generations
-	if(pairs.find("generations") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setSwarmGenerations(atoi(pairs.find("generations")->second.c_str()));
+	if(pairs.find("max_generations") != pairs.end()) {
+
+		s->options.maxGenerations = (stoi(pairs.find("max_generations")->second));
+	}
+
+	if(pairs.find("output_every") != pairs.end()) {
+
+		s->options.outputEvery = stoi(pairs.find("output_every")->second.c_str());
 	}
 
 	// Tell the swarm if we're using pipes
 	if(pairs.find("use_pipes") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setUsePipes((atoi(pairs.find("use_pipes")->second.c_str()) == 1) ? true : false );
+
+		s->options.usePipes = (stoi(pairs.find("use_pipes")->second) == 1) ? true : false;
 	}
 
 	// Tell the swarm if we should delete old files
 	if(pairs.find("delete_old_files") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setDeleteOldFiles((atoi(pairs.find("delete_old_files")->second.c_str()) == 1) ? true : false );
+
+		s->options.deleteOldFiles = (stoi(pairs.find("delete_old_files")->second) == 1) ? true : false;
 	}
 
 	// Tell the swarm if we're using a cluster
@@ -125,9 +130,9 @@ Swarm * Config::createSwarmFromConfig () {
 				s->options.clusterSoftware = pairs.find("cluster_software")->second;
 			}
 
-			s->setUseCluster((atoi(pairs.find("use_cluster")->second.c_str()) == 1) ? true : false );
+			s->options.useCluster = (stoi(pairs.find("use_cluster")->second) == 1) ? true : false;
 			s->getClusterInformation();
-			cout << "setting useCluster to " << s->options.useCluster << endl;
+			//cout << "setting useCluster to " << s->options.useCluster << endl;
 			// TODO: Set parallel count accordingly
 		}
 	}
@@ -135,73 +140,62 @@ Swarm * Config::createSwarmFromConfig () {
 	// TODO: Need to ensure path gets made
 	// Tell the swarm if we should save cluster output
 	if(pairs.find("save_cluster_output") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setSaveClusterOutput((atoi(pairs.find("save_cluster_output")->second.c_str()) == 1) ? true : false );
+		s->options.saveClusterOutput = (stoi(pairs.find("save_cluster_output")->second) == 1) ? true : false;
 	}
 
 	// Update swap rate
 	if(pairs.find("swap_rate") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setSwapRate(atof(pairs.find("swap_rate")->second.c_str()));
+		s->options.swapRate = stof(pairs.find("swap_rate")->second);
 	}
 
 	// Update extra weight
 	if(pairs.find("extra_weight") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setExtraWeight(atoi(pairs.find("extra_weight")->second.c_str()));
+		s->options.extraWeight = stoi(pairs.find("extra_weight")->second);
 	}
 
 	// Whether or not to force difference parents
 	if(pairs.find("force_different_parents") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setForceDifferentParents((atoi(pairs.find("force_different_parents")->second.c_str()) == 1) ? true : false );
+		s->options.forceDifferentParents = (stoi(pairs.find("force_different_parents")->second) == 1) ? true : false;
 	}
 
 	// How many retries when breeding
 	if(pairs.find("max_breeding_retries") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setMaxRetryDifferentParents(atoi(pairs.find("max_breeding_retries")->second.c_str()));
+		s->options.maxRetryDifferentParents = stoi(pairs.find("max_breeding_retries")->second);
 	}
 
 	// Set fit value that will cause fit to end
 	if(pairs.find("smoothing") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
 		s->options.smoothing = stod(pairs.find("smoothing")->second);
 	}
 
 	// Set output directory
 	if(pairs.find("output_dir") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setOutputDir(convertToAbsPath(pairs.find("output_dir")->second));
+		s->options.outputDir = convertToAbsPath(pairs.find("output_dir")->second);
 	}
 
 	// Set job name
 	if(pairs.find("job_name") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setJobName(pairs.find("job_name")->second);
+		s->options.jobName = pairs.find("job_name")->second;
 	}
 
 	// Set the job output directory
 	s->setJobOutputDir(s->options.outputDir + "/" + s->options.jobName + "/");
-	// TODO: Move directory creation to a swam function.  Also need to check cmd success.
+	// TODO: Move directory creation to a swarm function.  Also need to check cmd success.
 
 	// Set verbosity
 	if(pairs.find("verbosity") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setVerbosity(atoi(pairs.find("verbosity")->second.c_str()));
+		s->options.verbosity = stoi(pairs.find("verbosity")->second);
 	}
 
 	// Set fit value that will cause fit to end
 	if(pairs.find("min_fit") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
 		s->options.minFit = stod(pairs.find("min_fit")->second);
 	}
 
 	// Set the maximum fit value to consider in breeding
 	// TODO: Implement this
 	if(pairs.find("max_fit") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->options.maxFit = (stod(pairs.find("max_fit")->second));
+		s->options.maxFit = stod(pairs.find("max_fit")->second);
 	}
 
 	// Set maximum number of simulations in an asynchronous genetic fit
@@ -222,41 +216,36 @@ Swarm * Config::createSwarmFromConfig () {
 	if(pairs.find("parallel_count") != pairs.end()) {
 		// TODO: Make sure PC isn't higher than swarm size
 		if (s->options.useCluster) {
-			s->setParallelCount(s->options.swarmSize);
+			s->options.parallelCount = s->options.swarmSize;
 		}
 		else {
-			s->setParallelCount(stoi(pairs.find("parallel_count")->second));
+			s->options.parallelCount = stoi(pairs.find("parallel_count")->second);
 		}
 
 	}
 	// Whether or not to divide by value at t=0
 	if(pairs.find("divide_by_init") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setDivideByInit((atoi(pairs.find("divide_by_init")->second.c_str()) == 1) ? true : false );
+		s->options.divideByInit = (stoi(pairs.find("divide_by_init")->second.c_str()) == 1) ? true : false;
 	}
 
 	// Whether or not to log transform simulation output
 	if(pairs.find("log_transform_sim_data") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setLogTransformSimData((atoi(pairs.find("log_transform_sim_data")->second.c_str())));
+		s->options.logTransformSimData = stoi(pairs.find("log_transform_sim_data")->second);
 	}
 
 	// Whether or not to standardize simulation output
 	if(pairs.find("standardize_sim_data") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setStandardizeSimData((atoi(pairs.find("standardize_sim_data")->second.c_str()) == 1) ? true : false );
+		s->options.standardizeSimData = (stoi(pairs.find("standardize_sim_data")->second) == 1) ? true : false;
 	}
 
 	// Whether or not to standardize exp data
 	if(pairs.find("standardize_exp_data") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setStandardizeExpData((atoi(pairs.find("standardize_exp_data")->second.c_str()) == 1) ? true : false );
+		s->options.standardizeExpData = (stoi(pairs.find("standardize_exp_data")->second) == 1) ? true : false;
 	}
 
 	// Update fit calculation method
 	if(pairs.find("objfunc") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
-		s->setSosCalc((atoi(pairs.find("objfunc")->second.c_str())));
+		s->options.objFunc = stoi(pairs.find("objfunc")->second);
 	}
 
 
@@ -268,7 +257,7 @@ Swarm * Config::createSwarmFromConfig () {
 		s->options.inertia = stof(pairs.find("inertia")->second);
 	}
 
-	if (pairs.find("conginitive") != pairs.end()) {
+	if (pairs.find("cognitive") != pairs.end()) {
 		s->options.cognitive = stof(pairs.find("cognitive")->second);
 	}
 
@@ -321,12 +310,12 @@ Swarm * Config::createSwarmFromConfig () {
 	}
 
 	if(pairs.find("enhanced_stop") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+
 		s->options.enhancedStop = (stoi(pairs.find("enhanced_stop")->second) == 1) ? true : false;
 	}
 
 	if(pairs.find("enhanced_inertia") != pairs.end()) {
-		//cout << "Adding model file: " << pairs.find("model")->second << endl;
+
 		s->options.enhancedInertia = (stoi(pairs.find("enhanced_inertia")->second) == 1) ? true : false;
 		cout << "enhanced inertia set to " << s->options.enhancedInertia << endl;
 	}
@@ -408,7 +397,7 @@ Swarm * Config::createSwarmFromConfig () {
 		prefixedActions.push_back(i->first);
 
 		if (s->options.expFiles.count(i->first) == 1) {
-			if (s->getVerbosity() >=3 ) {
+			if (s->options.verbosity >=3 ) {
 				cout << "Linking action " << i->first << " with exp file: " << s->options.expFiles[i->first]->getPath() << endl;
 			}
 			i->second.dataSet = s->options.expFiles[i->first];
@@ -459,10 +448,21 @@ Swarm * Config::createSwarmFromConfig () {
 	return s;
 }
 
-void Config::createConfigFromSwarm () {
-
-}
-
 string Config::getLocation () {
 	return configPath_;
+}
+
+void Config::checkConsistency() {
+	/*
+	 *	All Requires:
+	 *	1. fit_type
+	 *	2. job_name
+	 *	3. model
+	 *	4. exp
+	 *	5. output_dir
+	 *	6. bng_command
+	 *	7. swarm_size
+	 *
+	 */
+
 }

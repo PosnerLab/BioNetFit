@@ -33,7 +33,7 @@ public:
 	void calculateFit();
 	void generateParams();
 
-	std::map<double, int> fitCalcs;
+	std::map<int, double> fitCalcs;
 
 private:
 	friend class boost::serialization::access;

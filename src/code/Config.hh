@@ -21,10 +21,11 @@ public:
 	std::string getLocation();
 	int makeCopy(std::string newLocation);
 	Swarm * createSwarmFromConfig();
-	void createConfigFromSwarm ();
 
 private:
 	friend class boost::serialization::access;
+
+	void checkConsistency();
 
 	std::string configPath_;
 

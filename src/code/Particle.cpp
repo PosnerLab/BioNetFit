@@ -15,6 +15,8 @@ using namespace std::chrono;
 Particle::Particle(Swarm * swarm, int id) {
 	id_ = id;
 	swarm_ = swarm;
+	model_ = 0;
+	objFuncPtr = 0;
 }
 
 void Particle::setModel(Model * model) {
@@ -105,7 +107,7 @@ void Particle::doParticle() {
 	bool doContinue = true;
 	while(doContinue) {
 
-		for (int i = 1; i <= swarm_->options.smoothing; ++i) {
+		for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 			runModel(i);
 		}
 
@@ -115,10 +117,10 @@ void Particle::doParticle() {
 
 		finalizeSim();
 
-		if (swarm_->options.swarmType == "genetic") {
+		if (swarm_->options.fitType == "genetic") {
 			checkMessagesGenetic();
 		}
-		else if (swarm_->options.swarmType == "pso") {
+		else if (swarm_->options.fitType == "pso") {
 			checkMessagesPSO();
 		}
 
@@ -172,7 +174,7 @@ void Particle::runModel(int iteration) {
 	}
 
 	// Construct our simulation command
-	string command = swarm_->options.simPath + "BNG2.pl --outdir " + path + " " + bnglFullPath + " >> " + path + to_string(static_cast<long long int>(id_)) + ".BNG_OUT 2>&1";
+	string command = swarm_->options.bngCommand + "BNG2.pl --outdir " + path + " " + bnglFullPath + " >> " + path + to_string(static_cast<long long int>(id_)) + ".BNG_OUT 2>&1";
 	if (swarm_->options.usePipes) {
 		command += " &";
 	}
@@ -280,7 +282,7 @@ void Particle::checkMessagesGenetic() {
 					++messageIndex;
 				}
 
-				for (int i = 1; i <= swarm_->options.smoothing; ++i) {
+				for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 
 					// Construct our filenames
 					string bnglFilename = to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(i)) + ".bngl";
@@ -428,7 +430,7 @@ void Particle::checkMessagesPSO() {
 						++messageIndex;
 					}
 
-					for (int i = 1; i <= swarm_->options.smoothing; ++i) {
+					for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 
 						// Construct our filenames
 						string bnglFilename = to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(i)) + ".bngl";
@@ -481,6 +483,10 @@ void Particle::checkMessagesPSO() {
 }
 
 void Particle::calculateFit() {
+	if (swarm_->options.verbosity >= 3) {
+		cout << "Calculating fit" << endl;
+	}
+
 	bool usingSD = false;
 	bool usingMean = false;
 
@@ -529,10 +535,11 @@ void Particle::calculateFit() {
 			for (std::map<double,double>::iterator timepoint = exp_col->second.begin(); timepoint != exp_col->second.end(); ++timepoint) {
 				// TODO: Need to handle missing points
 
-				//float exp = timepoint->second;
-				//cout << "exp: " << exp << endl;
-				//float sim = dataFiles_.at(e->first).at(swarm_->options.smoothing+1)->dataCurrent->at(exp_col->first).at(timepoint->first);
-				//cout << "sim: " << sim << endl;
+				double exp = timepoint->second;
+				cout << id_ << " exp: " << exp << endl;
+				double sim = dataFiles_.at(e->first).at(swarm_->options.smoothing)->dataCurrent->at(exp_col->first).at(timepoint->first);
+				std::cout.precision(10);
+				cout << id_ << " sim: " << sim << endl;
 				//float SD = e->second->standardDeviations.at(exp_col->first).at(timepoint->first);
 				//cout << "SD: " << SD << endl;
 
@@ -561,7 +568,9 @@ void Particle::calculateFit() {
 	// Store our fit calc
 	fitCalcs[swarm_->currentGeneration] = pow(totalSum,0.5);
 
-	cout << id_ << " fitcalc: " << pow(totalSum,0.5) << endl;
+	if (swarm_->options.verbosity >= 3) {
+		cout << id_ << " Fit calculation: " << pow(totalSum,0.5) << endl;
+	}
 }
 
 // #1
@@ -721,11 +730,16 @@ double Particle::mutateParam(FreeParam* fp, double paramValue) {
 
 void Particle::finalizeSim() {
 
+	if (swarm_->options.verbosity >= 3) {
+		cout << "Finalizing simulation" << endl;
+	}
+
 	// Calculate our fit
 	calculateFit();
 
 	// Put our fit calc into the message vector
 	swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(fitCalcs.at(swarm_->currentGeneration))));
+	cout << "stored fit calc of " << fitCalcs.at(swarm_->currentGeneration) << " as " << swarm_->swarmComm->univMessageSender[0] << endl;
 
 	// Put our simulation params into the message vector
 	for (map<string,double>::iterator i = simParams_.begin(); i != simParams_.end(); ++i){
@@ -744,28 +758,32 @@ void Particle::finalizeSim() {
 
 void Particle::smoothRuns() {
 
+	if (swarm_->options.verbosity >= 3) {
+		cout << "Smoothing simulation outputs" << endl;
+	}
+
 	map<string, map<double, double>> dataSet;
 	// For each action/prefix/exp file
 	for (auto action = dataFiles_.begin(); action != dataFiles_.end(); ++action) {
 		// For each column
 		// Insert a new iteration into the prefix set
-		//cout << "action loop " << action->first << endl;
+		cout << "action loop " << action->first << endl;
 		for (auto col = action->second.at(1)->dataCurrent->begin(); col != action->second.at(1)->dataCurrent->end(); ++col) {
 			// For each timepoint
 			// This map holds time/param value pairs
-			//cout << "col loop " << col->first << endl;
+			cout << "col loop " << col->first << endl;
 			map<double, double> timePairs;
 			for (auto time = col->second.begin(); time != col->second.end(); ++time) {
 				double sum = 0;
 				int i = 0;
 				// For each iteration
-				for (int iteration = 1; iteration <= swarm_->options.smoothing; ++iteration) {
-					//cout << "it loop " << iteration << endl;
+				for (unsigned int iteration = 1; iteration <= swarm_->options.smoothing; ++iteration) {
+					cout << "it loop " << iteration << endl;
 					sum += dataFiles_.at(action->first).at(iteration)->dataCurrent->at(col->first).at(time->first);
 					++i;
 				}
 				double average = sum / (double)i;
-
+				cout << "average: " << average << endl;
 				pair<double, double> timePair;
 				timePair = make_pair(time->first, average);
 				timePairs.insert(timePair);

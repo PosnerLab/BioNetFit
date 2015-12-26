@@ -12,14 +12,16 @@ using namespace std;
 Model::Model(Swarm * swarm, string path) {
 
 	swarm_ = swarm;
-
 	hasGenerateNetwork_ = false;
-
 	modelPath_ = convertToAbsPath(path);
 	parseModel();
 }
 
-Model::Model() {}
+Model::Model() {
+	swarm_ = 0;
+	hasGenerateNetwork_ = false;
+	modelPath_ = "";
+}
 
 void Model::parseNet(string path) {
 
