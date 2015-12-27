@@ -62,19 +62,19 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Add our model file to the swarm
 	if(pairs.find("model") != pairs.end()) {
-
+		cout << "Processing model" << endl;
 		s->setModel(pairs.find("model")->second);
 	}
 
 	// Update the swarm type
 	if(pairs.find("fit_type") != pairs.end()) {
-
+		cout << "Processing fit type" << endl;
 		s->setfitType(pairs.find("fit_type")->second);
 	}
 
 	// Update the swarm size
 	if(pairs.find("swarm_size") != pairs.end()) {
-
+		cout << "Processing swarm size" << endl;
 		int swarmSize = stoi(pairs.find("swarm_size")->second);
 
 		// If the swarm size isn't even, make it even by adding a particle
@@ -86,39 +86,47 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Update the sim path
 	if(pairs.find("bng_command") != pairs.end()) {
+		cout << "Processing bng command" << endl;
 		s->options.bngCommand = pairs.find("bng_command")->second;
 	}
 
 	// Update the synchronicity
 	if(pairs.find("synchronicity") != pairs.end()) {
+		cout << "Processing synchronicity" << endl;
 		s->options.synchronicity = (stoi(pairs.find("synchronicity")->second));
 	}
 
 	// Update the maximum number of generations
 	if(pairs.find("max_generations") != pairs.end()) {
+		cout << "Processing max generations" << endl;
 		s->options.maxGenerations = (stoi(pairs.find("max_generations")->second));
 	}
 
 	if(pairs.find("output_every") != pairs.end()) {
+		cout << "Processing outputevery" << endl;
 		s->options.outputEvery = stoi(pairs.find("output_every")->second.c_str());
 	}
 
 	// Tell the swarm if we're using pipes
 	if(pairs.find("use_pipes") != pairs.end()) {
+		cout << "Processing usepipes" << endl;
 		s->options.usePipes = (stoi(pairs.find("use_pipes")->second) == 1) ? true : false;
 	}
 
 	// Tell the swarm if we should delete old files
 	if(pairs.find("delete_old_files") != pairs.end()) {
+		cout << "Processing delete old files" << endl;
 		s->options.deleteOldFiles = (stoi(pairs.find("delete_old_files")->second) == 1) ? true : false;
 	}
 
 	// Tell the swarm if we're using a cluster
 	if(pairs.find("use_cluster") != pairs.end()) {
+		cout << "Processing use cluster" << endl;
 		if (stoi(pairs.find("use_cluster")->second)) {
 
 			// Set cluster platform if it was specified
 			if(pairs.find("cluster_software") != pairs.end()) {
+				cout << "Processing cluster software" << endl;
 				s->options.clusterSoftware = pairs.find("cluster_software")->second;
 			}
 
@@ -132,46 +140,55 @@ Swarm * Config::createSwarmFromConfig () {
 	// TODO: Need to ensure path gets made
 	// Tell the swarm if we should save cluster output
 	if(pairs.find("save_cluster_output") != pairs.end()) {
+		cout << "Processing save cluster output" << endl;
 		s->options.saveClusterOutput = (stoi(pairs.find("save_cluster_output")->second) == 1) ? true : false;
 	}
 
 	// Update swap rate
 	if(pairs.find("swap_rate") != pairs.end()) {
+		cout << "Processing swap rate" << endl;
 		s->options.swapRate = stof(pairs.find("swap_rate")->second);
 	}
 
 	// Update number of parents to keep unchanged in breeding
 	if(pairs.find("keep_parents") != pairs.end()) {
+		cout << "Processing keep parents" << endl;
 		s->options.keepParents = stoi(pairs.find("keep_parents")->second);
 	}
 
 	// Update extra weight
 	if(pairs.find("extra_weight") != pairs.end()) {
+		cout << "Processing extra weight" << endl;
 		s->options.extraWeight = stoi(pairs.find("extra_weight")->second);
 	}
 
 	// Whether or not to force difference parents
 	if(pairs.find("force_different_parents") != pairs.end()) {
+		cout << "Processing force different parents" << endl;
 		s->options.forceDifferentParents = (stoi(pairs.find("force_different_parents")->second) == 1) ? true : false;
 	}
 
 	// How many retries when breeding
 	if(pairs.find("max_breeding_retries") != pairs.end()) {
+		cout << "Processing max breeding retries" << endl;
 		s->options.maxRetryDifferentParents = stoi(pairs.find("max_breeding_retries")->second);
 	}
 
 	// Set fit value that will cause fit to end
 	if(pairs.find("smoothing") != pairs.end()) {
-		s->options.smoothing = stod(pairs.find("smoothing")->second);
+		cout << "Processing smoothing" << endl;
+		s->options.smoothing = stoi(pairs.find("smoothing")->second);
 	}
 
 	// Set output directory
 	if(pairs.find("output_dir") != pairs.end()) {
+		cout << "Processing output dir" << endl;
 		s->options.outputDir = convertToAbsPath(pairs.find("output_dir")->second);
 	}
 
 	// Set job name
 	if(pairs.find("job_name") != pairs.end()) {
+		cout << "Processing job name" << endl;
 		s->options.jobName = pairs.find("job_name")->second;
 	}
 
@@ -180,27 +197,32 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Set verbosity
 	if(pairs.find("verbosity") != pairs.end()) {
+		cout << "Processing verbosity" << endl;
 		s->options.verbosity = stoi(pairs.find("verbosity")->second);
 	}
 
 	// Set fit value that will cause fit to end
 	if(pairs.find("min_fit") != pairs.end()) {
+		cout << "Processing minfit" << endl;
 		s->options.minFit = stod(pairs.find("min_fit")->second);
 	}
 
 	// Set the maximum fit value to consider in breeding
 	if(pairs.find("max_fit") != pairs.end()) {
+		cout << "Processing maxfit" << endl;
 		s->options.maxFit = stod(pairs.find("max_fit")->second);
 	}
 
 	// Set maximum number of simulations in an asynchronous genetic fit
 	if(pairs.find("max_num_simulations") != pairs.end()) {
+		cout << "Processing max num sims" << endl;
 		s->options.maxNumSimulations = stol(pairs.find("max_num_simulations")->second);
 	}
 
 	// Set maximum fitting time
 	// TODO: Implement this in synchronous genetic fitting
 	if(pairs.find("max_fit_time") != pairs.end()) {
+		cout << "Processing max fit time" << endl;
 		vector<string> timeElements;
 		split(pairs.find("max_fit_time")->second, timeElements, ":");
 		long timeInSeconds = (stol(timeElements[0]) * 3600) + (stol(timeElements[1]) * 60) + stol(timeElements[2]);
@@ -209,6 +231,7 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Update the maximum number of parallel threads (non-cluster only)
 	if(pairs.find("parallel_count") != pairs.end()) {
+		cout << "Processing parallel count" << endl;
 		// TODO: Make sure PC isn't higher than swarm size
 		if (s->options.useCluster) {
 			s->options.parallelCount = s->options.swarmSize;
@@ -220,26 +243,31 @@ Swarm * Config::createSwarmFromConfig () {
 	}
 	// Whether or not to divide by value at t=0
 	if(pairs.find("divide_by_init") != pairs.end()) {
+		cout << "Processing divide by init" << endl;
 		s->options.divideByInit = (stoi(pairs.find("divide_by_init")->second.c_str()) == 1) ? true : false;
 	}
 
 	// Whether or not to log transform simulation output
 	if(pairs.find("log_transform_sim_data") != pairs.end()) {
+		cout << "Processing log transform sim data" << endl;
 		s->options.logTransformSimData = stoi(pairs.find("log_transform_sim_data")->second);
 	}
 
 	// Whether or not to standardize simulation output
 	if(pairs.find("standardize_sim_data") != pairs.end()) {
+		cout << "Processing standardize sim data" << endl;
 		s->options.standardizeSimData = (stoi(pairs.find("standardize_sim_data")->second) == 1) ? true : false;
 	}
 
 	// Whether or not to standardize exp data
 	if(pairs.find("standardize_exp_data") != pairs.end()) {
+		cout << "Processing standardize exp data" << endl;
 		s->options.standardizeExpData = (stoi(pairs.find("standardize_exp_data")->second) == 1) ? true : false;
 	}
 
 	// Update fit calculation method
 	if(pairs.find("objfunc") != pairs.end()) {
+		cout << "Processing objfunc" << endl;
 		s->options.objFunc = stoi(pairs.find("objfunc")->second);
 	}
 
@@ -249,10 +277,12 @@ Swarm * Config::createSwarmFromConfig () {
 	//////////////////////////////////////////////////////////////////
 
 	if (pairs.find("inertia") != pairs.end()) {
+		cout << "Processing inertia" << endl;
 		s->options.inertia = stof(pairs.find("inertia")->second);
 	}
 
 	if (pairs.find("cognitive") != pairs.end()) {
+		cout << "Processing cognitive" << endl;
 		s->options.cognitive = stof(pairs.find("cognitive")->second);
 	}
 
@@ -372,7 +402,7 @@ Swarm * Config::createSwarmFromConfig () {
 
 	for (unordered_multimap<string,string>::iterator exp = it.first; exp != it.second; ++exp) {
 		s->addMutate(exp->second);
-		s->options.hasMutate = true;
+		s->hasMutate = true;
 
 		if (boost::regex_search(exp->second, boost::regex("^default\\s"))) {
 			//cout << "found default mutation rate. breaking" << endl;

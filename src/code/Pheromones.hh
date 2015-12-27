@@ -22,6 +22,7 @@
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/unordered_map.hpp>
 #include <boost/serialization/set.hpp>
+#include <boost/serialization/utility.hpp>
 
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/containers/map.hpp>
@@ -69,6 +70,7 @@ class Swarm;
 #define FINISHED_WITH_FIT 20
 #define SEND_FINAL_PARAMS_TO_PARTICLE 21
 #define FIT_FINISHED 22
+#define SEND_NUMFLIGHTS_TO_PARTICLE 23
 #define MESSAGE_END 1000
 
 class Pheromones {

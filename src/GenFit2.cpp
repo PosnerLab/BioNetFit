@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
 		type = "master";
 
 	// Be sure action and type are valid
-	if (action != "run" && action != "cluster" && action != "load" && action != "results") {
+	if (action != "run" && action != "cluster" && action != "load" && action != "results" && action != "resume") {
 		outputError("Error: Couldn't find a valid 'action' in your arguments.");
 	}
 	if (type != "master" && type != "particle") {
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
 		Config myconfig(configFile);
 		//TODO: When rerunning BioNetFit master on cluster, let's not load parse config twice. Serialize.
 
-		if (action != "load") {
+		if (action != "load" && action != "resume") {
 			s = myconfig.createSwarmFromConfig();
 
 			//t = tmr.elapsed();
@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
 				s->setsConf(convertToAbsPath(serializedSwarmPath));
 				//cout << "Path is: " << s->getsConf() << endl;
 
-				boost::archive::text_oarchive ar(ofs);
+				boost::archive::binary_oarchive ar(ofs);
 				ar & s;
 				ofs.close();
 			}
@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
 			std::ifstream ifs(configFile);
 
 			if (ifs.is_open()) {
-				boost::archive::text_iarchive ar(ifs);
+				boost::archive::binary_iarchive ar(ifs);
 
 				// Load data
 				ar & s;
@@ -168,6 +168,71 @@ int main(int argc, char *argv[]) {
 			s->isMaster = true;
 			s->setExePath(convertToAbsPath(argv[0]));
 			s->initComm();
+		}
+		else if (action == "resume") {
+			string swarmState = configFile + "/swarmState.sconf";
+			std::ifstream ifs(swarmState);
+
+			if (ifs.is_open()) {
+				cout << "trying to load swarm..." << endl;
+				boost::archive::binary_iarchive ar(ifs);
+
+				// Load data
+				ar & s;
+				ifs.close();
+			}
+			else {
+				outputError("Error: Couldn't load swarm state: " + swarmState + ".");
+			}
+
+			cout << "loaded" << endl;
+
+			s->resumingSavedSwarm = true;
+
+			if (s->options.useCluster) {
+				setenv("OMPI_MCA_mpi_warn_on_fork","0", 1);
+				int randNum = rand();
+				string serializedSwarmPath = to_string(static_cast<long long int>(randNum)) + ".sconf";
+
+				std::ofstream ofs(serializedSwarmPath);
+				if (ofs.is_open()) {
+					s->setsConf(convertToAbsPath(serializedSwarmPath));
+					//cout << "Path is: " << s->getsConf() << endl;
+
+					boost::archive::binary_oarchive ar(ofs);
+					ar & s;
+					ofs.close();
+				}
+
+				s->isMaster = true;
+				string runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
+
+				if (s->options.saveClusterOutput) {
+					string outputPath = s->options.outputDir + "/" + s->options.jobName + "_cluster_output";
+					cout << "string: " << outputPath << endl;
+					if (!checkIfFileExists(outputPath)) {
+						string makeClusterOutputDirCmd = "mkdir " + outputPath;
+						if (runCommand(makeClusterOutputDirCmd) != 0) {
+							cout << "Warning: Couldn't create cluster output directory with command: " << makeClusterOutputDirCmd << ". Turning off save_cluster_output" << endl;
+							s->options.saveClusterOutput = false;
+							runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
+						}
+					}
+				}
+
+				cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
+
+				if(runCommand(runCmd) != 0) {
+					outputError("Error: Couldn't launch BioNetFit on cluster with command: " + runCmd + ". Quitting.");
+				}
+			}
+			else {
+				s->initComm();
+				s->isMaster = true;
+				s->doSwarm();
+			}
+
+			return 0;
 		}
 
 		if (action != "results") {
@@ -198,7 +263,7 @@ int main(int argc, char *argv[]) {
 			std::ifstream ifs(configFile);
 
 			if (ifs.is_open()) {
-				boost::archive::text_iarchive ar(ifs);
+				boost::archive::binary_iarchive ar(ifs);
 
 				// Load data
 				ar & s;

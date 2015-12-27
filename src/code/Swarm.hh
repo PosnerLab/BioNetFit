@@ -28,8 +28,18 @@
 #include <boost/random/uniform_int_distribution.hpp>
 #include <boost/random/uniform_real_distribution.hpp>
 #include <boost/random/normal_distribution.hpp>
+
+#include <boost/serialization/string.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/map.hpp>
+#include <boost/serialization/unordered_map.hpp>
+#include <boost/serialization/set.hpp>
+#include <boost/serialization/utility.hpp>
+
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
 
 #include "Utils.hh"
 #include "Timer.hh"
@@ -81,19 +91,20 @@ public:
 	bool isMaster;
 	boost::random::mt19937 randNumEngine;
 	unsigned int currentGeneration;
+	bool resumingSavedSwarm;
+	bool hasMutate;
 
 	struct SwarmOpts {
-		// TODO: Need to define defaults AND check for required variables
 		std::string jobName;	// name of the job
 		std::string fitType;	// genetic or swarm
 		std::string outputDir;	// root directory to use for output
 		std::string jobOutputDir;// outputDir + jobName
 		std::string bngCommand;	// Path to simulators
-
-		unsigned int outputEvery;
-
+		std::map<std::string,Data*> expFiles; // experimental data file
 		Model * model; 			// the model file
 
+		// General options
+		unsigned int verbosity;		// terminal output verbosity
 		bool synchronicity;		// 1 for synchronous
 		unsigned int maxGenerations;// maximum number of generations
 		unsigned int swarmSize;		// how many particles in the swarm
@@ -101,7 +112,7 @@ public:
 		float maxFit;		// we stop fitting if we reach this value // TODO: Implement this
 		unsigned int boostrap;		// how many times to bootstrap
 		unsigned int parallelCount;	// how many particles to run in parallel
-
+		unsigned int objFunc;		// which objective function to use
 		bool usePipes;	// whether or not to use pipes to gather simulation output
 		bool useCluster;// whether or not we are running on a cluster
 
@@ -111,8 +122,6 @@ public:
 		bool standardizeExpData;// whether or not to standardize experimental data
 
 		bool deleteOldFiles; // whether or not to delete unneeded files during the fitting run
-
-		unsigned int objFunc;		// which objective function to use
 
 		// Genetic algorithm options
 		unsigned int extraWeight;	// how much extra weight to add while breeding in genetic algorithm
@@ -143,86 +152,79 @@ public:
 		bool enhancedStop; // true
 		bool enhancedInertia; // true
 
-		unsigned int verbosity;		// terminal output verbosity
+		unsigned int outputEvery; // In a PSO fit, output a fit summary every n flights
 
-		bool hasMutate; // whether or not we should be mutating parameters during breeding in genetic algorithm
-
+		// Cluster options
 		std::string clusterSoftware;// which cluster software to use
 		std::string clusterAccount;	// user account to specify in cluster submission commands // TODO: Parse
 		bool saveClusterOutput;		// whether or not to save output during a cluster fit // TODO: Parse
 		std::string clusterQueue;	// The cluster queue to submit to // TODO: Parse
-
-		std::map<std::string,Data*> expFiles; // experimental data file
 
 		template<class Archive>
 		void serialize(Archive &ar, const unsigned int version)
 		{
 			//std::cout << " serializing options" << std::endl;
 
-			ar & jobName;	// name of the job
-
-			ar & fitType;	// genetic or swarm
-
-			ar & outputDir;	// root directory to use for output
-			ar & jobOutputDir;// outputDir + jobName
+			ar & jobName;
+			ar & fitType;
+			ar & outputDir;
+			ar & jobOutputDir;
 			ar & bngCommand;
+			ar & expFiles;
+			ar & model;
 
-			ar & synchronicity;		// 1 for synchronous
+			ar & verbosity;
+			ar & synchronicity;
+			ar & maxGenerations;
+			ar & swarmSize;
+			ar & minFit;
+			ar & maxFit;
+			ar & boostrap;
+			ar & parallelCount;
+			ar & objFunc;
+			ar & usePipes;
+			ar & useCluster;
 
-			ar & model; 			// the model file
+			ar & divideByInit;
+			ar & logTransformSimData;
+			ar & standardizeSimData;
+			ar & standardizeExpData;
 
-			ar & maxGenerations;// maximum number of generations
-			ar & swarmSize;		// how many particles in the swarm
-			ar & minFit;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
-			ar & maxFit;		// we stop fitting if we reach this value // TODO: Implement this
-			ar & boostrap;		// how many times to bootstrap
-			ar & parallelCount;	// how many particles to run in parallel
+			ar & deleteOldFiles;
 
-			ar & usePipes;	// whether or not to use pipes to gather simulation output
-			ar & useCluster;// whether or not we are running on a cluster
+			ar & extraWeight;
+			ar & swapRate;
+			ar & forceDifferentParents;
+			ar & maxRetryDifferentParents;
+			ar & smoothing;
+			ar & keepParents;
 
-			ar & divideByInit;// whether or not to divide simulation outputs by the value at t=0
-			ar & logTransformSimData;// whether or not to log transform simulation data. this value acts as the base.
-			ar & standardizeSimData;// whether or not to standardize simulation data
-			ar & standardizeExpData;// whether or not to standardize experimental data
-
-			ar & deleteOldFiles; // whether or not to delete unneeded files during the fitting run
-
-			ar & objFunc;		// which objective function to use
-			ar & extraWeight;	// how much extra weight to add while breeding in genetic algorithm
-			ar & swapRate;	// the rate at which to swap parent parameters during breeding
-			ar & forceDifferentParents;// whether or not to force difference parents when breeding
-			ar & maxRetryDifferentParents;// how many times to attempt selection of different parents if forceDifferentParents is true
-			ar & smoothing;		// How many simulations to average
-
+			ar & maxFitTime;
 			ar & maxNumSimulations;
 			ar & maxNumIterations;
 
-			// PSO options
-			ar & inertia; // 0.72
-			ar & cognitive; // 1.49
-			ar & social; // 1.49
-			ar & nmax; // 20
-			ar & nmin; // 80
-			ar & inertiaInit; // 1
-			ar & inertiaFinal; // 0.1
-			ar & absTolerance; // 10E-4
-			ar & relTolerance; // 10E-4
+			ar & inertia;
+			ar & cognitive;
+			ar & social;
+			ar & nmax;
+			ar & nmin;
+			ar & inertiaInit;
+			ar & inertiaFinal;
+			ar & absTolerance;
+			ar & relTolerance;
+
 			ar & topology;
 			ar & psoType;
+
 			ar & enhancedStop;
 			ar & enhancedInertia;
 
-			ar & verbosity;		// terminal output verbosity
+			ar & outputEvery;
 
-			ar & hasMutate; // whether or not we should be mutating parameters during breeding in genetic algorithm
-
-			ar & clusterSoftware;// which cluster software to use
-			ar & clusterAccount;	// user account to specify in cluster submission commands // TODO: Parse
-			ar & saveClusterOutput;		// whether or not to save output during a cluster fit // TODO: Parse
-			ar & clusterQueue;	// The cluster queue to submit to // TODO: Parse
-
-			ar & expFiles; // experimental data file
+			ar & clusterSoftware;
+			ar & clusterAccount;
+			ar & saveClusterOutput;
+			ar & clusterQueue;
 		}
 	};
 	SwarmOpts options;
@@ -245,6 +247,7 @@ private:
 	std::vector<unsigned int> checkMasterMessages();
 	void checkExternalMessages();
 
+	void initPSOswarm(bool resumeFit = false);
 	void processParticlesPSO(std::vector<unsigned int> particles, bool nextFlight = false);
 	void updateEnhancedStop();
 	double getEuclidianNorm(double y, unsigned int n);
@@ -254,6 +257,7 @@ private:
 	void processParamsPSO(std::vector<double> &params, unsigned int pID, double fit);
 	bool checkStopCriteria();
 	void updateInertia();
+	void saveSwarmState();
 
 	std::vector<double> calcParticlePosPSO(unsigned int particle);
 	std::vector<double> calcParticlePosBBPSO(unsigned int particle, bool exp = false);
@@ -294,29 +298,54 @@ private:
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
-		//std::cout << " serializing swarm" << std::endl;
+		std::cout << " serializing swarm" << std::endl;
+
+		std::cout << "options.." << std::endl;
+		ar & options;
+		std::cout << "0.." << std::endl;
 
 		ar & allGenFits;
-		ar & configPath_;
+
+		ar & isMaster;
 		ar & currentGeneration;
+		ar & resumingSavedSwarm;
+		ar & hasMutate;
+
+		ar & runningParticles_;
+		std::cout << "1.." << std::endl;
+		ar & failedParticles_;
+
 		ar & exePath_;
-		ar & options;
-		ar & particleBestFits_;
+		ar & configPath_;
 		ar & sConf_;
 
 		ar & allParticles_;
-		ar & particleBestFitsByFit_;
-		ar & particleParamVelocities_;
-		ar & particleBestParamSets_;
-		ar & particleCurrParamSets_;
-		ar & particleWeights_;
+		std::cout << "2.." << std::endl;
 		ar & particleBestFits_;
+		std::cout << 3 << std::endl;
+		ar & particleBestFitsByFit_;
+		std::cout << 4 << std::endl;
+		ar & particleParamVelocities_;
+		std::cout << 5 << std::endl;
+		ar & particleBestParamSets_;
+		std::cout << 6 << std::endl;
+		ar & particleCurrParamSets_;
+		std::cout << 7 << std::endl;
+		ar & particleWeights_;
+		std::cout << 8 << std::endl;
+		ar & particleIterationCounter_;
 
+		std::cout << 9 << std::endl;
 		ar & permanenceCounter_;
+		std::cout << 10 << std::endl;
 		ar & flightCounter_;
+		std::cout << 11 << std::endl;
 		ar & weightedAvgPos_;
+		std::cout << 12 << std::endl;
 		ar & optimum_;
+		std::cout << 13 << std::endl;
 		ar & inertiaUpdateCounter_;
+		std::cout << 14 << std::endl;
 	}
 
 	Timer tmr_;

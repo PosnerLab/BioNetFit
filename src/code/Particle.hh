@@ -61,9 +61,9 @@ private:
 	std::map<std::string, double> simParams_;
 	int id_;
 	std::map<std::string, std::map<int, Data*>> dataFiles_;
-	//std::string state_; // Stopped, running, simulating, analyzing, results, breeding, waiting
 	Swarm * swarm_;
 	std::map<std::string, double> bestParams_;
+	unsigned int currentGeneration_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
@@ -74,6 +74,7 @@ private:
 		ar & dataFiles_;
 		//ar & state_;
 		ar & swarm_;
+		ar & currentGeneration_;
 	}
 };
 #endif /* PARTICLE_HH_ */
