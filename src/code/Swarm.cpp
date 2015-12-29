@@ -79,7 +79,7 @@ Swarm::Swarm() {
 	std::map<int, std::vector<double>> particleCurrParamSets_;
 	std::map<int, double> particleWeights_;
 	std::map<double, int> particleBestFitsByFit_;
-	*/
+	 */
 
 	permanenceCounter_ = 0; // 0
 	flightCounter_ = 0; // 0
@@ -234,9 +234,7 @@ void Swarm::doSwarm() {
 	//system ("exec rm -r /home/brandon/projects/GenFit2/Debug/output/*");
 	system ("exec rm /home/brandon/projects/BioNetFit/Debug/pOUT");
 
-	if (!resumingSavedSwarm) {
-		initFit();
-	}
+	initFit();
 
 	// Main fit loops
 	if (options.synchronicity) {
@@ -838,13 +836,13 @@ void Swarm::processParticlesPSO(vector<unsigned int> particles, bool newFlight) 
 			if (options.enhancedInertia) {
 				updateInertia();
 			}
-			nextPositions = calcParticlePosPSO(*particle);
+			particleCurrParamSets_.at(*particle) = calcParticlePosPSO(*particle);
 		}
 		else if (options.psoType == "bbpso") {
-			nextPositions = calcParticlePosBBPSO(*particle);
+			particleCurrParamSets_.at(*particle) = calcParticlePosBBPSO(*particle);
 		}
 		else if (options.psoType == "bbpsoexp") {
-			nextPositions = calcParticlePosBBPSO(*particle, true);
+			particleCurrParamSets_.at(*particle) = calcParticlePosBBPSO(*particle, true);
 		}
 
 		if (options.verbosity >= 3) {
@@ -852,7 +850,7 @@ void Swarm::processParticlesPSO(vector<unsigned int> particles, bool newFlight) 
 		}
 		// Convert positions to string so they can be sent to the particle
 		vector<string> nextPositionsStr;
-		for (auto param = nextPositions.begin(); param != nextPositions.end(); ++param) {
+		for (auto param = particleCurrParamSets_.at(*particle).begin(); param != particleCurrParamSets_.at(*particle).end(); ++param) {
 			nextPositionsStr.push_back(to_string(static_cast<long double>(*param)));
 			//cout << *param << endl;
 		}
@@ -1010,18 +1008,22 @@ void Swarm::processParamsPSO(vector<double> &params, unsigned int pID, double fi
 		cout << "Processing finished params for particle " << pID << " with fit of " << fit << endl;
 	}
 
-	// First update the particles current parameter set
-	unsigned int i = 0;
-	for (auto param = params.begin(); param != params.end(); ++param) {
-		//cout << pID << " " << *param << endl;
-		particleCurrParamSets_[pID][i] = *param;
-		++i;
-	}
-
+	/*
 	//cout << "size: " << particleBestFits_.size();
 	for (auto p = particleBestFits_.begin(); p != particleBestFits_.end(); ++p) {
 		//cout << "loop" << endl;
 		//cout << p->first << " " << p->second << endl;
+	}
+	 */
+
+	unsigned int i = 0;
+	// If this is the particle's first iteration, we need to store its params
+	if (particleIterationCounter_.at(pID) == 1) {
+		cout << "Storing params: " << endl;
+		for (auto param = params.begin(); param != params.end(); ++param) {
+			particleCurrParamSets_[pID][i] = *param;
+			++i;
+		}
 	}
 
 	// The the fit value of this param set is less than the particles best fit
@@ -1040,9 +1042,8 @@ void Swarm::processParamsPSO(vector<double> &params, unsigned int pID, double fi
 
 		particleBestFits_[pID] = fit;
 
-		i = 0;
+		unsigned int i = 0;
 		for (auto param = params.begin(); param != params.end(); ++param) {
-			//cout << pID << " " << i	 << endl;
 			particleBestParamSets_[pID][i] = *param;
 			++i;
 		}
@@ -1697,64 +1698,84 @@ string Swarm::generateSlurmCommand(string cmd, bool multiProg) {
 
 void Swarm::initFit () {
 
-	if (options.verbosity >= 3) {
-		cout << "Initializing fitting run" << endl;
-	}
-
-	// If we are running ODE, we want to generate a network and network reader.
-	// The network file has parameters that are replaced in every generation,
-	// and the network reader is used to read those network files
-	if (options.model->getHasGenerateNetwork()) {
-
+	if (resumingSavedSwarm) {
 		if (options.verbosity >= 3) {
-			cout << "Creating dummy .bngl, running to get a .net file" << endl;
+			cout << "Resuming fitting run" << endl;
 		}
 
-		// First create a particle which will generate the network
-		// and fill it with dummy params
-		Particle p = Particle(this, 1);
-		p.setModel(options.model);
-		p.generateParams();
+		for (auto particle = particleIterationCounter_.begin(); particle != particleIterationCounter_.end(); ++particle) {
+			swarmComm->univMessageSender.push_back(to_string(static_cast<long long int>(particle->second)));
+			swarmComm->sendToSwarm(0, particle->first, SEND_NUMFLIGHTS_TO_PARTICLE, false, swarmComm->univMessageSender);
+			swarmComm->univMessageSender.clear();
 
-		// Output model file with dummy parameters. This file will be used to generate
-		// our initial network
-		options.model->outputModelWithParams(p.getParams(), options.jobOutputDir, "base.bngl", "", false, false, false, false, false);
-
-		// Construct our simulation command and run the network generator
-		string modelPath = options.jobOutputDir + "/base.bngl";
-		string command = options.bngCommand + "BNG2.pl --outdir " + options.jobOutputDir + " " + modelPath + " >> " + options.jobOutputDir + "netgen_output 2>&1";
-		cout << "Generating initial .net file with command: " << command << endl;
-
-		if (runCommand(command) != 0) {
-			outputError("Error: Couldn't generate initial .net file with command: " + command + ". Quitting.");
+			for (auto param = particleCurrParamSets_.at(particle->first).begin(); param != particleCurrParamSets_.at(particle->first).end(); ++param) {
+				//cout << "Sending " << *param << " to " << particle->first << endl;
+				swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(*param)));
+			}
+			swarmComm->sendToSwarm(0, particle->first, SEND_FINAL_PARAMS_TO_PARTICLE, false, swarmComm->univMessageSender);
+			swarmComm->univMessageSender.clear();
+		}
+	}
+	else {
+		if (options.verbosity >= 3) {
+			cout << "Initializing fitting run" << endl;
 		}
 
-		// Now that we have a .net file, replace the full .bngl with a .bngl
-		// containing ONLY action commands and a .net file loader. This is
-		// used later to run our .net files.
-		options.model->outputModelWithParams(p.getParams(), options.jobOutputDir, "base.bngl", "", false, true, false, false, false);
+		// If we are running ODE, we want to generate a network and network reader.
+		// The network file has parameters that are replaced in every generation,
+		// and the network reader is used to read those network files
+		if (options.model->getHasGenerateNetwork()) {
 
-		// Now store our .net file for later use
-		string netPath = options.jobOutputDir + "/base.net";
-		options.model->parseNet(netPath);
-		cout << 1 << endl;
-	}
+			if (options.verbosity >= 3) {
+				cout << "Creating dummy .bngl, running to get a .net file" << endl;
+			}
 
-	vector<double> params;
-	for (unsigned int param = 0; param < options.model->getNumFreeParams(); ++param) {
-		params.push_back(0);
-	}
-	for (unsigned int particle = 1; particle <= options.swarmSize; ++particle) {
-		particleCurrParamSets_.insert(pair<int, vector<double>>(particle, params));
-	}
+			// First create a particle which will generate the network
+			// and fill it with dummy params
+			Particle p = Particle(this, 1);
+			p.setModel(options.model);
+			p.generateParams();
 
-	if (options.fitType == "pso") {
-		// Initialize velocities to 0
+			// Output model file with dummy parameters. This file will be used to generate
+			// our initial network
+			options.model->outputModelWithParams(p.getParams(), options.jobOutputDir, "base.bngl", "", false, false, false, false, false);
+
+			// Construct our simulation command and run the network generator
+			string modelPath = options.jobOutputDir + "/base.bngl";
+			string command = options.bngCommand + "BNG2.pl --outdir " + options.jobOutputDir + " " + modelPath + " >> " + options.jobOutputDir + "netgen_output 2>&1";
+			cout << "Generating initial .net file with command: " << command << endl;
+
+			if (runCommand(command) != 0) {
+				outputError("Error: Couldn't generate initial .net file with command: " + command + ". Quitting.");
+			}
+
+			// Now that we have a .net file, replace the full .bngl with a .bngl
+			// containing ONLY action commands and a .net file loader. This is
+			// used later to run our .net files.
+			options.model->outputModelWithParams(p.getParams(), options.jobOutputDir, "base.bngl", "", false, true, false, false, false);
+
+			// Now store our .net file for later use
+			string netPath = options.jobOutputDir + "/base.net";
+			options.model->parseNet(netPath);
+			cout << 1 << endl;
+		}
+
+		vector<double> params;
+		for (unsigned int param = 0; param < options.model->getNumFreeParams(); ++param) {
+			params.push_back(0);
+		}
 		for (unsigned int particle = 1; particle <= options.swarmSize; ++particle) {
-			particleParamVelocities_[particle] = params;
-			particleBestParamSets_[particle] = params;
-			particleWeights_[particle] = 0;
-			particleIterationCounter_[particle] = 0;
+			particleCurrParamSets_.insert(pair<int, vector<double>>(particle, params));
+		}
+
+		if (options.fitType == "pso") {
+			// Initialize velocities to 0
+			for (unsigned int particle = 1; particle <= options.swarmSize; ++particle) {
+				particleParamVelocities_[particle] = params;
+				particleBestParamSets_[particle] = params;
+				particleWeights_[particle] = 0;
+				particleIterationCounter_[particle] = 0;
+			}
 		}
 	}
 }
@@ -1771,7 +1792,7 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 
 	if (numMessages >= 1) {
 		if (options.verbosity >= 3) {
-			//cout << "Found messages" << endl;
+			cout << "Found " << numMessages << " messages" << endl;
 		}
 
 		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
@@ -1812,7 +1833,7 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 
 				// Output a run summary every outputEvery flights
 				if (flightCounter_ % options.outputEvery == 0) {
-					string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(flightCounter_)) + "summary.txt";
+					string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(flightCounter_)) + "_summary.txt";
 					outputRunSummary(outputPath);
 				}
 
@@ -1829,7 +1850,7 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 			for (vector<string>::iterator m = sm->second.message.begin()+1; m != sm->second.message.end(); ++m) {
 				paramsString += *m + " ";
 				paramsVec.push_back(stod(*m));
-				particleCurrParamSets_[pID][i] = stod(*m);
+				//particleCurrParamSets_[pID][i] = stod(*m);
 				//cout << "pushed back: " << *m << endl;
 				//cout << "at " << pID << ": " << particleCurrParamSets_.at(pID)[i] << endl;
 				++i;
@@ -1845,15 +1866,15 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 
 			//particleBestFits_[pID] = fitCalc;
 			//cout << "saved fit" << endl;
-
+			//cout << "processing params" << endl;
 			if (options.fitType == "pso") {
 				processParamsPSO(paramsVec, pID, fitCalc);
 			}
+			//cout << "finished processing params" << endl;
 		}
 
 		// TODO: When sending NEXT_GENERATION, make sure failed particles have actually run again. If not, they need re-launched.
 		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_FAIL);
-
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 
 			int pID = sm->second.sender;
@@ -1876,7 +1897,6 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 		}
 
 		smhRange = swarmComm->univMessageReceiver.equal_range(GET_RUNNING_PARTICLES);
-
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 
 			vector<string> intParts;
@@ -1886,11 +1906,13 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 			}
 			swarmComm->sendToSwarm(0, sm->second.sender, SEND_RUNNING_PARTICLES, true, intParts);
 		}
+
 		swarmComm->univMessageReceiver.clear();
+
 	}
 
 	// Now let's check for any external messages
-	checkExternalMessages();
+	//checkExternalMessages();
 
 	return finishedParticles;
 }

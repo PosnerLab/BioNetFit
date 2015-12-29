@@ -100,17 +100,24 @@ void Particle::doParticle() {
 	}
 
 	if (swarm_->resumingSavedSwarm) {
+		cout << "Waiting for flight count from master" << endl;
 		swarm_->swarmComm->recvMessage(0, id_, SEND_NUMFLIGHTS_TO_PARTICLE, true, swarm_->swarmComm->univMessageReceiver);
-		currentGeneration_ = stoi(*(swarm_->swarmComm->univMessageReceiver.begin()->second.message.begin()));
+		currentGeneration_ = stoi(*(swarm_->swarmComm->univMessageReceiver.find(SEND_NUMFLIGHTS_TO_PARTICLE)->second.message.begin()));
+
 		swarm_->swarmComm->univMessageReceiver.clear();
+		cout << "Received flight count from master" << endl;
 
+		cout << "Waiting for param set from master" << endl;
 		swarm_->swarmComm->recvMessage(0, id_, SEND_FINAL_PARAMS_TO_PARTICLE, true, swarm_->swarmComm->univMessageReceiver);
-		currentGeneration_ = stoi(*(swarm_->swarmComm->univMessageReceiver.begin()->second.message.begin()));
 
-		for (auto param = swarm_->swarmComm->univMessageReceiver.begin()->second.message.begin(); param != swarm_->swarmComm->univMessageReceiver.begin()->second.message.end(); ++param) {
-
+		auto freeParam = swarm_->options.model->getFreeParams_().begin();
+		for (auto paramVal = swarm_->swarmComm->univMessageReceiver.find(SEND_FINAL_PARAMS_TO_PARTICLE)->second.message.begin(); paramVal != swarm_->swarmComm->univMessageReceiver.find(SEND_FINAL_PARAMS_TO_PARTICLE)->second.message.end(); ++paramVal) {
+			cout << "updating " << freeParam->first << " to " << *paramVal << endl;
+			simParams_.insert(pair<string, double>(freeParam->first, stod(*paramVal)));
+			++freeParam;
 		}
 		swarm_->swarmComm->univMessageReceiver.clear();
+
 	}
 	//cout << "Particle " << id_ << " waiting to begin" << endl;
 	swarm_->swarmComm->recvMessage(0, id_, NEXT_GENERATION, true, swarm_->swarmComm->univMessageReceiver);
@@ -121,7 +128,7 @@ void Particle::doParticle() {
 	}
 	bool doContinue = true;
 	while(doContinue) {
-
+		cout << "cg is now " << currentGeneration_ << endl;
 		for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 			runModel(i);
 		}
@@ -150,13 +157,14 @@ void Particle::runModel(int iteration) {
 	string bnglFilename = to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(iteration)) + ".bngl";
 	string path = swarm_->options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration_)) + "/";
 	string bnglFullPath = path + bnglFilename;
+	cout << "path is " << path << endl;
 
 	string suffix = to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(iteration));
 
 	string pipePath;
 
 	// Only need to generate files if we're in the first generation. In subsequent generations
-	// the model generation is handled by beeding parents
+	// the model generation is handled by breeding parents
 	if (currentGeneration_ == 1) {
 		if (swarm_->options.model->getHasGenerateNetwork()){
 			string netFilename = "base.net";
@@ -184,6 +192,7 @@ void Particle::runModel(int iteration) {
 			}
 
 			pipePath = path + i->first + "_" + to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(iteration)) + outputSuffix;
+			cout << "pp is: " << pipePath << endl;
 			createParticlePipe(pipePath.c_str());
 		}
 	}
@@ -768,6 +777,7 @@ void Particle::finalizeSim() {
 
 	// Put our simulation params into the message vector
 	for (map<string,double>::iterator i = simParams_.begin(); i != simParams_.end(); ++i){
+		cout << "stored param of " << i->second << endl;
 		swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(i->second)));
 	}
 

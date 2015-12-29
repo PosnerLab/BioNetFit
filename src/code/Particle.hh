@@ -72,7 +72,6 @@ private:
 		ar & simParams_;
 		ar & id_;
 		ar & dataFiles_;
-		//ar & state_;
 		ar & swarm_;
 		ar & currentGeneration_;
 	}

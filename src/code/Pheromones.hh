@@ -22,7 +22,6 @@
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/unordered_map.hpp>
 #include <boost/serialization/set.hpp>
-#include <boost/serialization/utility.hpp>
 
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/containers/map.hpp>
@@ -75,7 +74,7 @@ class Swarm;
 
 class Pheromones {
 public:
-	Pheromones() {}
+	Pheromones();
 
 	void init(Swarm *s);
 
@@ -135,12 +134,13 @@ private:
 	// IPC Stuff
 
 	// Our shared memory object
-	boost::interprocess::managed_shared_memory *segment_;
+	//boost::interprocess::managed_shared_memory *segment_;
 
 	// MQ Stuff
 	std::vector<boost::interprocess::message_queue *> smq_;
 
 
+	/*
 	typedef boost::interprocess::allocator<char, boost::interprocess::managed_shared_memory::segment_manager>
 	CharAllocator;
 	typedef boost::interprocess::basic_string<char, std::char_traits<char>, CharAllocator>
@@ -168,12 +168,14 @@ private:
 	MyMap_ *swarmMap_;
 	MyVector_ *swarmVec_;
 
+	*/
+
 	boost::mpi::request recvRequest_;
 	boost::mpi::status	recvStatus_;
 
-	boost::interprocess::interprocess_mutex *mutex_;
+	//boost::interprocess::interprocess_mutex *mutex_;
 
-	void putArrayInSHM(std::vector<std::string> theArray);
+	//void putArrayInSHM(std::vector<std::string> theArray);
 
 };
 

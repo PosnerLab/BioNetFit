@@ -81,7 +81,6 @@ private:
 	std::vector<std::string> netContents_;
 
 	bool hasGenerateNetwork_;
-	//std::map<std::string,std::string> freeParams_;
 	std::map<std::string, FreeParam*> freeParams_;
 
 	template<typename Archive>
