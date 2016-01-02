@@ -75,11 +75,14 @@ public:
 	std::string getsConf() { return sConf_; }
 	void setJobOutputDir(std::string dir);
 
+	void outputError(std::string errorMessage);
+
 	void initComm();
 	void doSwarm();
 	Particle *createParticle(unsigned int pID);
 
 	void getClusterInformation();
+	std::string generateTorqueBatchScript(std::string cmd);
 	std::string generateSlurmCommand(std::string cmd, bool multiProg = true);
 	std::string generateSlurmMultiProgCmd(std::string runCmd);
 	std::string generateSlurmBatchFile(std::string runCmd);
@@ -159,6 +162,8 @@ public:
 		std::string clusterAccount;	// user account to specify in cluster submission commands // TODO: Parse
 		bool saveClusterOutput;		// whether or not to save output during a cluster fit // TODO: Parse
 		std::string clusterQueue;	// The cluster queue to submit to // TODO: Parse
+		bool emailWhenFinished;
+		std::string emailAddress;
 
 		template<class Archive>
 		void serialize(Archive &ar, const unsigned int version)
@@ -217,6 +222,7 @@ public:
 			ar & psoType;
 
 			ar & enhancedStop;
+			std::cout << "es: " << enhancedStop << std::endl;
 			ar & enhancedInertia;
 
 			ar & outputEvery;
@@ -252,6 +258,7 @@ private:
 	void updateEnhancedStop();
 	double getEuclidianNorm(double y, unsigned int n);
 	void updateParticleWeights();
+	std::vector<double> Swarm::calcQPSOmBests()
 	double calcParticleWeight(unsigned int particle);
 	double calcWeightedAveragePosition();
 	void processParamsPSO(std::vector<double> &params, unsigned int pID, double fit);
@@ -261,6 +268,7 @@ private:
 
 	std::vector<double> calcParticlePosPSO(unsigned int particle);
 	std::vector<double> calcParticlePosBBPSO(unsigned int particle, bool exp = false);
+	std::vector<double> calcParticlePosQPSO(unsigned int particle, std::vector<double> mBests);
 	std::vector<double> getNeighborhoodBestPositions(unsigned int particle);
 
 	unsigned int pickWeighted(double weightSum, std::multimap<double, unsigned int> &weights, unsigned int extraWeight);
@@ -284,25 +292,26 @@ private:
 	// Maybe we can change them to vectors, too
 	std::map<unsigned int, double> particleBestFits_;
 	std::multimap<double, unsigned int> particleBestFitsByFit_;
+	std::map<double, unsigned int> swarmBestFits_;
 	std::map<unsigned int, std::vector<double>> particleParamVelocities_;
 	std::map<unsigned int, std::vector<double>> particleBestParamSets_;
 	std::map<unsigned int, std::vector<double>> particleCurrParamSets_;
 	std::map<unsigned int, double> particleWeights_;
 	std::map<unsigned int, unsigned int> particleIterationCounter_;
+	std::vector<unsigned int, double> mainstreamThought_;
 
 	unsigned int permanenceCounter_; // 0
 	unsigned int flightCounter_; // 0
 	double weightedAvgPos_; // 0
 	double optimum_; // 0
 	unsigned int inertiaUpdateCounter_; // 0;
+	double beta_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
 		std::cout << " serializing swarm" << std::endl;
 
-		std::cout << "options.." << std::endl;
 		ar & options;
-		std::cout << "0.." << std::endl;
 
 		ar & allGenFits;
 
@@ -312,7 +321,6 @@ private:
 		ar & hasMutate;
 
 		ar & runningParticles_;
-		std::cout << "1.." << std::endl;
 		ar & failedParticles_;
 
 		ar & exePath_;
@@ -320,32 +328,19 @@ private:
 		ar & sConf_;
 
 		ar & allParticles_;
-		std::cout << "2.." << std::endl;
 		ar & particleBestFits_;
-		std::cout << 3 << std::endl;
 		ar & particleBestFitsByFit_;
-		std::cout << 4 << std::endl;
 		ar & particleParamVelocities_;
-		std::cout << 5 << std::endl;
 		ar & particleBestParamSets_;
-		std::cout << 6 << std::endl;
 		ar & particleCurrParamSets_;
-		std::cout << 7 << std::endl;
 		ar & particleWeights_;
-		std::cout << 8 << std::endl;
 		ar & particleIterationCounter_;
 
-		std::cout << 9 << std::endl;
 		ar & permanenceCounter_;
-		std::cout << 10 << std::endl;
 		ar & flightCounter_;
-		std::cout << 11 << std::endl;
 		ar & weightedAvgPos_;
-		std::cout << 12 << std::endl;
 		ar & optimum_;
-		std::cout << 13 << std::endl;
 		ar & inertiaUpdateCounter_;
-		std::cout << 14 << std::endl;
 	}
 
 	Timer tmr_;

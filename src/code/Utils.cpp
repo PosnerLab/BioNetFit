@@ -10,12 +10,6 @@
 using namespace boost::filesystem;
 using namespace std;
 
-void outputError(string errorMessage) {
-	cout << errorMessage << endl;
-
-	exit (1);
-}
-
 string convertToAbsPath(string relPath) {
 	path fullPath;
 
@@ -149,4 +143,10 @@ int runCommand(string cmd) {
 
 	return status;
 	*/
+}
+
+void outputError(string errorMessage) {
+	cout << errorMessage << endl;
+
+	exit (1);
 }

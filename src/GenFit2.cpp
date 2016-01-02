@@ -87,6 +87,8 @@ int main(int argc, char *argv[]) {
 
 	//tmr.reset();
 
+	// TODO: Check to make sure user specified cluster action on a cluster with the getrank() command?
+
 	Swarm *s;
 	if (type == "master") {
 		Config myconfig(configFile);

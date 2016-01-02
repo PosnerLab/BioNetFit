@@ -70,6 +70,7 @@ class Swarm;
 #define SEND_FINAL_PARAMS_TO_PARTICLE 21
 #define FIT_FINISHED 22
 #define SEND_NUMFLIGHTS_TO_PARTICLE 23
+#define MASTER_DIED 24
 #define MESSAGE_END 1000
 
 class Pheromones {

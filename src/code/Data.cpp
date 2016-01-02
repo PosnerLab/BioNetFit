@@ -84,7 +84,7 @@ void Data::parseData(){
 		int fd = open(dataPath.c_str(), O_RDONLY);
 
 		if (fd < 0) {
-			cout << "couldn't open " << dataPath << endl;
+			cout << "Warning: couldn't open " << dataPath << " to gather simulation output." << endl;
 		}
 
 		int len;
@@ -115,8 +115,7 @@ void Data::parseData(){
 			}
 		}
 		else {
-			errMsg = "Error: Couldn't open data file " + dataPath + " for parsing.";
-			outputError(errMsg);
+			swarm_->outputError("Error: Couldn't open data file " + dataPath + " for parsing.");
 		}
 		dataFile.close();
 	}
@@ -125,8 +124,7 @@ void Data::parseData(){
 	string basename = boost::regex_replace(getFilename(dataPath),boost::regex("_\\d+_\\d+$"),replacement);
 
 	if(allLines[0].at(0) != '#') {
-		string errMsg = "Error: Your data file (" + dataPath + ") doesn't contain (#) as the first value.";
-		outputError(errMsg);
+		swarm_->outputError("Error: Your data file (" + dataPath + ") doesn't contain (#) as the first value.");
 	}
 
 	// TODO: Do we need to store columns that aren't in .exp?  Maybe not.
@@ -217,8 +215,7 @@ void Data::divideByInit() {
 	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			if (v->second == 0) {
-				string errMsg = "You chose to divide_by_init, but the first value in the column '" + c->first + "' is 0. We cannot divide by 0.";
-				outputError(errMsg);
+				swarm_->outputError("You chose to divide_by_init, but the first value in the column '" + c->first + "' is 0. We cannot divide by 0.");
 			}
 			if (v->second == NaN) {
 				dataDividedByInit_[c->first][v->first] = NaN;
@@ -234,7 +231,7 @@ void Data::getColumnAverages() {
 	double sum;
 	int counter;
 	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
-		cout << "gca col loop" << endl;
+		//cout << "gca col loop" << endl;
 
 		sum = 0;
 		counter = 0;
@@ -255,8 +252,7 @@ void Data::logTransformData() {
 	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			if (v->second == 0) {
-				string errMsg = "You chose to log transform simulation output, but the first value in the column '" + c->first + "' is 0. We cannot take the log of 0.";
-				outputError(errMsg);
+				swarm_->outputError("You chose to log transform simulation output, but the first value in the column '" + c->first + "' is 0. We cannot take the log of 0.");
 			}
 			else if (v->second == NaN) {
 				dataLogTransformed_[c->first][v->first] = NaN;

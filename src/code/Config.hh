@@ -14,6 +14,8 @@
 #include "Swarm.hh"
 #include "Model.hh"
 
+class Swarm;
+
 class Config {
 public:
 	Config(std::string configFile);
@@ -27,6 +29,7 @@ private:
 
 	void checkConsistency();
 
+	Swarm * swarm_;
 	std::string configPath_;
 
 	/*

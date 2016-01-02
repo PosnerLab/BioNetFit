@@ -198,7 +198,7 @@ void Particle::runModel(int iteration) {
 	}
 
 	// Construct our simulation command
-	string command = swarm_->options.bngCommand + "BNG2.pl --outdir " + path + " " + bnglFullPath + " >> " + path + to_string(static_cast<long long int>(id_)) + ".BNG_OUT 2>&1";
+	string command = swarm_->options.bngCommand + " --outdir " + path + " " + bnglFullPath + " >> " + path + to_string(static_cast<long long int>(id_)) + ".BNG_OUT 2>&1";
 	if (swarm_->options.usePipes) {
 		command += " &";
 	}
@@ -239,7 +239,7 @@ void Particle::runModel(int iteration) {
 	}
 	else {
 		// If our return code is not 0, tell the master that the simulation failed
-		cout << "I failed" << endl;
+		//cout << "I failed" << endl;
 		swarm_->swarmComm->sendToSwarm(int(id_), 0, SIMULATION_FAIL, true, swarm_->swarmComm->univMessageSender);
 	}
 }
