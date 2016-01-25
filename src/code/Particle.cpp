@@ -578,14 +578,15 @@ void Particle::calculateFit() {
 					//cout << "divisor: " << divisor << endl;
 				}
 
-				// TODO: Output error if we can't find .exp timepoint in simulation output
+				double sim;
 				// TODO: Introduce fudge tolerance to account for precision loss in simulation control column
 				if (swarm_->options.smoothing == 1) {
-					colSum += (this->*objFuncPtr)(dataFiles_.at(e->first).at(swarm_->options.smoothing)->dataCurrent->at(exp_col->first).at(timepoint->first), timepoint->second, divisor);
+					sim = dataFiles_.at(e->first).at(swarm_->options.smoothing)->dataCurrent->at(exp_col->first).at(timepoint->first);
 				}
 				else {
-					colSum += (this->*objFuncPtr)(dataFiles_.at(e->first).at(swarm_->options.smoothing+1)->dataCurrent->at(exp_col->first).at(timepoint->first), timepoint->second, divisor);
+					sim = dataFiles_.at(e->first).at(swarm_->options.smoothing+1)->dataCurrent->at(exp_col->first).at(timepoint->first);
 				}
+				colSum += (this->*objFuncPtr)(sim, timepoint->second, divisor);
 			}
 			setSum += colSum;
 		}

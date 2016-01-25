@@ -156,6 +156,12 @@ Swarm * Config::createSwarmFromConfig () {
 		swarm_->options.saveClusterOutput = (stoi(pairs.find("save_cluster_output")->second) == 1) ? true : false;
 	}
 
+	// Update seed
+	if(pairs.find("seed") != pairs.end()) {
+		cout << "Processing seed" << endl;
+		swarm_->options.seed = stod(pairs.find("seed")->second);
+	}
+
 	// Update swap rate
 	if(pairs.find("swap_rate") != pairs.end()) {
 		cout << "Processing swap rate" << endl;
@@ -338,6 +344,18 @@ Swarm * Config::createSwarmFromConfig () {
 		swarm_->options.relTolerance = stof(pairs.find("rel_tolerance")->second);
 	}
 
+	if (pairs.find("mutate_qpso") != pairs.end()) {
+		swarm_->options.mutateQPSO = (stoi(pairs.find("mutate_qpso")->second) == 1) ? true : false;
+	}
+
+	if (pairs.find("beta_min") != pairs.end()) {
+		swarm_->options.betaMin = stof(pairs.find("beta_min")->second);
+	}
+
+	if (pairs.find("beta_max") != pairs.end()) {
+		swarm_->options.betaMax = stof(pairs.find("beta_max")->second);
+	}
+
 	if (pairs.find("topology") != pairs.end()) {
 		swarm_->options.topology = pairs.find("topology")->second;
 	}
@@ -505,7 +523,7 @@ void Config::checkConsistency() {
 	 *	1. Enhanced stop
 	 *
 	 * Make sure we have SOME sort of stop criteria
-	 *
+	 * QPSO requires maxNumSimulations to update beta_. the max num of iterations should be close to the expected. would be nice if the user had to guess. is there an adaptive beta_ algorithm like enhancedInertia?
 	 */
 
 	if (swarm_->options.fitType.empty()) {

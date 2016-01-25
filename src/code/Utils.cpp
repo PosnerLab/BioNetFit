@@ -88,11 +88,11 @@ int runCommand(string cmd, string &result) {
 		return 1;
 	}
 
-	char buffer[128];
+	char buffer[1024];
 	result.clear();
 
 	while (!feof(pipe.get())) {
-		if (fgets(buffer, 128, pipe.get()) != NULL)
+		if (fgets(buffer, 1024, pipe.get()) != NULL)
 			result += buffer;
 	}
 

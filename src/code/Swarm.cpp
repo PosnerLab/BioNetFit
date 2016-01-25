@@ -17,6 +17,7 @@ Swarm::Swarm() {
 	resumingSavedSwarm = false;
 	sConf_ = "";
 	swarmComm = 0;
+	fitCompareTolerance = 1e-6;
 
 	options.jobName = "";
 	options.fitType = "";
@@ -33,6 +34,7 @@ Swarm::Swarm() {
 	options.maxFit = 0;
 	options.boostrap = 0;
 	options.parallelCount = 0;
+	options.seed = 0;
 
 	options.useCluster = false;
 	options.saveClusterOutput = false;
@@ -67,6 +69,9 @@ Swarm::Swarm() {
 	options.inertiaFinal = 0.1; // 0.1
 	options.absTolerance = 10e-4; // 10E-4
 	options.relTolerance = 10e-4; // 10E-4
+	options.mutateQPSO = false;
+	options.betaMin = 0.5;
+	options.betaMax = 1.0;
 
 	options.topology = "fullyconnected"; // fullyconnected
 	options.psoType = "pso"; // pso
@@ -92,14 +97,24 @@ Swarm::Swarm() {
 	weightedAvgPos_ = 0; // 0
 	optimum_ = 0; // 0
 	inertiaUpdateCounter_ = 0; // 0;
+	beta_ = 0.7;
+	cauchyMutator_ = 0.2;
 
-	// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
-	// Seed our random number engine
-	auto seed = chrono::high_resolution_clock::now().time_since_epoch().count();
-	randNumEngine.seed(seed);
-	randNumEngine.discard(700000);
+	if (options.seed) {
+		randNumEngine.seed(options.seed);
+		randNumEngine.discard(700000);
 
-	srand (std::tr1::random_device{}());
+		srand(options.seed);
+	}
+	else {
+		// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
+		// Seed our random number engine
+		auto seed = chrono::high_resolution_clock::now().time_since_epoch().count();
+		randNumEngine.seed(seed);
+		randNumEngine.discard(700000);
+
+		srand (std::tr1::random_device{}());
+	}
 }
 
 void Swarm::initComm() {
@@ -467,10 +482,10 @@ bool Swarm::checkStopCriteria() {
 	}
 
 	cout << "Fitcompare" << endl;
-	cout << swarmBestFits_.begin()->first << endl;
+	cout << particleBestFitsByFit_.begin()->first << endl;
 	cout << options.minFit << endl;
 	if (swarmBestFits_.begin()->first <= options.minFit) {
-		cout << "Stopped according to swarmBestFit (" << swarmBestFits_.begin()->first << ") <= options.minFit (" << options.minFit << ")" << endl;
+		cout << "Stopped according to swarmBestFit (" << particleBestFitsByFit_.begin()->first << ") <= options.minFit (" << options.minFit << ")" << endl;
 		return true;
 	}
 
@@ -544,12 +559,23 @@ double Swarm::calcWeightedAveragePosition() {
 vector<double> Swarm::calcQPSOmBests() {
 	// Eq 2b Liu et al
 	vector<double> mBests;
+
 	for (unsigned int param = 0; param < options.model->getFreeParams_().size(); ++param) {
 		double sum = 0;
 		for (unsigned int particle = 1; particle <= options.swarmSize; ++particle) {
-			sum += particleBestParamSets_.at(particle)[param];
+			sum += abs(particleBestParamSets_.at(particle)[param]);
 		}
-		mBests.push_back(sum / (double)options.swarmSize());
+
+		double mean = sum / (double)options.swarmSize;
+
+		// TODO: Adaptive mutation ala Liu 2005
+		if (options.mutateQPSO) {
+			boost::random::cauchy_distribution<double> dist(0, cauchyMutator_);
+			double mutator = dist(randNumEngine);
+			mean += mutator;
+			cout << mean << " mutated by: " << mutator << endl;
+		}
+		mBests.push_back(sum / (double)options.swarmSize);
 	}
 
 	return mBests;
@@ -856,16 +882,12 @@ void Swarm::processParticlesPSO(vector<unsigned int> particles, bool newFlight) 
 	if (options.psoType == "qpso") {
 		mBests = calcQPSOmBests();
 	}
+
 	// For each particle in our particle set
 	for (auto particle = particles.begin(); particle != particles.end(); ++particle) {
 		if (options.verbosity >= 3) {
 			cout << "Processing particle " << *particle << endl;
 		}
-
-		// We need to already have particle best position updated by the time we get here
-
-		// Will hold positions for next iteration
-		vector<double> nextPositions;
 
 		// Calculate the next iteration positions according
 		// to user preference
@@ -873,16 +895,17 @@ void Swarm::processParticlesPSO(vector<unsigned int> particles, bool newFlight) 
 			if (options.enhancedInertia) {
 				updateInertia();
 			}
-			particleCurrParamSets_.at(*particle) = calcParticlePosPSO(*particle);
+			particleCurrParamSets_[*particle] = calcParticlePosPSO(*particle);
 		}
 		else if (options.psoType == "bbpso") {
-			particleCurrParamSets_.at(*particle) = calcParticlePosBBPSO(*particle);
+			particleCurrParamSets_[*particle] = calcParticlePosBBPSO(*particle);
 		}
 		else if (options.psoType == "bbpsoexp") {
-			particleCurrParamSets_.at(*particle) = calcParticlePosBBPSO(*particle, true);
+			particleCurrParamSets_[*particle] = calcParticlePosBBPSO(*particle, true);
 		}
 		else if (options.psoType == "qpso") {
-			particleCurrParamSets_.at(*particle) = calcParticlePosQPSO(*particle, mBests);
+			updateContractionExpansionCoefficient();
+			particleCurrParamSets_[*particle] = calcParticlePosQPSO(*particle, mBests);
 		}
 
 		if (options.verbosity >= 3) {
@@ -939,6 +962,10 @@ vector<double> Swarm::calcParticlePosPSO(unsigned int particle) {
 		//cout << "cp: " << currPos << endl;
 		//cout << "nbp: " << neighborhoodBestPositions[i] << endl;
 		// Set velocity
+
+		// TODO: Look into constriction factor - Clerc
+		// Also, according to Eberhart and Shi, constriction factor + velocity clamping
+		// results in fastest convergence
 		double nextVelocity = (options.inertia * currVelocity) + options.cognitive * r1 * (personalBestPos - currPos) + options.social * r2 * (neighborhoodBestPositions[i] - currPos);
 		//cout << "nv: " << nextVelocity << endl;
 
@@ -954,7 +981,6 @@ vector<double> Swarm::calcParticlePosPSO(unsigned int particle) {
 			particleParamVelocities_.at(particle)[i] = 0;
 		}
 		 */
-
 
 		cout << "after " << nextPositions[i] << endl << endl;
 		++i;
@@ -972,10 +998,12 @@ vector<double> Swarm::calcParticlePosBBPSO(unsigned int particle, bool exp) {
 	// Get the best positions for particle's neighborhood
 	vector<double> neighborhoodBestPositions = getNeighborhoodBestPositions(particle);
 
+	/*
 	cout << "nbps:" << endl;
 	for (auto p = neighborhoodBestPositions.begin(); p != neighborhoodBestPositions.end(); ++p) {
 		cout << "nbp: " << *p << endl;
 	}
+	 */
 
 	// This vector holds the new positions to be sent to the particle
 	vector<double> nextPositions(particleCurrParamSets_.size());
@@ -984,7 +1012,7 @@ vector<double> Swarm::calcParticlePosBBPSO(unsigned int particle, bool exp) {
 
 	// For each parameter in the current parameter set
 	int i = 0;
-	for (auto param = particleCurrParamSets_.begin(); param != particleCurrParamSets_.end(); ++param) {
+	for (auto param = particleBestParamSets_.at(particle).begin(); param != particleBestParamSets_.at(particle).end(); ++param) {
 		if (exp) {
 			// TODO: Does this need to be inclusive?
 			if ( ((float) rand() / (RAND_MAX)) < 0.5 ) {
@@ -1000,6 +1028,7 @@ vector<double> Swarm::calcParticlePosBBPSO(unsigned int particle, bool exp) {
 		}
 		else {
 			// Calculate our mean and std
+			cout << "personalbest: " << personalBestPos << " neighborbest: " << neighborhoodBestPositions[i] << endl;
 			double mean = (abs(personalBestPos) + abs(neighborhoodBestPositions[i])) / 2;
 			cout << "mean: " << mean << endl;
 			double std = abs(abs(personalBestPos) - abs(neighborhoodBestPositions[i]));
@@ -1021,20 +1050,33 @@ vector<double> Swarm::calcParticlePosBBPSO(unsigned int particle, bool exp) {
 vector<double> Swarm::calcParticlePosQPSO(unsigned int particle, vector<double> mBests) {
 
 	vector<double> nextPositions;
-	for (int d = 0; d < options.model->getFreeParams_().size(); ++d) {
+	vector<double> neighborhoodBests = getNeighborhoodBestPositions(particle);
+	for (unsigned int d = 0; d < mBests.size(); ++d) {
+		//cout << particle << " before: " << particleCurrParamSets_[particle][d] << endl;
+		cout << particle << " mbest: " << mBests[d] << endl;
+		//cout << particle << " best: " << particleBestParamSets_[particle][d] << endl;
+		//cout << particle << " swarmbest: " << getNeighborhoodBestPositions(particle)[d] << endl;
 		double fi1 = ((double) rand() / (RAND_MAX));
-		double fi2 = ((double) rand() / (RAND_MAX));
-		double p = ((fi1 * particleBestFits_.at(particle)) + (fi2 * swarmBestFits_.begin()->first)) / (fi1 + fi2);
+		//cout << "f1: " << fi1 << endl;
+		//double fi2 = ((double) rand() / (RAND_MAX));
+		//double p = ((fi1 * particleBestFits_.at(particle)) + (fi2 * swarmBestFits_.begin()->first)) / (fi1 + fi2);
+		// TODO: Work out whether or not we should be using abs() for this and below
+		double p = fi1 * abs(particleBestParamSets_[particle][d]) + (1 - fi1) * neighborhoodBests[d];
 		double u = ((double) rand() / (RAND_MAX));
 
-		// TODO: Linearlly decrease beta from 1.0 to 0.5? See Liu et al.
+		// TODO: Linearly decrease beta from 1.0 to 0.5? See Liu et al.
 
 		// Liu et all, 2005, eq 2a
 		if (u > 0.5) {
-			nextPositions.push_back(p - beta_ * abs(mBests[d] - particleCurrParamSets_.at(particle)[d]) * log(1/u));
+			nextPositions.push_back(p - beta_ * abs(mBests[d] - abs(particleCurrParamSets_.at(particle)[d])) * log(1/u));
+			//cout << particle << " p: " << p << endl;
+			//cout << "mbest - curr: " << mBests[d] - particleCurrParamSets_.at(particle)[d] << endl;
+			//cout << "log: " << log(1/u) << endl;
+			//cout << particle << " after: " << p - beta_ * abs(mBests[d] - particleCurrParamSets_.at(particle)[d]) * log(1/u) << endl;
 		}
 		else {
-			nextPositions.push_back(p + beta_ * abs(mBests[d] - particleCurrParamSets_.at(particle)[d]) * log(1/u));
+			nextPositions.push_back(p + beta_ * abs(mBests[d] - abs(particleCurrParamSets_.at(particle)[d])) * log(1/u));
+			//cout << particle << " after: " << p + beta_ * abs(mBests[d] - particleCurrParamSets_.at(particle)[d]) * log(1/u) << endl;
 		}
 	}
 
@@ -1047,6 +1089,11 @@ void Swarm::updateInertia() {
 	cout << "Setting inertia to " << options.inertia << endl;
 }
 
+void Swarm::updateContractionExpansionCoefficient() {
+	beta_ = options.betaMax - (((float)flightCounter_ / options.maxNumSimulations) * (options.betaMax - options.betaMin));
+	cout << "updating beta_ to " << beta_ << endl;
+}
+
 vector<double> Swarm::getNeighborhoodBestPositions(unsigned int particle) {
 
 	if (options.verbosity >= 3) {
@@ -1055,37 +1102,32 @@ vector<double> Swarm::getNeighborhoodBestPositions(unsigned int particle) {
 
 	// Set the current best fit to our own best fit
 	double currBestFit = particleBestFits_.at(particle);
-	cout << "cbf: " << currBestFit << endl;
+	//cout << "cbf: " << currBestFit << endl;
 
 	int currentBestNeighbor = particle;
-	cout << "set initial nb to " << currentBestNeighbor << endl;
+	//cout << "set initial nb to " << currentBestNeighbor << endl;
 
-	cout << "allParticles size: " << allParticles_.size() << endl;
-	cout << "allParticles neighbor size: " << allParticles_[particle].size() << endl;
+	//cout << "allParticles size: " << allParticles_.size() << endl;
+	//cout << "allParticles neighbor size: " << allParticles_[particle].size() << endl;
 
 	// For every neighbor in this particle's neighborhood
 	for (auto neighbor = allParticles_[particle].begin(); neighbor != allParticles_[particle].end(); ++neighbor) {
-		// Set best fit of neighbor being tested
-		if (particleBestFits_.find(*neighbor) == particleBestFits_.end()) {
+
+		auto it = particleBestFits_.find(*neighbor);
+
+		// Skip this neighbor if it doesn't contain a fit value
+		if (it->second == 0) {
 			continue;
 		}
 
-		// Find this neighbor's fit in the global fit list
-		double neighborBestFit;
-		for (auto fit = swarmBestFits_.begin(); fit != swarmBestFits_.end(); ++fit) {
-			if (fit->second == *neighbor) {
-				neighborBestFit = fit->first;
-			}
-		}
-
-		cout << "checking if neighbor " << *neighbor << " has a better fit of " << neighborBestFit << " than " << currBestFit << endl;
+		//cout << "checking if neighbor " << *neighbor << " has a better fit of " << it->second << " than " << currBestFit << endl;
 
 		// If Neighbor's best fit is better than ours, update the best
 		// neighbor. Also, update the current best fit value
-		if (neighborBestFit < currBestFit) {
-			cout << "it does! setting current best fit of particle " << *neighbor << " of " << neighborBestFit << endl;
+		if (it->second < currBestFit) {
+			//cout << "it does! setting current best fit of particle " << *neighbor << " of " << it->second << endl;
 			currentBestNeighbor = *neighbor;
-			currBestFit = neighborBestFit;
+			currBestFit = it->second;
 		}
 	}
 
@@ -1099,28 +1141,16 @@ void Swarm::processParamsPSO(vector<double> &params, unsigned int pID, double fi
 		cout << "Processing finished params for particle " << pID << " with fit of " << fit << endl;
 	}
 
-	/*
-	//cout << "size: " << particleBestFits_.size();
-	for (auto p = particleBestFits_.begin(); p != particleBestFits_.end(); ++p) {
-		//cout << "loop" << endl;
-		//cout << p->first << " " << p->second << endl;
-	}
-	 */
-
 	unsigned int i = 0;
 	// If this is the particle's first iteration, we need to store its params
 	if (particleIterationCounter_.at(pID) == 1) {
-		cout << "Storing " << params.size() << " params" << endl;
+		//cout << "Storing " << params.size() << " params for particle " << pID << endl;
 		for (auto param = params.begin(); param != params.end(); ++param) {
+			//cout << *param << endl;
 			particleCurrParamSets_[pID][i] = *param;
 			++i;
 		}
 	}
-
-	// UHOH! We're need to be keeping track of best positions over all time,
-	// not just in the current generation. That means particleBestFitsByFits_
-	// should not be erased. OR the get neighborhood best needs to use values
-	// from the particleAllBestFits_ list?  Sort this out.
 
 	// The the fit value of this param set is less than the particles best fit
 	// we should update the particle's best fit, then store the best fit params
@@ -1134,9 +1164,9 @@ void Swarm::processParamsPSO(vector<double> &params, unsigned int pID, double fi
 
 		map<double, unsigned int>::iterator toDelIt = particleBestFitsByFit_.end();
 		for (auto it = particleBestFitsByFit_.begin(); it != particleBestFitsByFit_.end(); ++it) {
-			cout << "loop: " << it->second << endl;
+			//cout << "loop: " << it->second << endl;
 			if (it->second == pID) {
-				cout << "Erasing old best fit for particle " << pID << endl;
+				//cout << "Erasing old best fit for particle " << pID << endl;
 				toDelIt = it;
 			}
 		}
@@ -1148,12 +1178,11 @@ void Swarm::processParamsPSO(vector<double> &params, unsigned int pID, double fi
 
 		unsigned int i = 0;
 		for (auto param = params.begin(); param != params.end(); ++param) {
-			cout << "Updaing best param for particle " << pID << ": " << *param << endl;
+			//cout << "Updating best param for particle " << pID << ": " << *param << endl;
 			particleBestParamSets_[pID][i] = *param;
 			++i;
 		}
 	}
-	cout << 4 << endl;
 }
 
 void Swarm::launchParticle(unsigned int pID) {
@@ -1262,7 +1291,7 @@ void Swarm::cleanupFiles(const char * path) {
 	}
 }
 
-void Swarm::breedGeneration() {
+void Swarm::breedGeneration(vector<int> children) {
 	// TODO: Need to take into consideration failed particles? Definitely need to in first generation.
 	if (options.verbosity >= 3) {
 		cout << "Breeding generation" << endl;
@@ -1272,9 +1301,17 @@ void Swarm::breedGeneration() {
 
 	// TODO: Add redundancy here in case dir can't be created
 	// Create the output directory for the next generation
-	string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
-	if (runCommand(createDirCmd) != 0) {
-		outputError("Error: Couldn't create " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)) + " to hold next generation's output.");
+
+	if (!checkIfFileExists(options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)))) {
+		string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
+		int retryCounter = 0;
+		while (runCommand(createDirCmd) != 0) {
+			if(++retryCounter >= 10) {
+				outputError("Error: Couldn't create " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)) + " to hold next generation's output.");
+			}
+			sleep(1);
+			cout << "trying again to create dir" << endl;
+		}
 	}
 
 	unsigned int parentPoolSize = options.swarmSize;
@@ -1297,13 +1334,20 @@ void Swarm::breedGeneration() {
 		++w;
 	}
 
-	/*
+
 	cout << "max: " << maxWeight << endl;
-	for (auto i: weightDiffs) {
-		cout << "weight diff: " << i.first << " " << i.second << endl;
-	}
 	cout << "weight sum: " << weightSum << endl;
-	 */
+	for (auto i = weightDiffs.begin(); i != weightDiffs.end(); ++i) {
+		cout << "weight diff: " << i->first << " " << i->second << endl;
+	}
+
+	for (auto i = swarmBestFits_.begin(); i != swarmBestFits_.end(); ++i) {
+		cout << "sbf: " << i->first << " " << i->second << endl;
+	}
+
+	for (auto i = allGenFits.begin(); i != allGenFits.end(); ++i) {
+		cout << "agf: " << i->first << " " << i->second << endl;
+	}
 
 	// If we want to keep any parents unchanged, send unchanged param sets to children.
 	// We start with the global best fit params and iterate through the fit list from there.
@@ -1324,7 +1368,13 @@ void Swarm::breedGeneration() {
 		++childCounter;
 	}
 
-	float parentPairs = (float)parentPoolSize / 2;
+	float parentPairs;
+	if (children.size()) {
+		parentPairs = (float)children.size() / 2;
+	}
+	else {
+		parentPairs = (float)parentPoolSize / 2;
+	}
 
 	//cout << "we have " << parentPairs << " parent pairs" << endl;
 
@@ -1340,6 +1390,7 @@ void Swarm::breedGeneration() {
 		p1 = pickWeighted(weightSum, weightDiffs, options.extraWeight);
 		p2 = pickWeighted(weightSum, weightDiffs, options.extraWeight);
 
+		cout << "chose " << p1 << " and " << p2 << endl;
 		// Quit if we try to many times to select suitable parents
 		//if (++maxFitCounter >= 10000) {
 		//	outputError("Error: Tried too many times to select parents that didn't exceed the specified max_fit value of " + to_string(static_cast<long double>(options.maxFit)) + ". Quitting.");
@@ -1353,58 +1404,77 @@ void Swarm::breedGeneration() {
 			retryCount++;
 			if (retryCount > options.maxRetryDifferentParents) {
 				if (options.verbosity >= 1) {
-					cout << "Tried to many time to select different parents for breeding. Selecting the first two." << endl;
+					cout << "Tried too many time to select different parents for breeding. Selecting the first two." << endl;
 				}
 
-				// Get iterator to the weight map
+				// Get reverse iterator to the weight map (best parents are at the end)
 				multimap<double, unsigned int>::reverse_iterator w = weightDiffs.rbegin();
 
 				// The weight map is sorted, so the first element will be the best fit
 				p1 = w->second;
+				cout << "1: " << w->second;
 
 				// Increment the map iterator until we find a fit value that isn't ours
 				while (p1 == p2 && w != weightDiffs.rend()) {
 					++w;
 					p2 = w->second;
+					cout << "tried to set p2 as " << w->second;
 				}
 
 				break;
 			}
 			p2 = pickWeighted(weightSum, weightDiffs, options.extraWeight);
+			cout << "retry2: " << p2 << endl;
 		}
 
-		//cout << "selected " << p1 << " and " << p2 << endl;
+		auto p1It = allGenFits.begin();
+		advance(p1It, p1);
+		vector<string> p1Vec;
+		split(p1It->second, p1Vec);
+		p1Vec.erase(p1Vec.begin());
 
-		vector<string> c1Vec;
-		vector<string> c2Vec;
+		auto p2It = allGenFits.begin();
+		advance(p2It, p2);
+		vector<string> p2Vec;
+		split(p2It->second, p2Vec);
+		p2Vec.erase(p2Vec.begin());
+
+		vector<string> c1Vec, c2Vec;
 		unsigned int pi = 0;
 		for (auto p = options.model->getFreeParams_().begin(); p != options.model->getFreeParams_().end(); ++p) {
+			string p1Param, p2Param;
+			cout << "param: " << p->first << endl;
 			if (unif(randNumEngine) < (options.swapRate * 100) ) {
-				double p1Param = particleCurrParamSets_.at(p1)[pi];
-				double p2Param = particleCurrParamSets_.at(p2)[pi];
+				p1Param = p1Vec[pi];
+				p2Param = p2Vec[pi];
+
+				cout << "p1: " << p1Param << endl;
+				cout << "p2: " << p2Param << endl;
 
 				// TODO: Make sure individual mutation rates work
 				if (hasMutate && p->second->isHasMutation()) {
-					p1Param = mutateParam(p->second, p1Param);
-					p2Param = mutateParam(p->second, p2Param);
+					cout << "about to mutate" << endl;
+					p1Param = mutateParam(p->second, stod(p1Param));
+					p2Param = mutateParam(p->second, stod(p2Param));
+					cout << "mutated" << endl;
 				}
 
-				//cout << "swapping p1: " << p1Param << " with p2: " << particleCurrParamSets_.at(p2)[pi] << endl;
-				c1Vec.push_back(to_string(static_cast<long double>(p2Param)));
-				particleNewParamSets[childCounter].push_back(p2Param);
-				c2Vec.push_back(to_string(static_cast<long double>(p1Param)));
-				particleNewParamSets[childCounter+1].push_back(p1Param);
+				cout << "swapping p1: " << p1Param << " with p2: " << p2Param << endl;
+				c1Vec.push_back(p2Param);
+				particleNewParamSets[childCounter].push_back(stod(p2Param));
+				c2Vec.push_back(p1Param);
+				particleNewParamSets[childCounter+1].push_back(stod(p1Param));
 			}
 			else {
-				c1Vec.push_back(to_string(static_cast<long double>(particleCurrParamSets_.at(p1)[pi])));
-				particleNewParamSets[childCounter].push_back(particleCurrParamSets_.at(p1)[pi]);
-				c2Vec.push_back(to_string(static_cast<long double>(particleCurrParamSets_.at(p2)[pi])));
-				particleNewParamSets[childCounter+1].push_back(particleCurrParamSets_.at(p2)[pi]);
+				c1Vec.push_back(p1Vec[pi]);
+				particleNewParamSets[childCounter].push_back(stod(p1Vec[pi]));
+				c2Vec.push_back(p2Vec[pi]);
+				particleNewParamSets[childCounter+1].push_back(stod(p2Vec[pi]));
 			}
 			++pi;
 		}
 
-		//cout << "sending to " << childCounter << endl;
+		cout << "sending to " << childCounter << endl;
 		swarmComm->sendToSwarm(0, childCounter, SEND_FINAL_PARAMS_TO_PARTICLE, false, c1Vec);
 		++childCounter;
 
@@ -1416,7 +1486,12 @@ void Swarm::breedGeneration() {
 		}
 	}
 
-	particleCurrParamSets_ = particleNewParamSets;
+	//particleCurrParamSets_ = particleNewParamSets;
+
+	// Replace any change param sets in the master set
+	for (auto child = particleNewParamSets.begin(); child != particleNewParamSets.end(); ++child) {
+		particleCurrParamSets_[child->first] = child->second;
+	}
 
 	unsigned int numFinishedBreeding = 0;
 	while (numFinishedBreeding < options.swarmSize) {
@@ -1424,167 +1499,6 @@ void Swarm::breedGeneration() {
 		numFinishedBreeding+=numMessages;
 	}
 }
-
-/*
-void Swarm::breedGeneration() {
-	//Timer tmr;
-
-	string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
-	int ret = runCommand(createDirCmd);
-
-	// We let particles do the actual breeding.  The master's role is to generate a breeding pattern and
-	// tell which particles to breed with which
-
-	cout << "fit\tperm\t";
-
-	for (auto i: options.model->freeParams_) {
-		cout << i.first << "\t";
-	}
-
-	cout << endl;
-
-	for (auto i: allGenFits) {
-		cout << i.first << ": " << i.second << endl;
-	}*/
-
-/*
-	multimap<double,double> weights; // First element is original fit, second element is subtracted from max
-
-	// Fill in the weight map with fit values
-	for (multimap<double,string>::iterator f = allGenFits.begin(); f != allGenFits.end(); ++f) {
-		weights.insert(pair<double,double>(f->first,0));
-		//cout << "f: " << f->first << endl;
-	}
-
-	double maxWeight = weights.rbegin()->first; // TODO: Is this true??
-	//cout << "max: " << maxWeight << endl;
-
-	// Fill the second element of the weight map with difference between maxWeight and fit value
-	double weightSum;
-	for (map<double,double>::iterator w = weights.begin(); w != weights.end(); ++w) {
-		w->second = maxWeight - w->first;
-		weightSum += w->second;
-	}
-
-	for (auto i: weights) {
-		cout << "weight diff: " << i.first << " " << i.second << endl;
-	}
-	cout << "weight sum: " << weightSum << endl;
-	int parentPairs = options.swarmSize / 2;
-
-	//cout << "we have " << parentPairs << " parent pairs" << endl;
-
-	double p1;
-	double p2;
-	boost::smatch match;
-	vector<string> parentVec;
-	int numCurrBreeding = 0;
-	int numFinishedBreeding = 0;
-
-	//cout << "sum: " << weightSum << endl;
-
-	int swapID = -1;
-	for (unsigned int i = 0; i < parentPairs; ++i) {
-		swapID += 2;
-
-		// Pick the fit values (particle parents) used in breeding
-		p1 = pickWeighted(weightSum, weights, options.extraWeight);
-		p2 = pickWeighted(weightSum, weights, options.extraWeight);
-
-		// If we want different parents used in breeding, make sure that happens
-		int retryCount = 0;
-		while (p1 == p2 && options.forceDifferentParents) {
-			retryCount++;
-			if (retryCount > options.maxRetryDifferentParents) {
-				if (options.verbosity >= 1) {
-					cout << "Tried to many time to select different parents for breeding. Selecting the first two." << endl;
-				}
-
-				// Get iterator to the weight map
-				multimap<double,double>::iterator w = weights.begin();
-
-				// The weight map is sorted, so the first element will be the best fit
-				p1 = w->first;
-
-				// Increment the map iterator until we find a fit value that isn't ours
-				while (p1 == p2 && w != weights.end()) {
-					++w;
-					p2 = w->first;
-				}
-
-				break;
-			}
-			p2 = pickWeighted(weightSum, weights, options.extraWeight);
-		}
-
-		cout << "selected " << p1 << " and " << p2 << endl;
-
-		// We always send the breeding information to the first parent. That particle will then
-		// initiate breeding with its mate
-
-		// Get the string containing gen number, perm number, and param values
-		// We're searching a multimap which may contain duplicate fit values,
-		// but it shouldn't matter which we pick because if two runs have the
-		// exact same fit, they should have the same parameters sets as each other
-		// This isn't true!  Turns out some parameter sets will give the exact same
-		// fit as others. By selecting this way we may be making the breeding pool
-		// less diverse!!
-		string parentString1 = allGenFits.find(p1)->second;
-		string parentString2 = allGenFits.find(p2)->second;
-
-		// Split that string into array. We're only interested in the first element which contains
-		// the particle ID/permutation number
-		split(parentString1,parentVec);
-
-		// Extract the particle ID
-		boost::regex_search(parentVec[0], match, boost::regex("gen\\d+perm(\\d+)"));
-		string pID1 = match[1];
-
-		// Clear the parent vector for use with the next parent
-		parentVec.clear();
-
-		// Do same as above, but for the second parent
-		split(parentString2,parentVec);
-		boost::regex_search(parentVec[0], match, boost::regex("gen\\d+perm(\\d+)"));
-		string pID2 = match[1];
-		parentVec.clear();
-
-		cout << "p1 is " << pID1 << " p2 is " << pID2 << endl;
-
-		// Add second parent and swapID to the message
-		swarmComm->univMessageSender.push_back(to_string(static_cast<long long int>(swapID)));
-		swarmComm->univMessageSender.push_back(pID2);
-
-		// Send the message to the first parent
-		//cout << "sending message to " << stoi(pID1) << " with id of " << to_string(static_cast<long long int>(swapID)) << endl;
-
-		// Tell parent 1 to initiate breeding
-		swarmComm->sendToSwarm(0, stoi(pID1), INIT_BREEDING, false, swarmComm->univMessageSender);
-		swarmComm->univMessageSender.clear();
-		numCurrBreeding+=2;
-
-		//double t = tmr.elapsed();
-		//cout << "BREEDING took " << t << " seconds" << endl;
-		//tmr.reset();
-
-		// While the current number of breeding particles is greater than twice the parallel count
-		while ( numCurrBreeding >= (options.parallelCount * 15)) {
-
-			int numMessages = swarmComm->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm->univMessageReceiver, true);
-
-			numFinishedBreeding+=numMessages;
-			numCurrBreeding-=numMessages;
-		}
-	}
-	while (numFinishedBreeding < options.swarmSize) {
-
-		int numMessages = swarmComm->recvMessage(-1, 0, DONE_BREEDING, true, swarmComm->univMessageReceiver, true);
-
-		numFinishedBreeding+=numMessages;
-	}
-	//cout << "got them all!" << endl;
-}
- */
 
 void Swarm::finishFit() {
 
@@ -1780,9 +1694,9 @@ void Swarm::initFit () {
 		// We need to set current generation to the iteration counter because the saved swarm
 		// currentGeneration may not be accurate due to it changed between runGeneration() and
 		// breedGeneration()
-		if (options.fitType == "genetic") {
-			currentGeneration = particleIterationCounter_.begin()->second;
-		}
+		//if (options.fitType == "genetic") {
+		//	currentGeneration = particleIterationCounter_.begin()->second;
+		//}
 	}
 	else {
 		if (options.verbosity >= 3) {
@@ -1904,10 +1818,6 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 				paramsString = to_string(static_cast<long long int>(flightCounter_)) + " ";
 			}
 
-			//cout << "fitcalc prior to conversion is: " << sm->second.message[0] << endl;
-			double fitCalc = stod(sm->second.message[0]);
-			//cout << "stored calc" << endl;
-
 			// Store the parameters given to us by the particle
 			vector<double> paramsVec;
 			int i = 0;
@@ -1922,9 +1832,9 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 			}
 			cout << "stored params" << endl;
 
-			// Then store it
-			allGenFits.insert(pair<double,string>(fitCalc, paramsString));
-			swarmBestFits_.insert(pair<double, int>(fitCalc, pID));
+			double fitCalc = stod(sm->second.message[0]);
+			allGenFits.insert(pair<double, string>(fitCalc, paramsString));
+			swarmBestFits_.insert(pair<double, unsigned int>(fitCalc, pID));
 
 			if (options.fitType == "pso") {
 				processParamsPSO(paramsVec, pID, fitCalc);
@@ -2190,16 +2100,18 @@ unsigned int Swarm::pickWeighted(double weightSum, multimap<double, unsigned int
 	//cout << "chosen: " << chosen << endl;
 
 	double currentSum = 0;
+	unsigned int indexCounter = 0;
 	for (multimap<double, unsigned int>::reverse_iterator w = weights.rbegin(); w != weights.rend(); ++w) {
 		currentSum += w->first;
 		//cout << "adding " << w->first << endl;
 
 		if (currentSum >= chosen) {
-			return w->second;
+			return indexCounter;
 		}
+		++indexCounter;
 	}
 	//cout << "fell off the end" << endl;
-	return weights.rbegin()->second;
+	return 0;
 }
 
 void Swarm::insertKeyByValue(map<double, int> &theMap, double key, int value) {
@@ -2213,7 +2125,7 @@ void Swarm::insertKeyByValue(map<double, int> &theMap, double key, int value) {
 	}
 }
 
-double Swarm::mutateParam(FreeParam* fp, double paramValue) {
+string Swarm::mutateParam(FreeParam* fp, double paramValue) {
 	//Timer tmr;
 	//uniform_real_distribution<double> unif(0,1);
 	boost::random::uniform_real_distribution<double> unif(0,1);
@@ -2239,7 +2151,7 @@ double Swarm::mutateParam(FreeParam* fp, double paramValue) {
 	}
 	//double t = tmr.elapsed();
 	//cout << "Mutate took " << t << " seconds" << endl;
-	return paramValue;
+	return to_string(static_cast<long double>(paramValue));
 }
 
 void Swarm::saveSwarmState() {

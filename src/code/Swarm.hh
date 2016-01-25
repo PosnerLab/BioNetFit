@@ -28,6 +28,7 @@
 #include <boost/random/uniform_int_distribution.hpp>
 #include <boost/random/uniform_real_distribution.hpp>
 #include <boost/random/normal_distribution.hpp>
+#include <boost/random/cauchy_distribution.hpp>
 
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/vector.hpp>
@@ -96,6 +97,7 @@ public:
 	unsigned int currentGeneration;
 	bool resumingSavedSwarm;
 	bool hasMutate;
+	float fitCompareTolerance;
 
 	struct SwarmOpts {
 		std::string jobName;	// name of the job
@@ -118,6 +120,7 @@ public:
 		unsigned int objFunc;		// which objective function to use
 		bool usePipes;	// whether or not to use pipes to gather simulation output
 		bool useCluster;// whether or not we are running on a cluster
+		int seed; // seed for the random number engines
 
 		bool divideByInit;// whether or not to divide simulation outputs by the value at t=0
 		int logTransformSimData;// whether or not to log transform simulation data. this value acts as the base.
@@ -148,6 +151,9 @@ public:
 		float inertiaFinal; // 0.1
 		float absTolerance; // 10E-4
 		float relTolerance; // 10E-4
+		bool mutateQPSO;
+		float betaMax;
+		float betaMin;
 
 		std::string topology; // fullyconnected
 		std::string psoType; // bbpso
@@ -189,6 +195,7 @@ public:
 			ar & objFunc;
 			ar & usePipes;
 			ar & useCluster;
+			ar & seed;
 
 			ar & divideByInit;
 			ar & logTransformSimData;
@@ -217,12 +224,14 @@ public:
 			ar & inertiaFinal;
 			ar & absTolerance;
 			ar & relTolerance;
+			ar & mutateQPSO;
+			ar & betaMin;
+			ar & betaMax;
 
 			ar & topology;
 			ar & psoType;
 
 			ar & enhancedStop;
-			std::cout << "es: " << enhancedStop << std::endl;
 			ar & enhancedInertia;
 
 			ar & outputEvery;
@@ -242,7 +251,7 @@ private:
 	std::vector<std::vector<unsigned int>> generateInitParticles();
 	void launchParticle(unsigned int pID);
 	void runGeneration();
-	void breedGeneration();
+	void breedGeneration(std::vector<int> children);
 
 	void cleanupFiles(const char * path);
 	void finishFit();
@@ -258,21 +267,24 @@ private:
 	void updateEnhancedStop();
 	double getEuclidianNorm(double y, unsigned int n);
 	void updateParticleWeights();
-	std::vector<double> Swarm::calcQPSOmBests()
 	double calcParticleWeight(unsigned int particle);
 	double calcWeightedAveragePosition();
 	void processParamsPSO(std::vector<double> &params, unsigned int pID, double fit);
 	bool checkStopCriteria();
 	void updateInertia();
+	void updateContractionExpansionCoefficient();
+	double calcMeanFit();
+
 	void saveSwarmState();
 
 	std::vector<double> calcParticlePosPSO(unsigned int particle);
 	std::vector<double> calcParticlePosBBPSO(unsigned int particle, bool exp = false);
 	std::vector<double> calcParticlePosQPSO(unsigned int particle, std::vector<double> mBests);
 	std::vector<double> getNeighborhoodBestPositions(unsigned int particle);
+	std::vector<double> calcQPSOmBests();
 
 	unsigned int pickWeighted(double weightSum, std::multimap<double, unsigned int> &weights, unsigned int extraWeight);
-	double mutateParam(FreeParam* fp, double paramValue);
+	std::string mutateParam(FreeParam* fp, double paramValue);
 
 	void insertKeyByValue(std::map<double, int> &theMap, double key, int value);
 
@@ -292,13 +304,12 @@ private:
 	// Maybe we can change them to vectors, too
 	std::map<unsigned int, double> particleBestFits_;
 	std::multimap<double, unsigned int> particleBestFitsByFit_;
-	std::map<double, unsigned int> swarmBestFits_;
+	std::multimap<double, unsigned int> swarmBestFits_;
 	std::map<unsigned int, std::vector<double>> particleParamVelocities_;
 	std::map<unsigned int, std::vector<double>> particleBestParamSets_;
 	std::map<unsigned int, std::vector<double>> particleCurrParamSets_;
 	std::map<unsigned int, double> particleWeights_;
 	std::map<unsigned int, unsigned int> particleIterationCounter_;
-	std::vector<unsigned int, double> mainstreamThought_;
 
 	unsigned int permanenceCounter_; // 0
 	unsigned int flightCounter_; // 0
@@ -306,6 +317,7 @@ private:
 	double optimum_; // 0
 	unsigned int inertiaUpdateCounter_; // 0;
 	double beta_;
+	double cauchyMutator_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
@@ -330,6 +342,7 @@ private:
 		ar & allParticles_;
 		ar & particleBestFits_;
 		ar & particleBestFitsByFit_;
+		ar & swarmBestFits_;
 		ar & particleParamVelocities_;
 		ar & particleBestParamSets_;
 		ar & particleCurrParamSets_;
@@ -341,6 +354,8 @@ private:
 		ar & weightedAvgPos_;
 		ar & optimum_;
 		ar & inertiaUpdateCounter_;
+		ar & beta_;
+		ar & cauchyMutator_;
 	}
 
 	Timer tmr_;
