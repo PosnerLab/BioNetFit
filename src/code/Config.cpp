@@ -196,6 +196,9 @@ Swarm * Config::createSwarmFromConfig () {
 	if(pairs.find("smoothing") != pairs.end()) {
 		cout << "Processing smoothing" << endl;
 		swarm_->options.smoothing = stoi(pairs.find("smoothing")->second);
+		if (swarm_->options.smoothing == 0) {
+			swarm_->options.smoothing = 1;
+		}
 	}
 
 	// Set output directory

@@ -294,7 +294,7 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 				//std::cout << "trying a blocking receive to " << receiverID << " from " << senderID << std::endl;
 				smq_[receiverID]->receive(&serializedMessage[0], 1000, recvd_size, priority);
 				block = false;
-				//std::cout << "blocking receive too " << receiverID << " from " << senderID << " succeeded with recv_size of " << recvd_size << " and message of " << serialized_string << std::endl;
+				//std::cout << "blocking receive to " << receiverID << " from " << senderID << " succeeded with recv_size of " << recvd_size << " and message of " << serialized_string << std::endl;
 			}
 			else {
 				//std::cout << "trying a non-blocking receive to " << receiverID << " from " << senderID << std::endl;
@@ -302,20 +302,21 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 
 				//std::cout << "non-blocking receive to " << receiverID << " from " << senderID << " succeeded with recv_size of " << recvd_size << " and bool of " << hasMessage << std::endl;
 				if (!hasMessage) {
-					//std::cout << "breaking?" << std::endl;
+					//std::cout << "breaking" << std::endl;
 					break;
 				}
 			}
 			// If we have any messages in our messageHolder, let's process them
-			//std::cout << "smessage not empty: " << serialized_string << std::endl;
 
 			// De-serialize the smessage
 			serializedMessage.resize(recvd_size);
 			swarmMessage smessage = deserializeSwarmMessage(serializedMessage);
 
-
 			serializedMessage.clear();
 			serializedMessage.resize(1000);
+
+			//sleep(1);
+			//std::cout << "smessage not empty: " << smessage.tag << std::endl;
 
 			// Make sure our message matches the sender, tag, and id we requested
 			/*
@@ -341,6 +342,10 @@ int Pheromones::recvMessage(signed int senderID, const int receiverID, int tag, 
 
 				//std::cout << "putting it back in the queue..." << std::endl;
 				sendToSwarm(smessage.sender, receiverID, stoi(smessage.tag), false, smessage.message, smessage.id);
+
+				if (!block) {
+					break;
+				}
 			}
 		}
 	}

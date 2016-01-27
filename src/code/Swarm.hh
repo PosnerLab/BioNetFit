@@ -251,7 +251,7 @@ private:
 	std::vector<std::vector<unsigned int>> generateInitParticles();
 	void launchParticle(unsigned int pID);
 	void runGeneration();
-	void breedGeneration(std::vector<int> children);
+	void breedGeneration(std::vector<unsigned int> children = std::vector<unsigned int>());
 
 	void cleanupFiles(const char * path);
 	void finishFit();

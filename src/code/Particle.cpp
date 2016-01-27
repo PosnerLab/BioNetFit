@@ -257,8 +257,10 @@ void Particle::checkMessagesGenetic() {
 	while (1) {
 		// Retrieve any messages
 		int numCheckedMessages = 0;
+		//cout << id_ << " checking for messages" << endl;
 		int numMessages = swarm_->swarmComm->recvMessage(-1, id_, -1, true, swarm_->swarmComm->univMessageReceiver, true);
-
+		//cout << id_ << " found " << numMessages << " messages " << endl;
+		/*
 		smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(INIT_BREEDING);
 		if (smhRange.first != smhRange.second) {
 			for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
@@ -286,6 +288,7 @@ void Particle::checkMessagesGenetic() {
 				++numCheckedMessages;
 			}
 		}
+		*/
 
 		if (numCheckedMessages >= numMessages) {
 			swarm_->swarmComm->univMessageReceiver.clear();
@@ -300,7 +303,7 @@ void Particle::checkMessagesGenetic() {
 
 				int messageIndex = 0;
 				for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
-					cout << id_ << " updating parameter " << p->first << " to " << sm->second.message[messageIndex] << endl;
+					//cout << id_ << " updating parameter " << p->first << " to " << sm->second.message[messageIndex] << endl;
 					p->second = stod(sm->second.message[messageIndex]);
 					++messageIndex;
 				}
@@ -312,6 +315,11 @@ void Particle::checkMessagesGenetic() {
 					string path = swarm_->options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration_ + 1)) + "/";
 					string bnglFullPath = path + bnglFilename;
 					string suffix = to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(i));
+
+					if (!checkIfFileExists(path)) {
+						cout << "running: mkdir " << path << endl;
+						runCommand("mkdir " + path);
+					}
 
 					// And generate our models
 					if (swarm_->options.model->getHasGenerateNetwork()){
@@ -325,9 +333,8 @@ void Particle::checkMessagesGenetic() {
 				}
 
 				// Tell the master we have our new params and are ready for the next generation
-				//cout << id_ << " telling master we're finished " << endl;
+				//cout << id_ << " telling master we're finished breeding" << endl;
 				swarm_->swarmComm->sendToSwarm(id_, 0, DONE_BREEDING, false, swarm_->swarmComm->univMessageSender);
-
 				//double t = tmr.elapsed();
 				//cout << "SEND_FINAL_PARAMS took " << t << " seconds" << endl;
 				++numCheckedMessages;
@@ -339,6 +346,7 @@ void Particle::checkMessagesGenetic() {
 			continue;
 		}
 
+		/*
 		// TODO: maybe we should search for all tags within this loop, rather then using equal_ranges
 		for (Pheromones::swarmMsgHolderIt sm = swarm_->swarmComm->univMessageReceiver.begin(); sm != swarm_->swarmComm->univMessageReceiver.end(); ++sm) {
 			if (sm->first > 1000) {
@@ -395,6 +403,7 @@ void Particle::checkMessagesGenetic() {
 				++numCheckedMessages;
 			}
 		}
+		*/
 
 		if (numCheckedMessages >= numMessages) {
 			swarm_->swarmComm->univMessageReceiver.clear();
@@ -407,7 +416,7 @@ void Particle::checkMessagesGenetic() {
 		}
 
 		if (swarm_->swarmComm->univMessageReceiver.find(NEXT_GENERATION) != swarm_->swarmComm->univMessageReceiver.end()) {
-			cout << "next gen" << endl;
+			//cout << id_ << " next gen" << endl;
 			return;
 		}
 
@@ -778,16 +787,17 @@ void Particle::finalizeSim() {
 
 	// Put our simulation params into the message vector
 	for (map<string,double>::iterator i = simParams_.begin(); i != simParams_.end(); ++i){
-		cout << "stored param of " << i->second << endl;
+		//cout << "stored param of " << i->second << endl;
 		swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(i->second)));
 	}
 
 	// Tell the swarm master that we're finished
-	if (swarm_->options.verbosity >= 3) {
-		cout << "Telling master that my simulation is finished" << endl;
+	if (swarm_->options.verbosity >= 1) {
+		cout << id_ << " Telling master that my simulation is finished" << endl;
 	}
 
-	swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, true, swarm_->swarmComm->univMessageSender);
+	swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, false, swarm_->swarmComm->univMessageSender);
+
 	// Reset the message vector
 	swarm_->swarmComm->univMessageSender.clear();
 }
