@@ -4,6 +4,8 @@
  *  Created on: Jul 17, 2015
  *      Author: brandon
  */
+// TODO: "Iteration" in all_Fits.txt isn't informative. Need gen and perm too...
+// TODO: Auto average best fit gdat for results?
 
 #include "Swarm.hh"
 
@@ -100,6 +102,11 @@ Swarm::Swarm() {
 	beta_ = 0.7;
 	cauchyMutator_ = 0.2;
 
+	auto seed = chrono::high_resolution_clock::now().time_since_epoch().count();
+	randNumEngine.seed(seed);
+	randNumEngine.discard(700000);
+
+	/*
 	if (options.seed) {
 		randNumEngine.seed(options.seed);
 		randNumEngine.discard(700000);
@@ -113,6 +120,19 @@ Swarm::Swarm() {
 		randNumEngine.seed(seed);
 		randNumEngine.discard(700000);
 
+		srand (std::tr1::random_device{}());
+	}
+	 */
+}
+
+void Swarm::initRNGS(int seed) {
+	if (seed) {
+		srand(seed);
+		cout << "seeding rng with: " << seed << endl;
+	}
+	else {
+		// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
+		// Seed our random number engine
 		srand (std::tr1::random_device{}());
 	}
 }
@@ -183,7 +203,7 @@ void Swarm::setJobOutputDir(string path) {
 			myInp >> answer;
 
 			if (answer == "Y" || answer == "y") {
-				string cmd = "rm -r " + options.jobOutputDir + "*";
+				string cmd = "rm -r " + options.jobOutputDir;
 				if (options.verbosity >= 1) {
 					cout << "Deleting old output directory, this may take a minute..." << endl;
 				}
@@ -263,6 +283,10 @@ void Swarm::doSwarm() {
 		// Synchronous genetic
 		if (options.fitType == "genetic") {
 
+			if (options.verbosity >= 3) {
+				cout << "Running a synchronous genetic fit" << endl;
+			}
+
 			if (!checkIfFileExists(options.jobOutputDir + "1")) {
 				string createDirCmd = "mkdir " + options.jobOutputDir + "1";
 				if (runCommand(createDirCmd) != 0) {
@@ -287,9 +311,60 @@ void Swarm::doSwarm() {
 					breedGeneration();
 				}
 			}
-			cout << "fit finished " << endl;
 			finishFit();
 		}
+		else if (options.fitType == "pso") {
+
+			if (options.verbosity >= 3) {
+				cout << "Running a synchronous PSO fit" << endl;
+			}
+
+			if (!checkIfFileExists(options.jobOutputDir + "1")) {
+				string createDirCmd = "mkdir " + options.jobOutputDir + "1";
+				runCommand(createDirCmd);
+			}
+
+			if (!resumingSavedSwarm) {
+				// Generate all particles that will be present in the swarm
+				allParticles_ = generateInitParticles();
+			}
+
+			saveSwarmState();
+
+			vector<unsigned int> finishedParticles;
+			bool stopCriteria = false;
+			while (!stopCriteria) {
+				// Re-launch the particles in to the Swarm proper
+				for (unsigned int p = 1; p <= options.swarmSize; ++p) {
+					launchParticle(p);
+				}
+
+				while (finishedParticles.size() < options.swarmSize) {
+					usleep(250000);
+					vector<unsigned int> currFinishedParticles;
+					currFinishedParticles = checkMasterMessages();
+
+					if (currFinishedParticles.size()) {
+						finishedParticles.insert(finishedParticles.end(), currFinishedParticles.begin(), currFinishedParticles.end());
+					}
+				}
+
+				// Process particles
+				processParticlesPSO(finishedParticles, true);
+
+				// Check for stop criteria
+				stopCriteria = checkStopCriteria();
+
+				// Save swarm state
+				saveSwarmState();
+
+				// Clear our finished particles for the next round
+				finishedParticles.clear();
+			}
+
+			finishFit();
+		}
+
 	}
 	// TODO: Need to make asynchronous fits work in PCs
 	// Asynchronous fit loops
@@ -359,7 +434,7 @@ void Swarm::doSwarm() {
 		else if (options.fitType == "pso") {
 
 			if (options.verbosity >= 3) {
-				cout << "Running a PSO-type fit" << endl;
+				cout << "Running an asynchronous PSO fit" << endl;
 			}
 
 			if (!checkIfFileExists(options.jobOutputDir + "1")) {
@@ -389,7 +464,6 @@ void Swarm::doSwarm() {
 			if (options.verbosity >= 3) {
 				cout << "Entering main swarm loop" << endl;
 			}
-
 
 			vector<unsigned int> finishedParticles;
 			bool stopCriteria = false;
@@ -1278,6 +1352,7 @@ void Swarm::runGeneration () {
 }
 
 void Swarm::cleanupFiles(const char * path) {
+	// TODO: Should we fork to do this? ...yes.
 	DIR* dp;
 	dirent* de;
 	errno = 0;
@@ -1362,7 +1437,7 @@ void Swarm::breedGeneration(vector<unsigned int> children) {
 	// TODO: Check for weightsum of 0. This happens on convergence and will cause an exception
 	// to be thrown when we create a distribution in pickWeighted()
 
-
+	/*
 	cout << "max: " << maxWeight << endl;
 	cout << "weight sum: " << weightSum << endl;
 	for (auto i = weightDiffs.begin(); i != weightDiffs.end(); ++i) {
@@ -1376,6 +1451,7 @@ void Swarm::breedGeneration(vector<unsigned int> children) {
 	for (auto i = allGenFits.begin(); i != allGenFits.end(); ++i) {
 		cout << "agf: " << i->first << " " << i->second << endl;
 	}
+	 */
 
 
 	// If we want to keep any parents unchanged, send unchanged param sets to children.
@@ -1384,18 +1460,19 @@ void Swarm::breedGeneration(vector<unsigned int> children) {
 
 	// Only keep parents if we're doing an entire generation at once
 	if (children.size() == options.swarmSize) {
+		auto parent = allGenFits.begin();
 		for (unsigned int p = 1; p <= options.keepParents; ++p) {
 
 			vector<string> params;
-			auto parent = swarmBestFits_.begin();
+			split(parent->second, params);
+			params.erase(params.begin());
 
-			for (auto param = particleCurrParamSets_.at(parent->second).begin(); param != particleCurrParamSets_.at(parent->second).end(); ++param) {
-				params.push_back(to_string(static_cast<long double>(*param)));
-				particleNewParamSets[children[childCounter - 1]].push_back(*param);
+			for (auto param = params.begin(); param != params.end(); ++param) {
+				particleNewParamSets[childCounter].push_back(stod(*param));
 			}
 
 			//cout << "Sending unchanged params to " << childCounter << endl;
-			swarmComm->sendToSwarm(0, children[childCounter - 1], SEND_FINAL_PARAMS_TO_PARTICLE, false, params);
+			swarmComm->sendToSwarm(0, childCounter, SEND_FINAL_PARAMS_TO_PARTICLE, false, params);
 			++parent;
 			++childCounter;
 		}
@@ -1460,7 +1537,7 @@ void Swarm::breedGeneration(vector<unsigned int> children) {
 			//cout << "retry2: " << p2 << endl;
 		}
 
-		cout << "chose " << p1 << " and " << p2 << endl;
+		//cout << "chose " << p1 << " and " << p2 << endl;
 
 		auto p1It = allGenFits.begin();
 		advance(p1It, p1);
@@ -1478,13 +1555,13 @@ void Swarm::breedGeneration(vector<unsigned int> children) {
 		unsigned int pi = 0;
 		for (auto p = options.model->getFreeParams_().begin(); p != options.model->getFreeParams_().end(); ++p) {
 			string p1Param, p2Param;
-			cout << "param: " << p->first << endl;
-			if (unif(randNumEngine) < (options.swapRate * 100) ) {
-				p1Param = p1Vec[pi];
-				p2Param = p2Vec[pi];
+			//cout << "param: " << p->first << endl;
+			p1Param = p1Vec[pi];
+			p2Param = p2Vec[pi];
 
-				cout << "p1: " << p1Param << endl;
-				cout << "p2: " << p2Param << endl;
+			//cout << "p1: " << p1Param << endl;
+			//cout << "p2: " << p2Param << endl;
+			if (unif(randNumEngine) < (options.swapRate * 100) ) {
 
 				// TODO: Make sure individual mutation rates work
 				if (hasMutate && p->second->isHasMutation()) {
@@ -1497,12 +1574,14 @@ void Swarm::breedGeneration(vector<unsigned int> children) {
 				//cout << "swapping p1: " << p1Param << " with p2: " << p2Param << endl;
 				c1Vec.push_back(p2Param);
 				particleNewParamSets[children[childCounter - 1]].push_back(stod(p2Param));
+				//cout << "c1 final: " << p2Param << endl;
 				c2Vec.push_back(p1Param);
 				particleNewParamSets[children[childCounter]].push_back(stod(p1Param));
 			}
 			else {
 				c1Vec.push_back(p1Vec[pi]);
 				particleNewParamSets[children[childCounter - 1]].push_back(stod(p1Vec[pi]));
+				//cout << "c1 final: " << p1Vec[pi] << endl;
 				c2Vec.push_back(p2Vec[pi]);
 				particleNewParamSets[children[childCounter]].push_back(stod(p2Vec[pi]));
 			}
@@ -1718,7 +1797,7 @@ void Swarm::initFit () {
 		}
 
 		for (auto particle = particleIterationCounter_.begin(); particle != particleIterationCounter_.end(); ++particle) {
-			swarmComm->univMessageSender.push_back(to_string(static_cast<long long int>(particle->second)));
+			swarmComm->univMessageSender.push_back(to_string(static_cast<long long int>(currentGeneration - 1)));
 			swarmComm->sendToSwarm(0, particle->first, SEND_NUMFLIGHTS_TO_PARTICLE, false, swarmComm->univMessageSender);
 			swarmComm->univMessageSender.clear();
 
@@ -1733,9 +1812,9 @@ void Swarm::initFit () {
 		// We need to set current generation to the iteration counter because the saved swarm
 		// currentGeneration may not be accurate due to it changed between runGeneration() and
 		// breedGeneration()
-		//if (options.fitType == "genetic") {
-		//	currentGeneration = particleIterationCounter_.begin()->second;
-		//}
+		if (options.fitType == "genetic") {
+			currentGeneration = currentGeneration - 1;
+		}
 	}
 	else {
 		if (options.verbosity >= 3) {

@@ -159,7 +159,7 @@ Swarm * Config::createSwarmFromConfig () {
 	// Update seed
 	if(pairs.find("seed") != pairs.end()) {
 		cout << "Processing seed" << endl;
-		swarm_->options.seed = stod(pairs.find("seed")->second);
+		swarm_->options.seed = stoi(pairs.find("seed")->second);
 	}
 
 	// Update swap rate
@@ -196,6 +196,7 @@ Swarm * Config::createSwarmFromConfig () {
 	if(pairs.find("smoothing") != pairs.end()) {
 		cout << "Processing smoothing" << endl;
 		swarm_->options.smoothing = stoi(pairs.find("smoothing")->second);
+
 		if (swarm_->options.smoothing == 0) {
 			swarm_->options.smoothing = 1;
 		}
@@ -500,6 +501,7 @@ Swarm * Config::createSwarmFromConfig () {
 		cout << "DataSets: " << i.dataSet->getPath() << endl;
 	}
 	 */
+	checkConsistency();
 
 	return swarm_;
 }
@@ -533,6 +535,7 @@ void Config::checkConsistency() {
 		swarm_->outputError("Error: You didn't specify a fit_type in your .conf file. Refer to the documentation with help on setting this option. Quitting.");
 	}
 
+	// TODO: This doesn't work!!
 	if (swarm_->options.jobName.empty()) {
 		swarm_->outputError("Error: You didn't specify a job_name in your .conf file. Refer to the documentation with help on setting this option. Quitting.");
 	}

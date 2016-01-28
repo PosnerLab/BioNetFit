@@ -230,6 +230,7 @@ int main(int argc, char *argv[]) {
 			}
 			else {
 				s->initComm();
+				s->initRNGS(s->options.seed);
 				s->isMaster = true;
 				s->doSwarm();
 			}
@@ -278,9 +279,13 @@ int main(int argc, char *argv[]) {
 		s->setExePath(convertToAbsPath(argv[0]));
 
 		s->initComm();
+
 		if (pID == 0) {
 			pID = s->swarmComm->getRank();
 		}
+
+		cout << "seeding with: " << s->options.seed + pID << endl;
+		s->initRNGS(s->options.seed + pID);
 
 		Particle *p = s->createParticle(pID);
 		p->setModel(s->options.model);

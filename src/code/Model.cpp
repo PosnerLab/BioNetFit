@@ -160,7 +160,7 @@ void Model::parseModel() {
 	}
 }
 
-void Model::outputModelWithParams(map<string,double> params, string path, string filename, string suffix, bool stopAtNetGen=false, bool onlyActions=false, bool netAndBngl=false, bool usePipe=false, bool isNetFile=false) {
+void Model::outputModelWithParams(map<string, double> params, string path, string filename, string suffix, bool stopAtNetGen=false, bool onlyActions=false, bool netAndBngl=false, bool usePipe=false, bool isNetFile=false) {
 
 	if (netAndBngl) {
 		// First output the .bngl file (containing only action commands)
@@ -222,6 +222,7 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 					string line = "readFile({file=>\"" + path + filename + "\"})\n";
 					outFile << line;
 				}
+
 				//for (string line : fullContents_){
 				for (auto line = fullContents_.begin(); line != fullContents_.end(); ++line) {
 					if (onlyActions) {
@@ -238,25 +239,42 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 						outFile << actionLine;
 					}
 					else {
+						string newLine = *line;
+
+						bool inParameterBlock = true;
+						int numReplacedParams = 0;
+						int numParamsToReplace = params.size();
 						// Skip line if it's empty or if it is a comment
 						if (boost::regex_match(*line, boost::regex("^\\s*$")) || boost::regex_match(*line, boost::regex("^#"))) {
 							continue;
 						}
-						// Replace free param with generated param
-						if (boost::regex_search(*line, matches, boost::regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
-							// Older version of C++ don't support double overload to to_string, so we have to cast to long double
-							*line = boost::regex_replace(*line, boost::regex("\\w+__FREE__"), to_string(static_cast<long double>(params[matches[2]])));
+						// TODO: Next line is never working. Same as above for .net file?
+						if (*line == "end parameters" || numReplacedParams == numParamsToReplace) {
+							inParameterBlock = false;
+							cout << "out of parameter block" << endl;
+						}
+
+						//cout << *line << endl;
+						if (inParameterBlock) {
+							// Replace free param with generated param
+							if (boost::regex_search(*line, matches, boost::regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
+								// Older version of C++ don't support double overload to to_string, so we have to cast to long double
+								cout << "found a FP: " << matches[2] << endl;
+								newLine = boost::regex_replace(*line, boost::regex("\\w+__FREE__"), to_string(static_cast<long double>(params[matches[2]])));
+								cout << "replacing with: " << params[matches[2]] << endl;
+								++numReplacedParams;
+							}
 						}
 						// Add in the unique suffix
 						if (!suffix.empty()) {
 							if (boost::regex_search(*line, boost::regex("^simulate|^simulate_nf|^simulate_ode|^simulate_ssa|^simulate_pla|^parameter_scan"))) {
 								string suffixLine = ",suffix=>\"" + suffix + "\"})";
-								*line = boost::regex_replace(*line, boost::regex("\\}\\)"), suffixLine);
-								*line = *line + "\n";
+								newLine = boost::regex_replace(*line, boost::regex("\\}\\)"), suffixLine);
+								newLine = newLine + "\n";
 							}
 						}
 
-						outFile << *line;
+						outFile << newLine;
 						if (stopAtNetGen) {
 							if (boost::regex_search(*line,matches,boost::regex("^generate_network"))) {
 								break;

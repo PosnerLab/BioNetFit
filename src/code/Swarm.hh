@@ -79,6 +79,7 @@ public:
 	void outputError(std::string errorMessage);
 
 	void initComm();
+	void initRNGS(int seed=0);
 	void doSwarm();
 	Particle *createParticle(unsigned int pID);
 
