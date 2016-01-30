@@ -5,7 +5,7 @@ begin model
 begin parameters
 	# simulation parameters
 	# fraction of a single cell to be considered in a stochastic simulation
-	f 0.001 # [=] dimensionless, 0<f<=1
+	f 0.1 # [=] dimensionless, 0<f<=1
 	
 	# physical constants
 	# Avogadro constant
@@ -182,14 +182,14 @@ begin actions
 # actions
 
 # Generate the network
-#generate_network();
+generate_network();
 
 # Simulate for 600 seconds to reach equilibrium
-simulate({method=>"nf",t_start=>0,t_end=>600,n_steps=>1,suffix=>"equil"})
+simulate({method=>"ode",t_start=>0,t_end=>600,n_steps=>1,suffix=>"equil"})
 
 # Set Ligand_isPresent to 1 to enable ligand binding by means of the "func()" function
 setParameter("Ligand_isPresent",1)
 
 # Simulate for 60 seconds. This simulation output is fit to the data in example3.exp
-simulate({method=>"nf",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example5"})
+simulate({method=>"ode",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example5"})
 end actions

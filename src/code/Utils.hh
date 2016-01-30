@@ -30,7 +30,7 @@ void outputHelp();
 bool createParticlePipe(const char * path);
 //double pickWeighted(double weightSum, std::multimap<double,double>& weights, int extraWeight, boost::random::mt19937 &randNumEngine);
 bool isFloat(std::string number);
-double mutateParam(FreeParam* fp, double paramValue);
+double mutateParamGA(FreeParam* fp, double paramValue);
 int runCommand(std::string cmd, std::string &result);
 int runCommand(std::string cmd);
 

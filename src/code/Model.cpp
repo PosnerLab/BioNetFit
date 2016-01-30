@@ -259,9 +259,9 @@ void Model::outputModelWithParams(map<string, double> params, string path, strin
 							// Replace free param with generated param
 							if (boost::regex_search(*line, matches, boost::regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
 								// Older version of C++ don't support double overload to to_string, so we have to cast to long double
-								cout << "found a FP: " << matches[2] << endl;
+								//cout << "found a FP: " << matches[2] << endl;
 								newLine = boost::regex_replace(*line, boost::regex("\\w+__FREE__"), to_string(static_cast<long double>(params[matches[2]])));
-								cout << "replacing with: " << params[matches[2]] << endl;
+								//cout << "replacing with: " << params[matches[2]] << endl;
 								++numReplacedParams;
 							}
 						}

@@ -162,7 +162,12 @@ public:
 		bool enhancedStop; // true
 		bool enhancedInertia; // true
 
-		unsigned int outputEvery; // In a PSO fit, output a fit summary every n flights
+		// DE Options
+		unsigned int numIslands;
+		unsigned int mutateType;
+		float mutateFactor;
+
+		unsigned int outputEvery; // In an asynchronous fit, output a fit summary every n simulations
 
 		// Cluster options
 		std::string clusterSoftware;// which cluster software to use
@@ -235,6 +240,9 @@ public:
 			ar & enhancedStop;
 			ar & enhancedInertia;
 
+			ar & numIslands;
+			ar & mutateType;
+
 			ar & outputEvery;
 
 			ar & clusterSoftware;
@@ -249,10 +257,10 @@ private:
 	friend class boost::serialization::access;
 
 	void initFit();
-	std::vector<std::vector<unsigned int>> generateInitParticles();
+	std::vector<std::vector<unsigned int>> generateTopology(int populationSize = options.swarmSize);
 	void launchParticle(unsigned int pID);
 	void runGeneration();
-	void breedGeneration(std::vector<unsigned int> children = std::vector<unsigned int>());
+	void breedGenerationGA(std::vector<unsigned int> children = std::vector<unsigned int>());
 
 	void cleanupFiles(const char * path);
 	void finishFit();
@@ -285,7 +293,9 @@ private:
 	std::vector<double> calcQPSOmBests();
 
 	unsigned int pickWeighted(double weightSum, std::multimap<double, unsigned int> &weights, unsigned int extraWeight);
-	std::string mutateParam(FreeParam* fp, double paramValue);
+	std::string mutateParamGA(FreeParam* fp, double paramValue);
+
+	std::vector<double> mutateParticleDE(unsigned int particle);
 
 	void insertKeyByValue(std::map<double, int> &theMap, double key, int value);
 
@@ -299,7 +309,7 @@ private:
 	std::string configPath_;
 	std::string sConf_;
 
-	std::vector<std::vector<unsigned int> > allParticles_;
+	std::vector<std::vector<unsigned int> > populationTopology_;
 
 	// TODO: These need to be initialized with 0s
 	// Maybe we can change them to vectors, too
@@ -307,10 +317,23 @@ private:
 	std::multimap<double, unsigned int> particleBestFitsByFit_;
 	std::multimap<double, unsigned int> swarmBestFits_;
 	std::map<unsigned int, std::vector<double>> particleParamVelocities_;
+
+	// Holds the running best parameter set for each particle
 	std::map<unsigned int, std::vector<double>> particleBestParamSets_;
+
+	// Holds the current parameter set being used by each particle
 	std::map<unsigned int, std::vector<double>> particleCurrParamSets_;
+
+	// Holds particle weights for use in enhancedStop stop criteria
 	std::map<unsigned int, double> particleWeights_;
+
+	// Counts how many iterations each particle has performed
 	std::map<unsigned int, unsigned int> particleIterationCounter_;
+
+	// In DE, maps islands and particles together
+	std::vector<unsigned int> particleToIsland_; // particle -> island
+	std::vector<std::vector<unsigned int>> islandToParticle_; // island -> particle
+	std::multimap<double, unsigned int> islandBestFitsByFit_;
 
 	unsigned int permanenceCounter_; // 0
 	unsigned int flightCounter_; // 0
@@ -322,7 +345,7 @@ private:
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
-		std::cout << " serializing swarm" << std::endl;
+		//std::cout << " serializing swarm" << std::endl;
 
 		ar & options;
 
@@ -340,7 +363,7 @@ private:
 		ar & configPath_;
 		ar & sConf_;
 
-		ar & allParticles_;
+		ar & populationTopology_;
 		ar & particleBestFits_;
 		ar & particleBestFitsByFit_;
 		ar & swarmBestFits_;
@@ -349,6 +372,8 @@ private:
 		ar & particleCurrParamSets_;
 		ar & particleWeights_;
 		ar & particleIterationCounter_;
+		ar & particleToIsland_;
+		ar & islandToParticle_;
 
 		ar & permanenceCounter_;
 		ar & flightCounter_;

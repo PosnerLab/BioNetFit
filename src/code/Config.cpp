@@ -17,6 +17,8 @@ Config::Config(string configFile) {
 	configPath_ = convertToAbsPath(configFile);
 }
 
+// TODO: Make "max_flocks" synonymous with max_generations
+
 Swarm * Config::createSwarmFromConfig () {
 	swarm_ = new Swarm();
 
@@ -370,12 +372,23 @@ Swarm * Config::createSwarmFromConfig () {
 
 	if(pairs.find("enhanced_stop") != pairs.end()) {
 		swarm_->options.enhancedStop = (stoi(pairs.find("enhanced_stop")->second) == 1) ? true : false;
-		cout << "enhanced stop set to " << swarm_->options.enhancedStop << endl;
 	}
 
 	if(pairs.find("enhanced_inertia") != pairs.end()) {
 		swarm_->options.enhancedInertia = (stoi(pairs.find("enhanced_inertia")->second) == 1) ? true : false;
 
+	}
+
+	if(pairs.find("num_islands") != pairs.end()) {
+		swarm_->options.numIslands = stoi(pairs.find("num_islands")->second);
+
+		if (swarm_->options.swarmSize % swarm_->options.numIslands != 0) {
+			outputError("Error: The number of islands must divide evenly into the population size. Quitting.");
+		}
+	}
+
+	if(pairs.find("mutate_type") != pairs.end()) {
+		swarm_->options.mutateType = stoi(pairs.find("mutate_type")->second);
 	}
 
 	// Add any init param generation options

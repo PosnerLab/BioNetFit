@@ -47,9 +47,6 @@ private:
 	double objFunc_divByMeasured(double sim, double exp, double dummyvar);
 	double objFunc_divByMean(double sim, double exp, double mean);
 
-	void initBreedWithParticle(int pID, int swapID);
-	//void rcvBreedWithParticle(std::vector<std::string>& params, int reciprocateTo, int swapID, int pID);
-	//double mutateParam(FreeParam* fp, double paramValue);
 	void smoothRuns();
 	void finalizeSim();
 
@@ -62,7 +59,6 @@ private:
 	int id_;
 	std::map<std::string, std::map<int, Data*>> dataFiles_;
 	Swarm * swarm_;
-	std::map<std::string, double> bestParams_;
 	unsigned int currentGeneration_;
 
 	template<typename Archive>
