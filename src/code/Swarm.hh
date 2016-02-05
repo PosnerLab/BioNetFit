@@ -165,7 +165,6 @@ public:
 		// DE Options
 		unsigned int numIslands;
 		unsigned int mutateType;
-		float mutateFactor;
 
 		unsigned int outputEvery; // In an asynchronous fit, output a fit summary every n simulations
 
@@ -257,7 +256,7 @@ private:
 	friend class boost::serialization::access;
 
 	void initFit();
-	std::vector<std::vector<unsigned int>> generateTopology(int populationSize = options.swarmSize);
+	std::vector<std::vector<unsigned int> > generateTopology(unsigned int populationSize);
 	void launchParticle(unsigned int pID);
 	void runGeneration();
 	void breedGenerationGA(std::vector<unsigned int> children = std::vector<unsigned int>());
@@ -269,6 +268,7 @@ private:
 	void outputRunSummary();
 	void killAllParticles(int tag);
 	std::vector<unsigned int> checkMasterMessages();
+	std::vector<unsigned int> checkMasterMessagesDE(bool trial);
 	void checkExternalMessages();
 
 	void initPSOswarm(bool resumeFit = false);
@@ -297,7 +297,7 @@ private:
 
 	std::vector<double> mutateParticleDE(unsigned int particle);
 
-	void insertKeyByValue(std::map<double, int> &theMap, double key, int value);
+	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, int value);
 
 	std::set<int> runningParticles_;
 	std::set<int>::iterator runningParticlesIterator_;
@@ -333,7 +333,9 @@ private:
 	// In DE, maps islands and particles together
 	std::vector<unsigned int> particleToIsland_; // particle -> island
 	std::vector<std::vector<unsigned int>> islandToParticle_; // island -> particle
-	std::multimap<double, unsigned int> islandBestFitsByFit_;
+
+	// Holds the current parameter set being used by each particle
+	std::map<unsigned int, std::vector<double>> particleTrialParamSets_;
 
 	unsigned int permanenceCounter_; // 0
 	unsigned int flightCounter_; // 0

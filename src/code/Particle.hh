@@ -40,6 +40,7 @@ private:
 	void runModel(int id = 0);
 	void checkMessagesGenetic();
 	void checkMessagesPSO();
+	void checkMessagesDE();
 
 	void calculateFit();
 	double objFunc_chiSquare(double sim, double exp, double stdev);
@@ -60,6 +61,7 @@ private:
 	std::map<std::string, std::map<int, Data*>> dataFiles_;
 	Swarm * swarm_;
 	unsigned int currentGeneration_;
+	unsigned int island_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

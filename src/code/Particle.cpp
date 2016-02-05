@@ -18,6 +18,7 @@ Particle::Particle(Swarm * swarm, int id) {
 	model_ = 0;
 	objFuncPtr = 0;
 	currentGeneration_ = 1;
+	island_ = 1;
 }
 
 void Particle::setModel(Model * model) {
@@ -119,16 +120,32 @@ void Particle::doParticle() {
 		swarm_->swarmComm->univMessageReceiver.clear();
 
 	}
+
+	if (swarm_->options.fitType == "de") {
+		// Need to figure out which island I'm on
+		for (int island = 1; island <= swarm_->options.numIslands; ++island) {
+			for (int particle = 1; particle <= (swarm_->options.swarmSize / swarm_->options.numIslands) * island; ++particle) {
+				if (particle == id_) {
+					cout << "I'm in island " << island << endl;
+					island_ = island;
+					goto theEnd;
+				}
+			}
+		}
+		theEnd:;
+	}
+
 	//cout << "Particle " << id_ << " waiting to begin" << endl;
 	swarm_->swarmComm->recvMessage(0, id_, NEXT_GENERATION, true, swarm_->swarmComm->univMessageReceiver);
 	swarm_->swarmComm->univMessageReceiver.clear();
 	//cout << "Particle " << id_ << " starting" << endl;
+
 	if (swarm_->options.verbosity >= 3) {
 		cout << "In doParticle(), entering main run loop" << endl;
 	}
+
 	bool doContinue = true;
 	while(doContinue) {
-		cout << "cg is now " << currentGeneration_ << endl;
 		for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 			runModel(i);
 		}
@@ -146,7 +163,7 @@ void Particle::doParticle() {
 			checkMessagesPSO();
 		}
 		else if (swarm_->options.fitType == "de") {
-			//checkMessagesDE();
+			checkMessagesDE();
 		}
 
 		// Next generation
@@ -159,6 +176,7 @@ void Particle::runModel(int iteration) {
 	// First get our path and filename variables set up for use in model generation, sim command, etc
 	string bnglFilename = to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(iteration)) + ".bngl";
 	string path = swarm_->options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration_)) + "/";
+
 	string bnglFullPath = path + bnglFilename;
 	cout << "path is " << path << endl;
 
@@ -248,11 +266,6 @@ void Particle::runModel(int iteration) {
 }
 
 void Particle::checkMessagesGenetic() {
-	// Wait for message from master telling us who to breed with
-
-	// swapTracker holds swapIDs and pIDs to keep track of who is breeding with who,
-	// and which swaps are completed
-	unordered_map<int,int> swapTracker;
 
 	// Holds iterator ranges when finding items in the message holder
 	pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
@@ -277,6 +290,7 @@ void Particle::checkMessagesGenetic() {
 				}
 
 				string path = swarm_->options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration_ + 1)) + "/";
+
 				if (!checkIfFileExists(path)) {
 					runCommand("mkdir " + path);
 				}
@@ -329,6 +343,96 @@ void Particle::checkMessagesGenetic() {
 }
 
 void Particle::checkMessagesPSO() {
+
+	while(1) {
+
+		if (swarm_->options.verbosity >= 3) {
+			cout << "Checking for messages from master" << endl;
+		}
+
+		int numCheckedMessages = 0;
+		int numMessages = swarm_->swarmComm->recvMessage(-1, id_, -1, true, swarm_->swarmComm->univMessageReceiver, true);
+
+
+		if (swarm_->options.verbosity >= 3) {
+			cout << "Found " << numMessages << " messages" << endl;
+
+			/*
+			for (auto sm = swarm_->swarmComm->univMessageReceiver.begin(); sm != swarm_->swarmComm->univMessageReceiver.end(); ++sm) {
+				cout << "tag: " << sm->second.tag << endl;
+			}
+			 */
+		}
+
+		// Holds iterator ranges when finding items in the message holder
+		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
+
+		while (numCheckedMessages < numMessages) {
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(SEND_FINAL_PARAMS_TO_PARTICLE);
+			if (smhRange.first != smhRange.second) {
+				cout << "Receiving parameter list from master" << endl;
+				for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
+
+					int messageIndex = 0;
+					for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
+						cout << id_ << " updating parameter " << p->first << " to " << sm->second.message[messageIndex] << endl;
+						p->second = stod(sm->second.message[messageIndex]);
+						++messageIndex;
+					}
+
+					for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
+
+						// Construct our filenames
+						string bnglFilename = to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(i)) + ".bngl";
+						string path = swarm_->options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration_ + 1)) + "/";
+						string bnglFullPath = path + bnglFilename;
+						string suffix = to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(i));
+
+						if (!checkIfFileExists(path)) {
+							runCommand("mkdir " + path);
+						}
+
+						// And generate our models
+						if (swarm_->options.model->getHasGenerateNetwork()){
+							// If we're using ODE solver, output .net and .bngl
+							model_->outputModelWithParams(simParams_, path, bnglFilename, suffix, false, false, true, false, false);
+						}
+						else {
+							// If we're using network free simulation, output .bngl
+							model_->outputModelWithParams(simParams_, path, bnglFilename, suffix, false, false, false, false, false);
+						}
+					}
+
+					++numCheckedMessages;
+				}
+			}
+
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(FIT_FINISHED);
+			if (smhRange.first != smhRange.second) {
+
+				if (swarm_->options.verbosity >= 3) {
+					cout << "Master told me to die" << endl;
+				}
+
+				exit(0);
+			}
+
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEXT_GENERATION);
+			if (smhRange.first != smhRange.second) {
+
+				if (swarm_->options.verbosity >= 3) {
+					cout << "Master told me to move to the next iteration" << endl;
+				}
+
+				swarm_->swarmComm->univMessageReceiver.clear();
+				return;
+			}
+		}
+		swarm_->swarmComm->univMessageReceiver.clear();
+	}
+}
+
+void Particle::checkMessagesDE() {
 
 	while(1) {
 
@@ -543,11 +647,11 @@ void Particle::finalizeSim() {
 
 	// Put our fit calc into the message vector
 	swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(fitCalcs.at(currentGeneration_))));
-	cout << "stored fit calc of " << fitCalcs.at(currentGeneration_) << " as " << swarm_->swarmComm->univMessageSender[0] << endl;
+	//cout << "stored fit calc of " << fitCalcs.at(currentGeneration_) << " as " << swarm_->swarmComm->univMessageSender[0] << endl;
 
 	// Put our simulation params into the message vector
 	for (map<string,double>::iterator i = simParams_.begin(); i != simParams_.end(); ++i){
-		cout << "stored param of " << i->second << endl;
+		//cout << "stored param of " << i->second << endl;
 		swarm_->swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(i->second)));
 	}
 
@@ -614,5 +718,5 @@ void Particle::smoothRuns() {
 		}
 	}
 	 */
-	cout << id_ << " done smoothing" << endl;
+	//cout << id_ << " done smoothing" << endl;
 }

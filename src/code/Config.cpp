@@ -540,6 +540,8 @@ void Config::checkConsistency() {
 	 *	Enhanced inertia requires:
 	 *	1. Enhanced stop
 	 *
+	 *	In DE, different mutate types require different numbers of minimum particles in each island
+	 *
 	 * Make sure we have SOME sort of stop criteria
 	 * QPSO requires maxNumSimulations to update beta_. the max num of iterations should be close to the expected. would be nice if the user had to guess. is there an adaptive beta_ algorithm like enhancedInertia?
 	 */
