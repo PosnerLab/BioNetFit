@@ -165,6 +165,7 @@ public:
 		// DE Options
 		unsigned int numIslands;
 		unsigned int mutateType;
+		float cr;
 
 		unsigned int outputEvery; // In an asynchronous fit, output a fit summary every n simulations
 
@@ -241,6 +242,7 @@ public:
 
 			ar & numIslands;
 			ar & mutateType;
+			ar & cr;
 
 			ar & outputEvery;
 
@@ -296,6 +298,7 @@ private:
 	std::string mutateParamGA(FreeParam* fp, double paramValue);
 
 	std::vector<double> mutateParticleDE(unsigned int particle);
+	std::vector<double> crossoverParticleDE(unsigned int particle, std::vector<double> mutationSet);
 
 	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, int value);
 

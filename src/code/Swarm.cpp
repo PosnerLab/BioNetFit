@@ -415,7 +415,8 @@ void Swarm::doSwarm() {
 				cout << "Launching first generation" << endl;
 			}
 
-			vector<unsigned int> finishedParticles;
+			//vector<unsigned int> finishedParticles;
+			unordered_map<unsigned int, vector<double>> finishedParticles;
 			bool stopCriteria = false;
 			unsigned int numFinishedParticles = 0;
 			vector<unsigned int> islandFinishedParticles(options.numIslands + 1, 0);
@@ -423,7 +424,7 @@ void Swarm::doSwarm() {
 			bool trialLoop = false;
 			while(!stopCriteria) {
 
-				cout << "about to launch particles?" << endl;
+				//cout << "about to launch particles?" << endl;
 				for (unsigned int p = 1; p <= options.swarmSize; ++p) {
 					launchParticle(p);
 				}
@@ -445,8 +446,6 @@ void Swarm::doSwarm() {
 						}
 
 						// Check each island to see if it has completed its generation
-						//for (auto island : islandFinishedParticles) {
-						//for (auto island = islandFinishedParticles.begin() + 1; island != islandFinishedParticles.end(); ++island) {
 						for (unsigned int island = 1; island <= options.numIslands; ++island) {
 							// If the number finished in this island is equal to the total size of the island
 							if (islandFinishedParticles.at(island) == (options.swarmSize / options.numIslands)) {
@@ -461,12 +460,13 @@ void Swarm::doSwarm() {
 
 									if (trialLoop == false) {
 										// Create a mutation set for the particle
-										cout << "about to mutate" << endl;
+										//cout << "about to mutate" << endl;
 										newParamSet = mutateParticleDE(*particle);
-										cout << "done mutate" << endl;
+										//cout << "done mutate" << endl;
 
 										// Run crossover for the particle
-										//crossoverParticleDE(mutationSet);
+										newParamSet = crossoverParticleDE(*particle, newParamSet);
+										particleCurrParamSets_.at(*particle) = newParamSet;
 									}
 									else {
 										newParamSet = particleCurrParamSets_.at(*particle);
@@ -510,7 +510,6 @@ void Swarm::doSwarm() {
 				}
 
 				// Migration if applicable
-
 
 			}
 		}
@@ -651,6 +650,114 @@ void Swarm::doSwarm() {
 
 			// If we're out of the loop, we've finished the fit
 			finishFit();
+		}
+		else if (options.fitType == "de") {
+			if (options.verbosity >= 3) {
+				cout << "Running an asynchronous DE fit" << endl;
+			}
+
+			// Create an output directory for each island
+			if (!checkIfFileExists(options.jobOutputDir + to_string(static_cast<long long int>(1)))) {
+				string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(1));
+				runCommand(createDirCmd);
+			}
+
+			if (options.verbosity >= 3) {
+				cout << "Generating island topology" << endl;
+			}
+
+			vector<vector<unsigned int>> islandTopology;
+			vector<bool> islandIsTrial = new vector(options.numIslands + 1, false);
+
+			if (!resumingSavedSwarm) {
+				// Generate all particles that will be present in the swarm
+				populationTopology_ = generateTopology(options.numIslands);
+				// Map all particles and islands
+				unsigned int particlesPerIsland = options.swarmSize / options.numIslands;
+				unsigned int currParticle = 1;
+				for (unsigned int i = 1; i <= options.numIslands; ++i) {
+					for (unsigned int p = 0; p < particlesPerIsland; ++p) {
+						particleToIsland_[currParticle] = i;
+						islandToParticle_[i][p] = currParticle;
+						cout << i << " " << p << " " << islandToParticle_[i][p] << endl;
+						++currParticle;
+					}
+				}
+			}
+
+			saveSwarmState();
+
+			if (options.verbosity >= 3) {
+				cout << "Launching first generation" << endl;
+			}
+
+			vector<unsigned int> finishedParticles;
+			bool stopCriteria = false;
+			vector<unsigned int> islandFinishedParticles(options.numIslands + 1, 0);
+
+			for (unsigned int p = 1; p <= options.swarmSize; ++p) {
+				launchParticle(p);
+			}
+
+			bool trialLoop = false;
+			while(!stopCriteria) {
+				// Either need to re-organize things such that checkMasterMessages returns a parameter set
+				// so we can use them differently depending on main/trail loop, OR need to pass checkMasterMessages
+				// a vector containing information on whether a given particle is doing a main or trial loop
+				finishedParticles = checkMasterMessagesDE();
+
+				if (finishedParticles.size()) {
+
+					// Increment the counter that tracks the number of particles finished
+					// for a given island
+					for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
+						islandFinishedParticles[particleToIsland_.at(*particle)] += 1;
+						cout << "set particle " << *particle << " in island " << particleToIsland_.at(*particle) << " finished. total finished is " << numFinishedParticles << endl;
+					}
+
+					// Check each island to see if it has completed its generation
+					for (unsigned int island = 1; island <= options.numIslands; ++island) {
+						// If the number finished in this island is equal to the total size of the island
+						if (islandFinishedParticles.at(island) == (options.swarmSize / options.numIslands)) {
+							cout << "Island " << island << " finished" << endl;
+
+							for (auto particle = islandToParticle_.at(island).begin(); particle != islandToParticle_.at(island).end(); ++particle) {
+								cout << "particle " << *particle << endl;
+
+								vector<double> newParamSet;
+
+								if (islandIsTrial[island] == false) {
+									// Create a mutation set for the particle
+									//cout << "about to mutate" << endl;
+									newParamSet = mutateParticleDE(*particle);
+									//cout << "done mutate" << endl;
+
+									// Run crossover for the particle
+									newParamSet = crossoverParticleDE(*particle, newParamSet);
+									particleCurrParamSets_.at(*particle) = newParamSet;
+								}
+								else { // Finishing the trial set
+									newParamSet = particleCurrParamSets_.at(*particle);
+									// Do migration here?
+								}
+
+								// Convert our param set to string for sending
+								vector<string> paramVecStr;
+								//for (auto param : particleCurrParamSets_.at(*particle)) {
+								for (auto param = newParamSet.begin(); param != newParamSet.end(); ++param) {
+									paramVecStr.push_back(to_string(static_cast<long double>(*param)));
+								}
+
+								// Send new param sets to particles for next generation
+								swarmComm->sendToSwarm(0, *particle, SEND_FINAL_PARAMS_TO_PARTICLE, false, paramVecStr);
+
+								// Empty our finished particle counter for the next loop
+								islandFinishedParticles[island] = 0;
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 }
@@ -1488,7 +1595,7 @@ void Swarm::runGeneration () {
 		}
 		//}
 
-		// Check for any messages from particles
+	// Check for any messages from particles
 		usleep(10000);
 		finishedParticles = checkMasterMessages();
 		numFinishedParticles += finishedParticles.size();
@@ -2186,7 +2293,7 @@ vector<unsigned int> Swarm::checkMasterMessagesDE(bool trial) {
 
 	if (numMessages >= 1) {
 		if (options.verbosity >= 3) {
-			cout << "Found " << numMessages << " messages" << endl;
+			//cout << "Found " << numMessages << " messages" << endl;
 		}
 
 		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
@@ -2196,7 +2303,7 @@ vector<unsigned int> Swarm::checkMasterMessagesDE(bool trial) {
 			int pID = sm->second.sender;
 
 			if (options.verbosity >= 3) {
-				cout << "Particle " << pID << " finished simulation" << endl;
+				//cout << "Particle " << pID << " finished simulation" << endl;
 			}
 
 			// Get an iterator to the particle in our list of running particles
@@ -2251,7 +2358,7 @@ vector<unsigned int> Swarm::checkMasterMessagesDE(bool trial) {
 			int i = 0;
 			for (vector<string>::iterator m = sm->second.message.begin() + 1; m != sm->second.message.end(); ++m) {
 				if (replaceParams) {
-					cout << "stored " << stod(*m) << " for particle " << pID << " as " << particleCurrParamSets_[pID][i] << endl;
+					//cout << "stored " << stod(*m) << " for particle " << pID << " as " << particleCurrParamSets_[pID][i] << endl;
 					particleCurrParamSets_[pID][i] = stod(*m);
 					paramsString += *m + " ";
 				}
@@ -2266,7 +2373,7 @@ vector<unsigned int> Swarm::checkMasterMessagesDE(bool trial) {
 				allGenFits.insert(pair<double, string>(particleBestFits_[pID], paramsString));
 				swarmBestFits_.insert(pair<double, unsigned int>(fitCalc, pID));
 			}
-			cout << "done processing particle " << pID << endl;
+			//cout << "done processing particle " << pID << endl;
 		}
 
 		// TODO: When sending NEXT_GENERATION, make sure failed particles have actually run again. If not, they need re-launched.
@@ -2536,10 +2643,10 @@ unsigned int Swarm::pickWeighted(double weightSum, multimap<double, unsigned int
 }
 
 void Swarm::insertKeyByValue(multimap<double, unsigned int> &theMap, double key, int value) {
-	cout << "looking for " << value << endl;
+	//cout << "looking for " << value << endl;
 	for (auto thePair = theMap.begin(); thePair != theMap.end(); ++thePair) {
 		if (thePair->second == value) {
-			cout << "found " << value << " inserting " << key << endl;
+			//cout << "found " << value << " inserting " << key << endl;
 			theMap.erase(thePair);
 			theMap.insert(pair<double, unsigned int>(key, value));
 			return;
@@ -2653,7 +2760,7 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 	}
 
 	vector<double> mutatedParams;
-	int currIsland = particleToIsland_.at(particle);
+	unsigned int currIsland = particleToIsland_.at(particle);
 	int particlesPerIsland = options.swarmSize / options.numIslands;
 
 	// f between 0.1 and 0.9
@@ -2663,9 +2770,9 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 	if (options.mutateType == 1) {
 		int bestParticle = 0;
 		for (auto fitVal = particleBestFitsByFit_.begin(); fitVal != particleBestFitsByFit_.end(); ++fitVal) {
-			if (fitVal->first > 0) {
+			if (fitVal->first > 0 && particleToIsland_.at(fitVal->second) == currIsland) {
 				bestParticle = fitVal->second;
-				//cout << "setting particle " << fitVal->second << " as best with fit of " << fitVal -> first << endl;
+				cout << "setting particle " << fitVal->second << " as best with fit of " << fitVal -> first << endl;
 				break;
 			}
 		}
@@ -2685,6 +2792,7 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 
 			double p1Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p1])[pi];
 			double p2Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p2])[pi];
+			//cout << "p1: " << islandToParticle_.at(currIsland)[p1] << " p2: " << islandToParticle_.at(currIsland)[p2] << endl;
 			mutatedParams.push_back(bestParamSet[pi] + f * (p1Param - p2Param));
 			++pi;
 		}
@@ -2693,7 +2801,7 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 		unsigned int pi = 0;
 		int bestParticle = 0;
 		for (auto fitVal = particleBestFitsByFit_.begin(); fitVal != particleBestFitsByFit_.end(); ++fitVal) {
-			if (fitVal->first > 0) {
+			if (fitVal->first > 0 && particleToIsland_.at(fitVal->second) == currIsland) {
 				bestParticle = fitVal->second;
 			}
 		}
@@ -2723,7 +2831,7 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 		unsigned int pi = 0;
 		int bestParticle = 0;
 		for (auto fitVal = particleBestFitsByFit_.begin(); fitVal != particleBestFitsByFit_.end(); ++fitVal) {
-			if (fitVal->first > 0) {
+			if (fitVal->first > 0 && particleToIsland_.at(fitVal->second) == currIsland) {
 				bestParticle = fitVal->second;
 			}
 		}
@@ -2750,7 +2858,7 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 		unsigned int pi = 0;
 		int bestParticle = 0;
 		for (auto fitVal = particleBestFitsByFit_.begin(); fitVal != particleBestFitsByFit_.end(); ++fitVal) {
-			if (fitVal->first > 0) {
+			if (fitVal->first > 0 && particleToIsland_.at(fitVal->second) == currIsland) {
 				bestParticle = fitVal->second;
 			}
 		}
@@ -2781,4 +2889,30 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 	}
 
 	return mutatedParams;
+}
+
+vector<double> Swarm::crossoverParticleDE(unsigned int particle, vector<double> mutationSet) {
+	boost::random::uniform_int_distribution<int> intDist(0, options.model->getNumFreeParams() - 1);
+	unsigned int randParam = intDist(randNumEngine);
+	boost::random::uniform_real_distribution<float> floatDist(0, 1);
+
+
+	cout << "crossing over particle " << particle << ". randParam is " << randParam << endl;
+	vector<double> newParamSet;
+
+	for (unsigned int p = 0; p < options.model->getNumFreeParams(); ++p) {
+		float rand = floatDist(randNumEngine);
+		cout << "p: " << p << ". rand: " << rand << endl;
+
+		if (rand < options.cr || p == randParam) {
+			newParamSet.push_back(mutationSet[p]);
+			cout << "pushing back " << mutationSet[p] << " from mutation set" << endl;
+		}
+		else {
+			newParamSet.push_back(particleCurrParamSets_.at(particle)[p]);
+			cout << "pushing back " << particleCurrParamSets_.at(particle)[p] << " from current set" << endl;
+		}
+	}
+
+	return newParamSet;
 }
