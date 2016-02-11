@@ -270,7 +270,7 @@ private:
 	void outputRunSummary();
 	void killAllParticles(int tag);
 	std::vector<unsigned int> checkMasterMessages();
-	std::vector<unsigned int> checkMasterMessagesDE(bool trial);
+	std::unordered_map<unsigned int, std::vector<double>> checkMasterMessagesDE();
 	void checkExternalMessages();
 
 	void initPSOswarm(bool resumeFit = false);
