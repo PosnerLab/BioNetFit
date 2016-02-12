@@ -166,6 +166,8 @@ public:
 		unsigned int numIslands;
 		unsigned int mutateType;
 		float cr;
+		unsigned int migrationFrequency;
+		unsigned int numToMigrate;
 
 		unsigned int outputEvery; // In an asynchronous fit, output a fit summary every n simulations
 
@@ -243,6 +245,8 @@ public:
 			ar & numIslands;
 			ar & mutateType;
 			ar & cr;
+			ar & migrationFrequency;
+			ar & numToMigrate;
 
 			ar & outputEvery;
 
@@ -299,6 +303,8 @@ private:
 
 	std::vector<double> mutateParticleDE(unsigned int particle);
 	std::vector<double> crossoverParticleDE(unsigned int particle, std::vector<double> mutationSet);
+	void sendMigrationSetDE(unsigned int island, std::vector<std::vector<unsigned int>> islandTopology, std::map<unsigned int, std::vector<std::vector<double>>> &migrationSets);
+	void recvMigrationSetDE(unsigned int island, std::map<unsigned int, std::vector<std::vector<double>>> &migrationSets);
 
 	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, int value);
 

@@ -395,6 +395,14 @@ Swarm * Config::createSwarmFromConfig () {
 		swarm_->options.cr = stof(pairs.find("crossover_rate")->second);
 	}
 
+	if(pairs.find("migration_frequency") != pairs.end()) {
+		swarm_->options.migrationFrequency = stoi(pairs.find("migration_frequency")->second);
+	}
+
+	if(pairs.find("num_to_migrate") != pairs.end()) {
+		swarm_->options.numToMigrate = stoi(pairs.find("num_to_migrate")->second);
+	}
+
 	// Add any init param generation options
 	//for (auto pair: pairs) {
 	for (unordered_multimap<string, string>::iterator pair = pairs.begin(); pair != pairs.end(); ++pair) {
