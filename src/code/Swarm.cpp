@@ -395,7 +395,7 @@ void Swarm::doSwarm() {
 			vector<vector<unsigned int>> islandTopology;
 			if (!resumingSavedSwarm) {
 				// Generate all particles that will be present in the swarm
-				populationTopology_ = generateTopology(options.numIslands);
+				islandTopology = generateTopology(options.numIslands);
 				// Map all particles and islands
 				unsigned int particlesPerIsland = options.swarmSize / options.numIslands;
 				unsigned int currParticle = 1;
@@ -419,6 +419,7 @@ void Swarm::doSwarm() {
 			bool stopCriteria = false;
 			unsigned int numFinishedParticles = 0;
 			vector<unsigned int> islandFinishedParticles(options.numIslands + 1, 0);
+			map<unsigned int, vector<vector<double>>> migrationSets;
 
 			bool trialLoop = false;
 			while(!stopCriteria) {
@@ -479,11 +480,13 @@ void Swarm::doSwarm() {
 										// concatenate the param string for output
 										particleCurrParamSets_[particle->first][i] = *param;
 										paramsString += to_string(static_cast<long double>(*param)) + " ";
+										cout << "added " << paramsString << endl;
 									}
 									// Otherwise, do nothing except use the current/old param
 									// set in the output
 									else {
 										paramsString += to_string(static_cast<long double>(particleCurrParamSets_[particle->first][i])) + " ";
+										cout << "added: " << paramsString << endl;
 									}
 									++i;
 								}
@@ -571,12 +574,12 @@ void Swarm::doSwarm() {
 						// Send/receive migration sets
 						if (currentGeneration % options.migrationFrequency == 0) {
 							for (unsigned int island = 1; island <= options.numIslands; ++island) {
-								sendMigrationSetDE(island, islandTopology);
+								sendMigrationSetDE(island, islandTopology, migrationSets);
 							}
 						}
 
 						for (unsigned int island = 1; island <= options.numIslands; ++island) {
-							recvMigrationSetDE(island);
+							recvMigrationSetDE(island, migrationSets);
 						}
 
 						string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)) + "_summary.txt";
@@ -746,7 +749,7 @@ void Swarm::doSwarm() {
 
 			if (!resumingSavedSwarm) {
 				// Generate all particles that will be present in the swarm
-				populationTopology_ = generateTopology(options.numIslands);
+				islandTopology = generateTopology(options.numIslands);
 				// Map all particles and islands
 				unsigned int particlesPerIsland = options.swarmSize / options.numIslands;
 				unsigned int currParticle = 1;
@@ -770,6 +773,7 @@ void Swarm::doSwarm() {
 			bool stopCriteria = false;
 			vector<unsigned int> islandFinishedParticles(options.numIslands + 1, 0);
 			vector<unsigned int> islandGenerationCounter(options.numIslands + 1, 1);
+			map<unsigned int, vector<vector<double>>> migrationSets;
 
 			for (unsigned int p = 1; p <= options.swarmSize; ++p) {
 				launchParticle(p);
@@ -882,11 +886,11 @@ void Swarm::doSwarm() {
 
 								if (islandGenerationCounter[island] % options.migrationFrequency == 0) {
 									for (unsigned int island = 1; island <= options.numIslands; ++island) {
-										sendMigrationSetDE(island, islandTopology);
+										sendMigrationSetDE(island, islandTopology, migrationSets);
 									}
 								}
 
-								recvMigrationSetDE(island);
+								recvMigrationSetDE(island, migrationSets);
 
 								++islandGenerationCounter[island];
 							}
@@ -2063,18 +2067,16 @@ void Swarm::outputRunSummary(string outputPath) {
 
 		vector<string> paramVals;
 
-		//for (auto i: allGenFits) {
 		for (auto i = allGenFits.begin(); i != allGenFits.end(); ++i) {
+			cout << "first: " << i->first << endl << "second: " << i->second << endl;
 			split(i->second, paramVals);
 
 			outputFile << left << setw(16) << i->first << left << setw(16) << paramVals[0];
-
 			for (unsigned int i = 1; i < paramVals.size(); i++) {
 				outputFile << left << setw(16) << stod(paramVals[i]);
 			}
 
 			paramVals.clear();
-
 			outputFile << endl;
 		}
 
@@ -2950,7 +2952,7 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 
 			double p1Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p1])[pi];
 			double p2Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p2])[pi];
-			//cout << "p1: " << islandToParticle_.at(currIsland)[p1] << " p2: " << islandToParticle_.at(currIsland)[p2] << endl;
+
 			mutatedParams.push_back(bestParamSet[pi] + f * (p1Param - p2Param));
 			++pi;
 		}
@@ -3083,9 +3085,12 @@ void Swarm::sendMigrationSetDE(unsigned int island, vector<vector<unsigned int>>
 
 	// Fill a vector with particles from this island, starting with best fits and ending with worst
 	vector<unsigned int> particlesToSend;
-	for (auto fitIt = particleBestFitsByFit_.begin(); fitIt < particleBestFitsByFit_.end(); ++fitIt) {
+	for (auto fitIt = particleBestFitsByFit_.begin(); fitIt != particleBestFitsByFit_.end(); ++fitIt) {
 		if (particleToIsland_.at(fitIt->second) == island) {
 			particlesToSend.push_back(fitIt->second);
+			if (particlesToSend.size() == options.numToMigrate) {
+				break;
+			}
 		}
 	}
 
@@ -3094,9 +3099,9 @@ void Swarm::sendMigrationSetDE(unsigned int island, vector<vector<unsigned int>>
 
 	// Loop through particles to send
 	vector<double> migrationSet;
-	for (auto particle = particlesToSend.begin(); particle < particlesToSend; ++particle) {
+	for (auto particle = particlesToSend.begin(); particle != particlesToSend.end(); ++particle) {
 		// Fill migrationSet with this particles current parameters
-		for (auto param = particleCurrParamSets_.at(*particle).begin(); param < particleCurrParamSets_.at(*particle).end(); ++param) {
+		for (auto param = particleCurrParamSets_.at(*particle).begin(); param != particleCurrParamSets_.at(*particle).end(); ++param) {
 			migrationSet.push_back(*param);
 		}
 		// Add that migration set to the list of the receiving island's
@@ -3106,5 +3111,37 @@ void Swarm::sendMigrationSetDE(unsigned int island, vector<vector<unsigned int>>
 }
 
 void Swarm::recvMigrationSetDE(unsigned int island, map<unsigned int, vector<vector<double>>> &migrationSets) {
+	cout << 0 << endl;
+	// If we have any sets to receive..
+	if (migrationSets.find(island) != migrationSets.end() && migrationSets.at(island).size()) {
+		// Create a list of particles from the receiving island that will
+		vector<unsigned int> particlesToRecv;
+		for (map<double, unsigned int>::reverse_iterator fitIt = particleBestFitsByFit_.rbegin(); fitIt != particleBestFitsByFit_.rend(); ++fitIt) {
+			if (particleToIsland_.at(fitIt->second) == island) {
+				particlesToRecv.push_back(fitIt->second);
+			}
+		}
+		// Iterates through the list of receiving particles
+		auto recvIt = particlesToRecv.begin();
+		unsigned int i = 0;
+		// For each migration set destined for this island
+		for (auto migrationSet = migrationSets[island].begin(); migrationSet != migrationSets[island].end(); ++migrationSet) {
+			vector<string> paramStr;
+			// For each parameter in the migration set
+			for (auto param = migrationSet->begin(); param != migrationSet->end(); ++param) {
+				// Insert parameter to the currentParamSets tracker
+				particleCurrParamSets_.at(*recvIt)[i] = *param;
+				paramStr.push_back(to_string(static_cast<long double>(*param)));
+				++i;
+			}
+			// Send the parameters to the particle
+			swarmComm->sendToSwarm(0, *recvIt, SEND_FINAL_PARAMS_TO_PARTICLE, false, paramStr);
+			// Next migration set, choose a new receiver from the island
+			++recvIt;
+		}
 
+		// Erase the received sets from the migrationSets
+		migrationSets.at(island).clear();
+		cout << 10 << endl;
+	}
 }
