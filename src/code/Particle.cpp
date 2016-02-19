@@ -445,7 +445,7 @@ void Particle::checkMessagesDE() {
 
 
 		if (swarm_->options.verbosity >= 3) {
-			cout << "Found " << numMessages << " messages" << endl;
+			//cout << "Found " << numMessages << " messages" << endl;
 
 			/*
 			for (auto sm = swarm_->swarmComm->univMessageReceiver.begin(); sm != swarm_->swarmComm->univMessageReceiver.end(); ++sm) {
@@ -460,12 +460,12 @@ void Particle::checkMessagesDE() {
 		while (numCheckedMessages < numMessages) {
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(SEND_FINAL_PARAMS_TO_PARTICLE);
 			if (smhRange.first != smhRange.second) {
-				cout << "Receiving parameter list from master" << endl;
+				//cout << "Receiving parameter list from master" << endl;
 				for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 
 					int messageIndex = 0;
 					for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
-						cout << id_ << " updating parameter " << p->first << " to " << sm->second.message[messageIndex] << endl;
+						//cout << id_ << " updating parameter " << p->first << " to " << sm->second.message[messageIndex] << endl;
 						p->second = stod(sm->second.message[messageIndex]);
 						++messageIndex;
 					}
