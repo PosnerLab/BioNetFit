@@ -81,11 +81,19 @@ public:
 	void initComm();
 	void initRNGS(int seed=0);
 	void doSwarm();
+
+	void runSGA();
+	void runSPSO();
+	void runSDE();
+	void runAGA();
+	void runAPSO();
+	void runADE();
+
 	Particle *createParticle(unsigned int pID);
 
 	void getClusterInformation();
 	std::string generateTorqueBatchScript(std::string cmd);
-	std::string generateSlurmCommand(std::string cmd, bool multiProg = true);
+	std::string generateSlurmCommand(std::string cmd, bool multiProg = true, int nCPU = 0);
 	std::string generateSlurmMultiProgCmd(std::string runCmd);
 	std::string generateSlurmBatchFile(std::string runCmd);
 

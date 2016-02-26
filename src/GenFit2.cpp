@@ -87,15 +87,20 @@ int main(int argc, char *argv[]) {
 
 	//tmr.reset();
 
-	// TODO: Check to make sure user specified cluster action on a cluster with the getrank() command?
-
 	Swarm *s;
 	if (type == "master") {
 		Config myconfig(configFile);
-		//TODO: When rerunning BioNetFit master on cluster, let's not load parse config twice. Serialize.
 
 		if (action != "load" && action != "resume") {
 			s = myconfig.createSwarmFromConfig();
+
+			if (action != "cluster") {
+				s->getClusterInformation();
+
+				if (s->options.clusterSoftware.size()) {
+					action = "cluster";
+				}
+			}
 
 			//t = tmr.elapsed();
 			//cout << "Processing .conf took " << t << " seconds" << endl;
@@ -114,7 +119,6 @@ int main(int argc, char *argv[]) {
 			std::ofstream ofs(serializedSwarmPath);
 			if (ofs.is_open()) {
 				s->setsConf(convertToAbsPath(serializedSwarmPath));
-				//cout << "Path is: " << s->getsConf() << endl;
 
 				boost::archive::binary_oarchive ar(ofs);
 				ar & s;
@@ -142,7 +146,6 @@ int main(int argc, char *argv[]) {
 
 			cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
 
-			//runCmd = "exec bash -c '" + runCmd + "'";
 			if(runCommand(runCmd) != 0) {
 				outputError("Error: Couldn't launch BioNetFit on cluster with command: " + runCmd + ". Quitting.");
 			}

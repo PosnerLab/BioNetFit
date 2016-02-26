@@ -70,7 +70,7 @@ void Particle::generateParams() {
 			pair<string,double> paramPair = make_pair(paramName, myrand);
 			setParam(paramPair);
 		}
-		else if (genType == "loguniform_var") { //TODO: Almost positive it works fine, but maybe test distribution of this generator
+		else if (genType == "loguniform_var") {
 
 			// Store our min and max values
 			double min = i->second->getGenMin();
