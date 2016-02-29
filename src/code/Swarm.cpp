@@ -33,7 +33,7 @@ Swarm::Swarm() {
 	options.swarmSize = 0;
 	options.minFit = 0;
 	options.maxFit = 0;
-	options.boostrap = 0;
+	options.bootstrap = 0;
 	options.parallelCount = 0;
 	options.seed = 0;
 
@@ -127,7 +127,7 @@ Swarm::Swarm() {
 void Swarm::initRNGS(int seed) {
 	if (seed) {
 		srand(seed);
-		cout << "seeding rng with: " << seed << endl;
+		//cout << "seeding rng with: " << seed << endl;
 	}
 	else {
 		// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
@@ -270,41 +270,42 @@ void Swarm::addMutate(std::string mutateString) {
 
 void Swarm::doSwarm() {
 
-	//system ("exec rm -r /home/brandon/projects/GenFit2/Debug/output/*");
 	system ("exec rm /home/brandon/projects/BioNetFit/Debug/pOUT");
 
-	initFit();
+	for (bootstrapCounter = 0; bootstrapCounter < options.bootstrap; ++bootstrapCounter) {
+		initFit();
 
-	// Main fit loops
-	if (options.synchronicity) {
-		cout << "synchronous" << endl;
-		// Synchronous genetic
-		if (options.fitType == "genetic") {
-			runSGA();
-		}
-		else if (options.fitType == "pso") {
-			runSPSO();
+		// Main fit loops
+		if (options.synchronicity) {
+			// Synchronous genetic
+			if (options.fitType == "genetic") {
+				runSGA();
+			}
+			else if (options.fitType == "pso") {
+				runSPSO();
 
+			}
+			else if (options.fitType == "de") {
+				runSDE();
+			}
 		}
-		else if (options.fitType == "de") {
-			runSDE();
-		}
-	}
 
-	// TODO: Need to make asynchronous fits work in PCs
-	// Asynchronous fit loops
-	else {
-		// Genetic fit
-		if (options.fitType == "genetic") {
-			runAGA();
+		// TODO: Need to make asynchronous fits work in PCs
+		// Asynchronous fit loops
+		else {
+			// Genetic fit
+			if (options.fitType == "genetic") {
+				runAGA();
+			}
+			// PSO fit
+			else if (options.fitType == "pso") {
+				runAPSO();
+			}
+			else if (options.fitType == "de") {
+				runADE();
+			}
 		}
-		// PSO fit
-		else if (options.fitType == "pso") {
-			runAPSO();
-		}
-		else if (options.fitType == "de") {
-			runADE();
-		}
+		finishFit();
 	}
 }
 
@@ -374,7 +375,7 @@ bool Swarm::checkStopCriteria() {
 			}
 		}
 	}
-	else if (options.fitType == "genetic" && options.synchronicity) {
+	else if ((options.fitType == "genetic" || options.fitType == "de") && options.synchronicity) {
 		if (options.verbosity >= 3) {
 			cout << "Checking if we've reached max generation. Current is " << currentGeneration << " and max is " << options.maxGenerations << endl;
 		}
@@ -1094,9 +1095,9 @@ void Swarm::processParamsPSO(vector<double> &params, unsigned int pID, double fi
 	}
 }
 
-void Swarm::launchParticle(unsigned int pID) {
+void Swarm::launchParticle(unsigned int pID, bool nextGen) {
 
-	if (currentGeneration == 1 && !options.useCluster) {
+	if (currentGeneration == 1 && !options.useCluster && !nextGen && bootstrapCounter == 0) {
 
 		// Construct command needed to run the particle
 		string command = exePath_ + " particle " + to_string(static_cast<long long int>(pID)) + " run " + to_string(static_cast<long long int>(currentGeneration)) + " " + sConf_;
@@ -1108,7 +1109,6 @@ void Swarm::launchParticle(unsigned int pID) {
 			failedParticles_.insert(pID);
 			return;
 		}
-		//cout << "Command: " << command << endl;
 	}
 
 	if (options.verbosity >= 3) {
@@ -1424,29 +1424,79 @@ void Swarm::breedGenerationGA(vector<unsigned int> children) {
 
 void Swarm::finishFit() {
 
+	string outputDir;
+	if (options.bootstrap) {
+		outputDir = options.outputDir + "/" + options.jobName + "_bootstrap/";
 
-	string outputDir = options.jobOutputDir + "Results/";
-	string command = "mkdir " + outputDir + " && cp " + configPath_ + " " + outputDir;
+		if (!checkIfFileExists(outputDir)) {
+			string command = "mkdir " + outputDir + " && cp " + configPath_ + " " + outputDir;
 
-	int errorCounter = 0;
-	while (runCommand(command) != 0 && errorCounter < 10) {
-		sleep(1);
-		++errorCounter;
+			int errorCounter = 0;
+			while (runCommand(command) != 0 && errorCounter < 10) {
+				sleep(1);
+				++errorCounter;
+			}
+
+			if (errorCounter > 10) {
+				cout << "Error: Couldn't create directory: " + outputDir + " to contain final bootstrap results.";
+				//outputBootstrapSummary();
+			}
+		}
+
+		outputBootstrapSummary();
+
+		string outputFilePath = outputDir + to_string(static_cast<long long int>(bootstrapCounter + 1)) + "_all_fits.txt";
+		outputRunSummary(outputFilePath);
+
+		// Reset variables
+		resetVariables();
+
+		cout << "counter: " << bootstrapCounter << " bootstrap " << options.bootstrap << endl;
+		if ((bootstrapCounter + 1) < options.bootstrap) {
+			cout << "Deleting last fitting run and beginning next fit.." << endl;
+
+			string command = "cd " + options.jobOutputDir + " && find -mindepth 1 -maxdepth 1 -type d -exec rm -r {} \\";
+			runCommand(command);
+
+			killAllParticles(NEW_BOOTSTRAP);
+		}
+		else {
+			killAllParticles(FIT_FINISHED);
+		}
+	}
+	else {
+		outputDir = options.jobOutputDir + "Results/";
+		string command = "mkdir " + outputDir + " && cp " + configPath_ + " " + outputDir;
+
+		int errorCounter = 0;
+		while (runCommand(command) != 0 && errorCounter < 10) {
+			sleep(1);
+			++errorCounter;
+		}
+
+		if (errorCounter > 10) {
+			cout << "Error: Couldn't create directory: " + outputDir + " to contain final fitting results. Outputting results to screen.";
+			outputRunSummary();
+		}
+
+		string outputFilePath = outputDir + "all_fits.txt";
+		outputRunSummary(outputFilePath);
+
+		killAllParticles(FIT_FINISHED);
+
+		cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options.jobOutputDir << "Results" << endl;
 	}
 
-	if (errorCounter > 10) {
-		cout << "Error: Couldn't create directory: " + outputDir + " to contain final fitting results. Outputting results to screen.";
-		outputRunSummary();
-	}
 
-	string outputFilePath = outputDir + "all_fits.txt";
-	outputRunSummary(outputFilePath);
 	//generateBestFitModels(outputDir);
 	//copyBestFitToResults(outputDir);
 
-	killAllParticles(FIT_FINISHED);
 
-	cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options.jobOutputDir << "Results" << endl;
+}
+
+void Swarm::resetVariables() {
+	allGenFits.clear();
+	currentGeneration = 1;
 }
 
 void Swarm::outputRunSummary(string outputPath) {
@@ -1521,10 +1571,46 @@ void Swarm::outputRunSummary() {
 	}
 }
 
+void Swarm::outputBootstrapSummary() {
+	string outputPath = options.outputDir + "/" + options.jobName + "_bootstrap/bootstrap_results.txt";
+	ofstream outputFile;
+	outputFile.open(outputPath, ofstream::out | std::ofstream::app);
+
+	if (outputFile.is_open()) {
+		outputFile.precision(8);
+		outputFile.setf(ios::scientific);
+
+		if (bootstrapCounter == 0) {
+			// Output first two fields of header
+			outputFile << left << setw(16) << "Fit";
+
+			// Output parameter names
+			for (auto i = options.model->freeParams_.begin(); i != options.model->freeParams_.end(); ++i) {
+				outputFile << left << setw(16) << i->first;
+			}
+			outputFile << endl;
+		}
+
+		vector<string> paramVals;
+		split(allGenFits.begin()->second, paramVals);
+		//outputFile << left << setw(16) << allGenFits.begin()->first << left << setw(16) << paramVals[0];
+		for (unsigned int i = 1; i < paramVals.size(); i++) {
+			outputFile << left << setw(16) << stod(paramVals[i]);
+		}
+		outputFile << endl;
+		outputFile.close();
+	}
+	else {
+		cout << "Warning: couldn't open: " << outputFile << " to write fit summary." << endl;
+	}
+}
+
 void Swarm::killAllParticles(int tag) {
 	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
+		cout << "killing " << p << " with tag: " << tag << endl;
 		swarmComm->sendToSwarm(0, p, tag, false, swarmComm->univMessageSender);
 	}
+	swarmComm->univMessageSender.clear();
 }
 
 void Swarm::getClusterInformation() {
@@ -1626,7 +1712,7 @@ void Swarm::initFit () {
 		// If we are running ODE, we want to generate a network and network reader.
 		// The network file has parameters that are replaced in every generation,
 		// and the network reader is used to read those network files
-		if (options.model->getHasGenerateNetwork()) {
+		if (options.model->getHasGenerateNetwork() && bootstrapCounter == 0) {
 
 			if (options.verbosity >= 3) {
 				cout << "Creating dummy .bngl, running to get a .net file" << endl;
@@ -1711,7 +1797,7 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 
 	if (numMessages >= 1) {
 		if (options.verbosity >= 3) {
-			cout << "Found " << numMessages << " messages" << endl;
+			//cout << "Found " << numMessages << " messages" << endl;
 		}
 
 		pair <Pheromones::swarmMsgHolderIt, Pheromones::swarmMsgHolderIt> smhRange;
@@ -2352,7 +2438,6 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 		}
 
 		vector<double> bestParamSet = particleCurrParamSets_.at(bestParticle);
-
 		unsigned int pi = 0;
 		for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
 			int p1 = 0;
@@ -2384,7 +2469,7 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 			int p2 = 0;
 			int p3 = 0;
 			int p4 = 0;
-			while (p1 == p2) {
+			while (p1 == p2 || p1 == p3 || p1 == p4 || p2 == p3 || p2 == p4 || p3 == p4) {
 				p1 = unif(randNumEngine);
 				p2 = unif(randNumEngine);
 				p3 = unif(randNumEngine);
@@ -2413,7 +2498,7 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 			int p1 = 0;
 			int p2 = 0;
 			int p3 = 0;
-			while (p1 == p2) {
+			while (p1 == p2 || p1 == p3 || p2 == p3) {
 				p1 = unif(randNumEngine);
 				p2 = unif(randNumEngine);
 				p3 = unif(randNumEngine);
@@ -2442,7 +2527,8 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 			int p3 = 0;
 			int p4 = 0;
 			int p5 = 0;
-			while (p1 == p2) {
+			// This (and above instances) should be optimized
+			while (p1 == p2 || p1 == p3 || p1 == p4 || p2 == p3 || p2 == p4 || p3 == p4 || p1 == p5 || p2 == p5 || p3 == p5 || p4 == p5) {
 				p1 = unif(randNumEngine);
 				p2 = unif(randNumEngine);
 				p3 = unif(randNumEngine);
@@ -2465,6 +2551,10 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle) {
 }
 
 vector<double> Swarm::crossoverParticleDE(unsigned int particle, vector<double> mutationSet) {
+	if (options.verbosity >= 3) {
+		cout << "Crossing over particle " << particle << endl;
+	}
+
 	// Uses binomial crossover
 	boost::random::uniform_int_distribution<int> intDist(0, options.model->getNumFreeParams() - 1);
 	unsigned int randParam = intDist(randNumEngine);
@@ -2492,6 +2582,10 @@ vector<double> Swarm::crossoverParticleDE(unsigned int particle, vector<double> 
 }
 
 void Swarm::sendMigrationSetDE(unsigned int island, vector<vector<unsigned int>> islandTopology, map<unsigned int, vector<vector<double>>> &migrationSets) {
+	if (options.verbosity >= 3) {
+		cout << "Sending migration set from island " << island << endl;
+	}
+
 	// Generate a random number between 1 and the number of neighbors
 	// in the island topology
 	boost::random::uniform_int_distribution<int> unif(0, islandTopology[island].size() - 1);
@@ -2514,7 +2608,7 @@ void Swarm::sendMigrationSetDE(unsigned int island, vector<vector<unsigned int>>
 	vector<double> migrationSet;
 	//for (auto particle = particlesToSend.begin(); particle != particlesToSend.end(); ++particle) {
 	for (unsigned int i = 0; i < options.numToMigrate; ++i) {
-		cout << "sending set " << i + 1 << " from particle " << particlesToSend[i] << endl;
+		//cout << "sending set " << i + 1 << " from particle " << particlesToSend[i] << endl;
 		// Fill migrationSet with this particles current parameters
 		for (auto param = particleCurrParamSets_.at(particlesToSend[i]).begin(); param != particleCurrParamSets_.at(particlesToSend[i]).end(); ++param) {
 			migrationSet.push_back(*param);
@@ -2523,7 +2617,7 @@ void Swarm::sendMigrationSetDE(unsigned int island, vector<vector<unsigned int>>
 		// migration sets
 		migrationSets[islandTopology[island][receivingIslandIndex]].push_back(migrationSet);
 		migrationSet.clear();
-		cout << island << " sending migration set to island " << islandTopology[island][receivingIslandIndex] << endl;
+		//cout << island << " sending migration set to island " << islandTopology[island][receivingIslandIndex] << endl;
 	}
 }
 
@@ -2531,7 +2625,9 @@ void Swarm::recvMigrationSetDE(unsigned int island, map<unsigned int, vector<vec
 	// If we have any sets to receive..
 	if (migrationSets.find(island) != migrationSets.end() && migrationSets.at(island).size()) {
 
-		cout << "Receiving " << migrationSets.at(island).size() << " migration sets for island " << island << endl;
+		if (options.verbosity >= 3) {
+			cout << "Receiving " << migrationSets.at(island).size() << " migration sets for island " << island << endl;
+		}
 
 		// Create a list of particles from the receiving island that will
 		// receive the migration set
@@ -2603,7 +2699,6 @@ void Swarm::runSGA() {
 			breedGenerationGA();
 		}
 	}
-	finishFit();
 }
 
 void Swarm::runSPSO() {
@@ -2669,8 +2764,6 @@ void Swarm::runSPSO() {
 		// Clear our finished particles for the next round
 		finishedParticles.clear();
 	}
-
-	finishFit();
 }
 
 void Swarm::runSDE() {
@@ -2720,134 +2813,135 @@ void Swarm::runSDE() {
 	while(!stopCriteria) {
 
 		// Generation loop
+		unsigned int p = 1;
 		while (numFinishedParticles < options.swarmSize) {
-			unsigned int p = 1;
-			if (runningParticles_.size() < options.parallelCount) {
-				launchParticle(p);
+			// Launch next particle
+			if (runningParticles_.size() < options.parallelCount && p <= options.swarmSize) {
+				launchParticle(p++, trialLoop);
 			}
 
-			finishedParticles = checkMasterMessagesDE();
+			unordered_map<unsigned int, vector<double>> finished = checkMasterMessagesDE();
 
-			// If we need to process any finished particles
-			if (finishedParticles.size()) {
-				// Increment our total finished particles
-				numFinishedParticles += finishedParticles.size();
+			if (finished.size()) {
+				finishedParticles.insert(finished.begin(), finished.end());
+				numFinishedParticles += finished.size();
+			}
+		}
 
-				// For each finished particle
-				for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
-					// Increment the counter that tracks the number of particles finished
-					// for a given island
-					islandFinishedParticles[particleToIsland_.at(particle->first)] += 1;
-					cout << "set particle " << particle->first << " in island " << particleToIsland_.at(particle->first) << " finished. total finished is " << numFinishedParticles << endl;
+		// For each finished particle
+		for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
+			// Increment the counter that tracks the number of particles finished
+			// for a given island
+			islandFinishedParticles[particleToIsland_.at(particle->first)] += 1;
 
-					// If we're in a trial loop..
-					if (trialLoop) {
-						// Create the beginning of our param string for use in summary and result outputs
-						string paramsString = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(particle->first)) + " ";
+			if (options.verbosity >= 3) {
+				cout << "Particle " << particle->first << " in island " << particleToIsland_.at(particle->first) << " finished. total finished is " << numFinishedParticles << endl;
+			}
 
-						// Increment the flight counter only at the end of a trial
-						++flightCounter_;
+			// If we're in a trial loop..
+			if (trialLoop) {
+				// Create the beginning of our param string for use in summary and result outputs
+				string paramsString = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(particle->first)) + " ";
 
-						bool replaceParams = false;
+				// Increment the flight counter only at the end of a trial
+				++flightCounter_;
 
-						// If the trail sim fit is better than our current best fit, we need
-						// to replace the old fit value with the new one
-						if (particle->second[0] < particleBestFits_.at(particle->first)) {
-							particleBestFits_[particle->first] = particle->second[0];
-							insertKeyByValue(particleBestFitsByFit_, particle->second[0], particle->first);
+				bool replaceParams = false;
 
-							replaceParams = true;
-						}
+				// If the trail sim fit is better than our current best fit, we need
+				// to replace the old fit value with the new one
+				if (particle->second[0] < particleBestFits_.at(particle->first)) {
+					particleBestFits_[particle->first] = particle->second[0];
+					insertKeyByValue(particleBestFitsByFit_, particle->second[0], particle->first);
 
-						// Loop through parameters sent to us by the particle
-						unsigned int i = 0;
-						for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
-
-							// If we need to replace old params with new ones (because fit calc
-							// was better in the trial)...
-							if (replaceParams) {
-								// Store the parameter in the global param set and
-								// concatenate the param string for output
-								particleCurrParamSets_[particle->first][i] = *param;
-								paramsString += to_string(static_cast<long double>(*param)) + " ";
-								//cout << "added " << paramsString << endl;
-							}
-							// Otherwise, do nothing except use the current/old param
-							// set in the output
-							else {
-								paramsString += to_string(static_cast<long double>(particleCurrParamSets_[particle->first][i])) + " ";
-								//cout << "added: " << paramsString << endl;
-							}
-							++i;
-						}
-
-						// Insert fit values and parameters into our global trackers
-						allGenFits.insert(pair<double, string>(particleBestFits_[particle->first], paramsString));
-						swarmBestFits_.insert(pair<double, unsigned int>(particle->second[0], particle->first));
-					}
-					// If we're not in a trial loop...
-					else {
-						// Replace old best fit value with the new one
-						particleBestFits_[particle->first] = particle->second[0];
-						insertKeyByValue(particleBestFitsByFit_, particle->second[0], particle->first);
-
-						// Loop through the params sent to us by the particle
-						unsigned int i = 0;
-						for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
-							// Replace current params with the new ones and add to
-							// our output string
-							particleCurrParamSets_[particle->first][i] = *param;
-							//paramsString += to_string(static_cast<long double>(*param)) + " ";
-							++i;
-						}
-					}
+					replaceParams = true;
 				}
 
-				// Done processing params. Now we need to...
-				// Check each island to see if it has completed its generation
-				for (unsigned int island = 1; island <= options.numIslands; ++island) {
-					// If the number finished in this island is equal to the total size of the island
-					if (islandFinishedParticles.at(island) == (options.swarmSize / options.numIslands)) {
-						cout << "Island " << island << " finished" << endl;
-						// Loop through the particles in the island
-						for (auto particle = islandToParticle_.at(island).begin(); particle != islandToParticle_.at(island).end(); ++particle) {
-							//cout << "particle " << *particle << endl;
+				// Loop through parameters sent to us by the particle
+				unsigned int i = 0;
+				for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
 
-							// Will hold mutated and crossed over parameter sets
-							vector<double> newParamSet;
-
-							// If we're not in a trial loop, we should mutate and crossover
-							if (trialLoop == false) {
-								// Create a mutation set for the particle
-								newParamSet = mutateParticleDE(*particle);
-
-								// Run crossover for the particle
-								newParamSet = crossoverParticleDE(*particle, newParamSet);
-							}
-							// If we're in a main loop, we just send the current parameter
-							// set back to the particle
-							else {
-								newParamSet = particleCurrParamSets_.at(*particle);
-							}
-
-							// Convert our param set to string for sending
-							vector<string> paramVecStr;
-							for (auto param = newParamSet.begin(); param != newParamSet.end(); ++param) {
-								paramVecStr.push_back(to_string(static_cast<long double>(*param)));
-							}
-
-							// Send new param sets to particles for next generation
-							swarmComm->sendToSwarm(0, *particle, SEND_FINAL_PARAMS_TO_PARTICLE, false, paramVecStr);
-
-							// Empty our finished particle counter for the next loop
-							islandFinishedParticles[island] = 0;
-						}
+					// If we need to replace old params with new ones (because fit calc
+					// was better in the trial)...
+					if (replaceParams) {
+						// Store the parameter in the global param set and
+						// concatenate the param string for output
+						particleCurrParamSets_[particle->first][i] = *param;
+						paramsString += to_string(static_cast<long double>(*param)) + " ";
+						//cout << "added " << paramsString << endl;
 					}
+					// Otherwise, do nothing except use the current/old param
+					// set in the output
+					else {
+						paramsString += to_string(static_cast<long double>(particleCurrParamSets_[particle->first][i])) + " ";
+						//cout << "added: " << paramsString << endl;
+					}
+					++i;
+				}
+
+				// Insert fit values and parameters into our global trackers
+				allGenFits.insert(pair<double, string>(particleBestFits_[particle->first], paramsString));
+				swarmBestFits_.insert(pair<double, unsigned int>(particle->second[0], particle->first));
+			}
+			// If we're not in a trial loop...
+			else {
+				// Replace old best fit value with the new one
+				particleBestFits_[particle->first] = particle->second[0];
+				insertKeyByValue(particleBestFitsByFit_, particle->second[0], particle->first);
+
+				// Loop through the params sent to us by the particle
+				unsigned int i = 0;
+				for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
+					// Replace current params with the new ones and add to
+					// our output string
+					particleCurrParamSets_[particle->first][i] = *param;
+					++i;
 				}
 			}
 		}
-		// Reset particle counter
+
+		finishedParticles.clear();
 		numFinishedParticles = 0;
+
+		// Done processing params. Now we need to...
+		// Check each island to see if it has completed its generation
+		for (unsigned int island = 1; island <= options.numIslands; ++island) {
+			// If the number finished in this island is equal to the total size of the island
+			if (islandFinishedParticles.at(island) == (options.swarmSize / options.numIslands)) {
+				cout << "Island " << island << " finished" << endl;
+				// Loop through the particles in the island
+				for (auto particle = islandToParticle_.at(island).begin(); particle != islandToParticle_.at(island).end(); ++particle) {
+
+					// Will hold mutated and crossed over parameter sets
+					vector<double> newParamSet;
+					// If we're not in a trial loop, we should mutate and crossover
+					if (trialLoop == false) {
+						// Create a mutation set for the particle
+						newParamSet = mutateParticleDE(*particle);
+
+						// Run crossover for the particle
+						newParamSet = crossoverParticleDE(*particle, newParamSet);
+					}
+					// If we're in a main loop, we just send the current parameter
+					// set back to the particle
+					else {
+						newParamSet = particleCurrParamSets_.at(*particle);
+					}
+
+					// Convert our param set to string for sending
+					vector<string> paramVecStr;
+					for (auto param = newParamSet.begin(); param != newParamSet.end(); ++param) {
+						paramVecStr.push_back(to_string(static_cast<long double>(*param)));
+					}
+
+					// Send new param sets to particles for next generation
+					swarmComm->sendToSwarm(0, *particle, SEND_FINAL_PARAMS_TO_PARTICLE, false, paramVecStr);
+
+					// Empty our finished particle counter for the next loop
+					islandFinishedParticles[island] = 0;
+				}
+			}
+		}
 
 		// Switch from trial/main loops
 		if (trialLoop == false) {
@@ -2858,7 +2952,6 @@ void Swarm::runSDE() {
 		else {
 			// Only want to check stop criteria at end of trial set
 			stopCriteria = checkStopCriteria();
-
 			if (!stopCriteria) {
 				// Send/receive migration sets
 				if (currentGeneration % options.migrationFrequency == 0) {
@@ -2880,7 +2973,6 @@ void Swarm::runSDE() {
 			}
 		}
 	}
-	finishFit();
 }
 
 void Swarm::runAGA() {
@@ -2939,8 +3031,6 @@ void Swarm::runAGA() {
 			}
 		}
 	}
-	// Wrap things up
-	finishFit();
 }
 
 void Swarm::runAPSO() {
@@ -3009,9 +3099,6 @@ void Swarm::runAPSO() {
 			}
 		}
 	}
-
-	// If we're out of the loop, we've finished the fit
-	finishFit();
 }
 
 void Swarm::runADE() {
@@ -3183,5 +3270,172 @@ void Swarm::runADE() {
 			}
 		}
 	}
-	finishFit();
+}
+
+void Swarm::runASA() {
+	if (options.verbosity >= 3) {
+		cout << "Running an asynchronous PSADE fit" << endl;
+	}
+
+	vector<bool> isLocal = vector<bool>(options.swarmSize, false);
+	vector<float> particleTemps = vector<float>(options.swarmSize + 1, 0);
+	vector<float> particleRadii = vector<float>(options.swarmSize + 1, 0);
+
+	// Launch the initialization population
+	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
+		launchParticle(p);
+	}
+
+	unordered_map<unsigned int, vector<double>> finishedParticles;
+	unsigned int numFinishedParticles = 0;
+
+	// Wait for initialization population to finish simulations
+	while (numFinishedParticles < options.swarmSize) {
+		finishedParticles = checkMasterMessagesDE();
+		numFinishedParticles += finishedParticles.size();
+
+		// Process each finished particle
+		for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
+			unsigned int i = 0;
+
+			// Update parameter values
+			for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
+				particleCurrParamSets_[particle->first][i] = *param;
+			}
+
+			// Update fit calcs
+			particleBestFits_[particle->first] = particle->second[0];
+			insertKeyByValue(particleBestFitsByFit_, particle->second[0], particle->first);
+		}
+	}
+
+	// Generate our initial temps and radii
+	particleTemps = generateParticleTemps();
+	particleRadii = generateParticleRadii();
+
+	// Main loop
+	bool stopCriteria = false;
+	while (!stopCriteria) {
+		finishedParticles = checkMasterMessagesDE();
+	}
+}
+
+vector<float> Swarm::generateParticleTemps() {
+	// Eq 4 in Olensek et al
+
+	// maxTemp is the difference between highest and lowest fits
+	float maxTemp = particleBestFitsByFit_.rbegin()->first - particleBestFitsByFit_.begin()->first;
+
+	float ct = (1 / (options.swarmSize - 1)) * log(maxTemp / options.minTemp);
+
+	vector<float> temps = vector<float>(options.swarmSize + 1, 0);
+	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
+		temps[p] = exp(0 - (ct * (p - 1)));
+		cout << "temp of " << p << " is " << temps[p] << endl;
+	}
+
+	return temps;
+}
+
+vector<float> Swarm::generateParticleRadii() {
+	// Eq 4 in Olensek et al
+
+	float rMax = 1;
+	float cr = (1 / (options.swarmSize - 1)) * log(rMax / options.minRadius);
+
+	vector<float> radii = vector<float>(options.swarmSize + 1, 0);
+	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
+		radii[p] = exp(0 - (cr * (p - 1)));
+		cout << "radius of " << p << " is " << radii[p] << endl;
+	}
+
+	return radii;
+}
+
+unsigned int Swarm::pickWeightedSA() {
+
+	//Eq 6 Olensek et al
+
+	// Calculate the reimann sum
+	float sum = 0;
+	for (unsigned int r = 1; r <= options.swarmSize; ++r) {
+		sum += exp(0 - r);
+	}
+
+	// Fill vector with probabilities of particles being selected
+	map<float, unsigned int> probabilities;
+	unsigned int r = 0;
+	for (auto particle = particleBestFitsByFit_.begin(); particle != particleBestFitsByFit_.end(); ++particle) {
+		probabilities[exp(0 - ++r) / sum] = particle->second;
+	}
+
+	float rnd = ((float) rand() / (RAND_MAX));
+
+	// Go through and choose the particle
+	for (auto probability = probabilities.rbegin(); probability != probabilities.rend(); ++probability) {
+		if (rnd < probability->first) {
+			return probability->second;
+		}
+
+		rnd -= probability->first;
+	}
+
+	// Fell off the end..return the worst particle.
+	return probabilities.rend()->second;
+}
+
+void Swarm::generateBootstrapMaps(vector<map<string, map<string, map<double,unsigned int>>>> &bootStrapMaps) {
+	for (unsigned int i = 0; i < options.bootstrap; ++i) {
+		//cout << "i: " << i << endl;
+		// For each .exp file
+		map<string, map<string, map<double, unsigned int>>> maps;
+		for (auto dataSet = options.expFiles.begin(); dataSet != options.expFiles.end(); ++dataSet) {
+			//cout << "set: " << dataSet->first << endl;
+			// For each column
+			map<string, map<double, unsigned int>> bsMap;
+			for (auto col = dataSet->second->dataCurrent->begin(); col != dataSet->second->dataCurrent->end(); ++col) {
+				//cout << "col: " << col->first << endl;
+				// Fill the map with 0's
+				map<double, unsigned int> colVals;
+				for (auto tp = col->second.begin(); tp != col->second.end(); ++tp) {
+					//cout << "tp: " << tp->first << endl;
+					colVals[tp->first] = 0;
+				}
+
+				// Select datapoints at random. If a datapoint is selected,
+				// increment it's integer value in the vals map
+				for (unsigned int o = 0; o < col->second.size(); ++o) {
+					int i = rand() % (col->second.size() - 1);
+					auto it = col->second.begin();
+					advance(it, i);
+					colVals[it->first] += 1;
+					//cout << "chose " << i << " (" << it->first << ")" << endl;
+				}
+
+				// Insert this column into the map
+				bsMap.insert(pair<string, map<double, unsigned int>>(col->first, colVals));
+			}
+			// Insert this dataset into the maps set
+			maps.insert(pair<string, map<string, map<double, unsigned int>>>(dataSet->first, bsMap));
+		}
+		// Insert this set of maps into the master set
+		bootStrapMaps.push_back(maps);
+	}
+
+
+	unsigned int setCounter = 1;
+	for (auto bsSet = bootStrapMaps.begin(); bsSet != bootStrapMaps.end(); ++bsSet) {
+		cout << "Set " << setCounter << endl;
+		for (auto dataSet = bsSet->begin(); dataSet != bsSet->end(); ++dataSet) {
+			cout << "Dataset " << dataSet->first << endl;
+			for (auto col = dataSet->second.begin(); col != dataSet->second.end(); ++col) {
+				cout << "Col " << col->first << endl;
+				for (auto tp = col->second.begin(); tp != col->second.end(); ++tp) {
+					cout << tp->first << " " << tp -> second << endl;
+				}
+			}
+		}
+	}
+
+	cout << "size: " << bootstrapMaps.size() << endl;
 }

@@ -75,6 +75,7 @@ public:
 	void setsConf(std::string sConf) { sConf_ = sConf; }
 	std::string getsConf() { return sConf_; }
 	void setJobOutputDir(std::string dir);
+	void generateBootstrapMaps(std::vector<std::map<std::string, std::map<std::string, std::map<double,unsigned int>>>> &bootStrapMaps);
 
 	void outputError(std::string errorMessage);
 
@@ -88,6 +89,7 @@ public:
 	void runAGA();
 	void runAPSO();
 	void runADE();
+	void runASA();
 
 	Particle *createParticle(unsigned int pID);
 
@@ -100,10 +102,12 @@ public:
 	Pheromones *swarmComm;
 
 	std::multimap<double, std::string> allGenFits;
+	std::vector<std::map<std::string, std::map<std::string, std::map<double,unsigned int>>>> bootstrapMaps;
 
 	bool isMaster;
 	boost::random::mt19937 randNumEngine;
 	unsigned int currentGeneration;
+	unsigned int bootstrapCounter;
 	bool resumingSavedSwarm;
 	bool hasMutate;
 	float fitCompareTolerance;
@@ -124,12 +128,12 @@ public:
 		unsigned int swarmSize;		// how many particles in the swarm
 		float minFit;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
 		float maxFit;		// we stop fitting if we reach this value // TODO: Implement this
-		unsigned int boostrap;		// how many times to bootstrap
 		unsigned int parallelCount;	// how many particles to run in parallel
 		unsigned int objFunc;		// which objective function to use
 		bool usePipes;	// whether or not to use pipes to gather simulation output
 		bool useCluster;// whether or not we are running on a cluster
 		int seed; // seed for the random number engines
+		unsigned int bootstrap;
 
 		bool divideByInit;// whether or not to divide simulation outputs by the value at t=0
 		int logTransformSimData;// whether or not to log transform simulation data. this value acts as the base.
@@ -177,6 +181,10 @@ public:
 		unsigned int migrationFrequency;
 		unsigned int numToMigrate;
 
+		// SA options
+		float minTemp;
+		float minRadius;
+
 		unsigned int outputEvery; // In an asynchronous fit, output a fit summary every n simulations
 
 		// Cluster options
@@ -206,7 +214,7 @@ public:
 			ar & swarmSize;
 			ar & minFit;
 			ar & maxFit;
-			ar & boostrap;
+			ar & bootstrap;
 			ar & parallelCount;
 			ar & objFunc;
 			ar & usePipes;
@@ -256,6 +264,9 @@ public:
 			ar & migrationFrequency;
 			ar & numToMigrate;
 
+			ar & minTemp;
+			ar & minRadius;
+
 			ar & outputEvery;
 
 			ar & clusterSoftware;
@@ -271,7 +282,7 @@ private:
 
 	void initFit();
 	std::vector<std::vector<unsigned int> > generateTopology(unsigned int populationSize);
-	void launchParticle(unsigned int pID);
+	void launchParticle(unsigned int pID, bool nextGen = false);
 	void runGeneration();
 	void breedGenerationGA(std::vector<unsigned int> children = std::vector<unsigned int>());
 
@@ -280,10 +291,12 @@ private:
 	void getAllParticleParams();
 	void outputRunSummary(std::string outputDir);
 	void outputRunSummary();
+	void outputBootstrapSummary();
 	void killAllParticles(int tag);
 	std::vector<unsigned int> checkMasterMessages();
 	std::unordered_map<unsigned int, std::vector<double>> checkMasterMessagesDE();
 	void checkExternalMessages();
+	void resetVariables();
 
 	void initPSOswarm(bool resumeFit = false);
 	void processParticlesPSO(std::vector<unsigned int> particles, bool nextFlight = false);
@@ -313,6 +326,10 @@ private:
 	std::vector<double> crossoverParticleDE(unsigned int particle, std::vector<double> mutationSet);
 	void sendMigrationSetDE(unsigned int island, std::vector<std::vector<unsigned int>> islandTopology, std::map<unsigned int, std::vector<std::vector<double>>> &migrationSets);
 	void recvMigrationSetDE(unsigned int island, std::map<unsigned int, std::vector<std::vector<double>>> &migrationSets);
+
+	std::vector<float> generateParticleTemps();
+	std::vector<float> generateParticleRadii();
+	unsigned int pickWeightedSA();
 
 	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, int value);
 
@@ -369,6 +386,7 @@ private:
 		ar & options;
 
 		ar & allGenFits;
+		ar & bootstrapMaps;
 
 		ar & isMaster;
 		ar & currentGeneration;

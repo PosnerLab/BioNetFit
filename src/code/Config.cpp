@@ -273,19 +273,16 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Whether or not to log transform simulation output
 	if(pairs.find("log_transform_sim_data") != pairs.end()) {
-		cout << "Processing log transform sim data" << endl;
 		swarm_->options.logTransformSimData = stoi(pairs.find("log_transform_sim_data")->second);
 	}
 
 	// Whether or not to standardize simulation output
 	if(pairs.find("standardize_sim_data") != pairs.end()) {
-		cout << "Processing standardize sim data" << endl;
 		swarm_->options.standardizeSimData = (stoi(pairs.find("standardize_sim_data")->second) == 1) ? true : false;
 	}
 
 	// Whether or not to standardize exp data
 	if(pairs.find("standardize_exp_data") != pairs.end()) {
-		cout << "Processing standardize exp data" << endl;
 		swarm_->options.standardizeExpData = (stoi(pairs.find("standardize_exp_data")->second) == 1) ? true : false;
 	}
 
@@ -311,34 +308,32 @@ Swarm * Config::createSwarmFromConfig () {
 	}
 
 	if (pairs.find("social") != pairs.end()) {
+		cout << "Processing social" << endl;
 		swarm_->options.social = stof(pairs.find("social")->second);
 	}
 
 	if (pairs.find("inertia") != pairs.end()) {
-		swarm_->options.inertia = stof(pairs.find("inertia")->second);
-	}
-
-	if (pairs.find("inertia") != pairs.end()) {
-		swarm_->options.inertia = stof(pairs.find("inertia")->second);
-	}
-
-	if (pairs.find("inertia") != pairs.end()) {
+		cout << "Processing inertia" << endl;
 		swarm_->options.inertia = stof(pairs.find("inertia")->second);
 	}
 
 	if (pairs.find("nmin") != pairs.end()) {
+		cout << "Processing nmin" << endl;
 		swarm_->options.nmin = stoi(pairs.find("nmin")->second);
 	}
 
 	if (pairs.find("nmax") != pairs.end()) {
+		cout << "Processing nmax" << endl;
 		swarm_->options.nmax = stoi(pairs.find("nmax")->second);
 	}
 
 	if (pairs.find("inertia_init") != pairs.end()) {
+		cout << "Processing inertia_init" << endl;
 		swarm_->options.inertiaInit = stof(pairs.find("inertia_init")->second);
 	}
 
 	if (pairs.find("inertia_final") != pairs.end()) {
+		cout << "Processing inertia_final" << endl;
 		swarm_->options.inertiaFinal = stof(pairs.find("inertia_final")->second);
 	}
 
@@ -382,7 +377,7 @@ Swarm * Config::createSwarmFromConfig () {
 	if(pairs.find("num_islands") != pairs.end()) {
 		swarm_->options.numIslands = stoi(pairs.find("num_islands")->second);
 
-		if (swarm_->options.swarmSize % swarm_->options.numIslands != 0) {
+		if (swarm_->options.swarmSize % swarm_->options.numIslands != 0 && swarm_->options.fitType == "de") {
 			outputError("Error: The number of islands must divide evenly into the population size. Quitting.");
 		}
 	}
@@ -401,6 +396,14 @@ Swarm * Config::createSwarmFromConfig () {
 
 	if(pairs.find("num_to_migrate") != pairs.end()) {
 		swarm_->options.numToMigrate = stoi(pairs.find("num_to_migrate")->second);
+	}
+
+	if(pairs.find("min_temp") != pairs.end()) {
+		swarm_->options.minTemp = stof(pairs.find("min_temp")->second);
+	}
+
+	if(pairs.find("min_radius") != pairs.end()) {
+		swarm_->options.minRadius = stof(pairs.find("min_radius")->second);
 	}
 
 	// Add any init param generation options
@@ -452,6 +455,15 @@ Swarm * Config::createSwarmFromConfig () {
 
 	for (unordered_multimap<string,string>::iterator exp = it.first; exp != it.second; ++exp) {
 		swarm_->addExp(exp->second);
+	}
+
+	if(pairs.find("bootstrap") != pairs.end()) {
+		swarm_->options.bootstrap = stoi(pairs.find("bootstrap")->second);
+		if (swarm_->options.bootstrap) {
+			vector<map<string, map<string, map<double, unsigned int>>>> bootstrapMaps;
+			swarm_->generateBootstrapMaps(bootstrapMaps);
+			swarm_->bootstrapMaps = bootstrapMaps;
+		}
 	}
 
 	// Add any .mutation rates to the swarm

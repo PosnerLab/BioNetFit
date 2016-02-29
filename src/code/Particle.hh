@@ -57,7 +57,7 @@ private:
 
 	Model * model_;
 	std::map<std::string, double> simParams_;
-	int id_;
+	unsigned int id_;
 	std::map<std::string, std::map<int, Data*>> dataFiles_;
 	Swarm * swarm_;
 	unsigned int currentGeneration_;

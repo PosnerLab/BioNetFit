@@ -94,12 +94,8 @@ int main(int argc, char *argv[]) {
 		if (action != "load" && action != "resume") {
 			s = myconfig.createSwarmFromConfig();
 
-			if (action != "cluster") {
-				s->getClusterInformation();
-
-				if (s->options.clusterSoftware.size()) {
-					action = "cluster";
-				}
+			if (s->options.useCluster) {
+				action = "cluster";
 			}
 
 			//t = tmr.elapsed();

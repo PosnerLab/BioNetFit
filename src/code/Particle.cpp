@@ -123,10 +123,9 @@ void Particle::doParticle() {
 
 	if (swarm_->options.fitType == "de") {
 		// Need to figure out which island I'm on
-		for (int island = 1; island <= swarm_->options.numIslands; ++island) {
-			for (int particle = 1; particle <= (swarm_->options.swarmSize / swarm_->options.numIslands) * island; ++particle) {
+		for (unsigned int island = 1; island <= swarm_->options.numIslands; ++island) {
+			for (unsigned int particle = 1; particle <= (swarm_->options.swarmSize / swarm_->options.numIslands) * island; ++particle) {
 				if (particle == id_) {
-					cout << "I'm in island " << island << endl;
 					island_ = island;
 					goto theEnd;
 				}
@@ -146,6 +145,11 @@ void Particle::doParticle() {
 
 	bool doContinue = true;
 	while(doContinue) {
+		if (swarm_->bootstrapCounter > 0 && currentGeneration_ == 1) {
+			swarm_->swarmComm->recvMessage(0, id_, NEXT_GENERATION, true, swarm_->swarmComm->univMessageReceiver);
+			swarm_->swarmComm->univMessageReceiver.clear();
+		}
+
 		for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 			runModel(i);
 		}
@@ -186,7 +190,7 @@ void Particle::runModel(int iteration) {
 
 	// Only need to generate files if we're in the first generation. In subsequent generations
 	// the model generation is handled by breeding parents
-	if (currentGeneration_ == 1) {
+	if (currentGeneration_ == 1 && swarm_->bootstrapCounter == 0) {
 		if (swarm_->options.model->getHasGenerateNetwork()){
 			string netFilename = "base.net";
 			string netFullPath = swarm_->options.jobOutputDir + netFilename;
@@ -329,12 +333,22 @@ void Particle::checkMessagesGenetic() {
 
 
 		if (swarm_->swarmComm->univMessageReceiver.find(FIT_FINISHED) != swarm_->swarmComm->univMessageReceiver.end()) {
-			//cout << id_ << " exiting " << endl;
 			exit(0);
 		}
 
+		if (swarm_->swarmComm->univMessageReceiver.find(NEW_BOOTSTRAP) != swarm_->swarmComm->univMessageReceiver.end()) {
+			if (swarm_->options.verbosity >= 3) {
+				cout << id_ << ": Starting a new bootstrapping run" << endl;
+			}
+
+			++swarm_->bootstrapCounter;
+			currentGeneration_ = 0;
+
+			swarm_->swarmComm->univMessageReceiver.clear();
+			return;
+		}
+
 		if (swarm_->swarmComm->univMessageReceiver.find(NEXT_GENERATION) != swarm_->swarmComm->univMessageReceiver.end()) {
-			cout << "next gen" << endl;
 			return;
 		}
 
@@ -411,17 +425,31 @@ void Particle::checkMessagesPSO() {
 			if (smhRange.first != smhRange.second) {
 
 				if (swarm_->options.verbosity >= 3) {
-					cout << "Master told me to die" << endl;
+					cout << id_ << ": Master told me to die" << endl;
 				}
 
 				exit(0);
+			}
+
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEW_BOOTSTRAP);
+			if (smhRange.first != smhRange.second) {
+
+				if (swarm_->options.verbosity >= 3) {
+					cout << id_ << ": Starting a new bootstrapping run" << endl;
+				}
+
+				++swarm_->bootstrapCounter;
+				currentGeneration_ = 0;
+
+				swarm_->swarmComm->univMessageReceiver.clear();
+				return;
 			}
 
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEXT_GENERATION);
 			if (smhRange.first != smhRange.second) {
 
 				if (swarm_->options.verbosity >= 3) {
-					cout << "Master told me to move to the next iteration" << endl;
+					cout << id_ << ": Master told me to move to the next iteration" << endl;
 				}
 
 				swarm_->swarmComm->univMessageReceiver.clear();
@@ -501,17 +529,31 @@ void Particle::checkMessagesDE() {
 			if (smhRange.first != smhRange.second) {
 
 				if (swarm_->options.verbosity >= 3) {
-					cout << "Master told me to die" << endl;
+					cout << id_ << ": Master told me to die" << endl;
 				}
 
 				exit(0);
+			}
+
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEW_BOOTSTRAP);
+			if (smhRange.first != smhRange.second) {
+
+				if (swarm_->options.verbosity >= 3) {
+					cout << id_ << ": Starting a new bootstrapping run" << endl;
+				}
+
+				++swarm_->bootstrapCounter;
+				currentGeneration_ = 0;
+
+				swarm_->swarmComm->univMessageReceiver.clear();
+				return;
 			}
 
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEXT_GENERATION);
 			if (smhRange.first != smhRange.second) {
 
 				if (swarm_->options.verbosity >= 3) {
-					cout << "Master told me to move to the next iteration" << endl;
+					cout << id_ << ": Master told me to move to the next iteration" << endl;
 				}
 
 				swarm_->swarmComm->univMessageReceiver.clear();
@@ -598,7 +640,18 @@ void Particle::calculateFit() {
 				else {
 					sim = dataFiles_.at(e->first).at(swarm_->options.smoothing+1)->dataCurrent->at(exp_col->first).at(timepoint->first);
 				}
-				colSum += (this->*objFuncPtr)(sim, timepoint->second, divisor);
+				double sum = (this->*objFuncPtr)(sim, timepoint->second, divisor);
+
+				if (swarm_->options.bootstrap) {
+					cout << "all sets: "<< swarm_->bootstrapMaps.size() << endl;
+					cout << "files: " << swarm_->bootstrapMaps[swarm_->bootstrapCounter].size() << endl;
+					cout << "cols: " << (swarm_->bootstrapMaps[swarm_->bootstrapCounter].begin())->first << endl;
+					//cout << "tps: " << swarm_->bootstrapMaps[swarm_->bootstrapCounter][exp_col->first][timepoint->first] << endl;
+					//cout << "multiplying " << colSum << " by " << swarm_->bootstrapMaps[swarm_->bootstrapCounter - 1][e->first][exp_col->first][timepoint->first] << endl;
+					cout << "m: " << colSum << " by " << swarm_->bootstrapMaps[swarm_->bootstrapCounter].at(e->first).at(exp_col->first).at(timepoint->first) << endl;
+					sum *= swarm_->bootstrapMaps[swarm_->bootstrapCounter][e->first][exp_col->first][timepoint->first];
+				}
+				colSum += sum;
 			}
 			setSum += colSum;
 		}
