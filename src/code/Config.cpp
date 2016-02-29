@@ -406,6 +406,14 @@ Swarm * Config::createSwarmFromConfig () {
 		swarm_->options.minRadius = stof(pairs.find("min_radius")->second);
 	}
 
+	if(pairs.find("local_search_probability") != pairs.end()) {
+		swarm_->options.localSearchProbability = stof(pairs.find("local_search_probability")->second);
+	}
+
+	if(pairs.find("rand_params_probability") != pairs.end()) {
+		swarm_->options.randParamsProbability = stof(pairs.find("rand_params_probability")->second);
+	}
+
 	// Add any init param generation options
 	//for (auto pair: pairs) {
 	for (unordered_multimap<string, string>::iterator pair = pairs.begin(); pair != pairs.end(); ++pair) {
@@ -463,6 +471,9 @@ Swarm * Config::createSwarmFromConfig () {
 			vector<map<string, map<string, map<double, unsigned int>>>> bootstrapMaps;
 			swarm_->generateBootstrapMaps(bootstrapMaps);
 			swarm_->bootstrapMaps = bootstrapMaps;
+			if (checkIfFileExists(swarm_->options.outputDir + "/" + swarm_->options.jobName + "_bootstrap")) {
+				runCommand("rm " + swarm_->options.outputDir + "/" + swarm_->options.jobName + "_bootstrap/*");
+			}
 		}
 	}
 

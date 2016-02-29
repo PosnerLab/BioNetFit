@@ -343,6 +343,8 @@ void Particle::checkMessagesGenetic() {
 
 			++swarm_->bootstrapCounter;
 			currentGeneration_ = 0;
+			simParams_.clear();
+			generateParams();
 
 			swarm_->swarmComm->univMessageReceiver.clear();
 			return;

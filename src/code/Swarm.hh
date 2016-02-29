@@ -184,6 +184,8 @@ public:
 		// SA options
 		float minTemp;
 		float minRadius;
+		float localSearchProbability;
+		float randParamsProbability;
 
 		unsigned int outputEvery; // In an asynchronous fit, output a fit summary every n simulations
 
@@ -266,6 +268,8 @@ public:
 
 			ar & minTemp;
 			ar & minRadius;
+			ar & localSearchProbability;
+			ar & randParamsProbability;
 
 			ar & outputEvery;
 
@@ -329,7 +333,12 @@ private:
 
 	std::vector<float> generateParticleTemps();
 	std::vector<float> generateParticleRadii();
+	std::vector<float> generateParticleFs();
+	std::vector<float> generateParticleCRs();
 	unsigned int pickWeightedSA();
+	bool metropolisSelection(unsigned int particle, double fit, float particleTemp);
+	void swapTR(std::vector<float> particleRadii, std::vector<float> particleTemps);
+	std::vector<double> generateTrialPointSA();
 
 	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, int value);
 

@@ -1443,8 +1443,10 @@ void Swarm::finishFit() {
 			}
 		}
 
+		// Output to bootstrap file
 		outputBootstrapSummary();
 
+		// Output fit summary
 		string outputFilePath = outputDir + to_string(static_cast<long long int>(bootstrapCounter + 1)) + "_all_fits.txt";
 		outputRunSummary(outputFilePath);
 
@@ -1497,6 +1499,7 @@ void Swarm::finishFit() {
 void Swarm::resetVariables() {
 	allGenFits.clear();
 	currentGeneration = 1;
+	flightCounter_ = 0;
 }
 
 void Swarm::outputRunSummary(string outputPath) {
@@ -1521,7 +1524,7 @@ void Swarm::outputRunSummary(string outputPath) {
 		vector<string> paramVals;
 
 		for (auto i = allGenFits.begin(); i != allGenFits.end(); ++i) {
-			//cout << "first: " << i->first << endl << "second: " << i->second << endl;
+			cout << "first: " << i->first << endl << "second: " << i->second << endl;
 			//cout << "about to split" << endl;
 			split(i->second, paramVals);
 			//cout << "split done" << endl;
@@ -1593,7 +1596,7 @@ void Swarm::outputBootstrapSummary() {
 
 		vector<string> paramVals;
 		split(allGenFits.begin()->second, paramVals);
-		//outputFile << left << setw(16) << allGenFits.begin()->first << left << setw(16) << paramVals[0];
+		outputFile << left << setw(16) << allGenFits.begin()->first;
 		for (unsigned int i = 1; i < paramVals.size(); i++) {
 			outputFile << left << setw(16) << stod(paramVals[i]);
 		}
@@ -3277,13 +3280,19 @@ void Swarm::runASA() {
 		cout << "Running an asynchronous PSADE fit" << endl;
 	}
 
+	// Initialize and/or fill our parameter vectors
 	vector<bool> isLocal = vector<bool>(options.swarmSize, false);
 	vector<float> particleTemps = vector<float>(options.swarmSize + 1, 0);
 	vector<float> particleRadii = vector<float>(options.swarmSize + 1, 0);
+	vector<float> particleFs = generateParticleFs();
+	vector<float> particleCRs = generateParticleCRs();
+	vector<float> cpuToParticle = vector<float>(options.swarmSize + 1, 0);
 
-	// Launch the initialization population
+	// Launch the initialization population and map
+	// CPUs to particles
 	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
 		launchParticle(p);
+		cpuToParticle[p] = p;
 	}
 
 	unordered_map<unsigned int, vector<double>> finishedParticles;
@@ -3300,12 +3309,12 @@ void Swarm::runASA() {
 
 			// Update parameter values
 			for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
-				particleCurrParamSets_[particle->first][i] = *param;
+				particleCurrParamSets_[cpuToParticle[particle->first]][i] = *param;
 			}
 
 			// Update fit calcs
-			particleBestFits_[particle->first] = particle->second[0];
-			insertKeyByValue(particleBestFitsByFit_, particle->second[0], particle->first);
+			particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
+			insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
 		}
 	}
 
@@ -3317,6 +3326,84 @@ void Swarm::runASA() {
 	bool stopCriteria = false;
 	while (!stopCriteria) {
 		finishedParticles = checkMasterMessagesDE();
+
+		// Process any finished particles
+		for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
+
+			unsigned int receiver = rand() % options.swarmSize + 1;
+
+			// If the particle finished their local search
+			if (isLocal[particle->first]) {
+
+				// Greedy acceptance
+				particleBestFits_[receiver] = particle->second[0];
+				insertKeyByValue(particleBestFitsByFit_, particle->second[0], receiver);
+
+				isLocal[cpuToParticle[particle->first]] = false;
+			}
+			else {
+				// If we pass metropolis selection, store the params for assignment to receiver
+				if (metropolisSelection(particle->first, particle->second[0], particleTemps[particle->first])) {
+					particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin()+ 1, particle->second.end());
+
+					// Update fitness
+					particleBestFits_[receiver] = particle->second[0];
+					insertKeyByValue(particleBestFitsByFit_, particle->second[0], receiver);
+
+					// Update CR and F
+					particleFs[receiver] = particleFs[cpuToParticle[particle->first]];
+					particleCRs[receiver] = particleCRs[cpuToParticle[particle->first]];
+				}
+
+				// Do a local search at some probability
+				if (options.localSearchProbability < (float)rand() / (float)RAND_MAX) {
+					//local search
+					isLocal[cpuToParticle[particle->first]] = true;
+				}
+			}
+
+			// Either assign random F and CR values to the receiver
+			// or give the
+			if ( ((float)rand() / (float)RAND_MAX) < options.randParamsProbability) {
+				float min = 0.5;
+				float max = 1.5;
+
+				float r = (float)rand() / (float)RAND_MAX;
+				float diff = max - min;
+				particleFs[receiver] = (r * diff) + min;
+
+				min = 0.1;
+				max = 0.9;
+				r = (float)rand() / (float)RAND_MAX;
+				diff = max - min;
+				particleCRs[receiver] = (r * diff) + min;
+			}
+			else {
+				particleFs[receiver] = particleFs[cpuToParticle[particle->first]];
+				particleCRs[receiver] = particleCRs[cpuToParticle[particle->first]];
+			}
+
+			// Pick the controller
+			unsigned int controller = pickWeightedSA();
+
+			// If we aren't going to do a local search, generate a new trial point
+			if (!isLocal[cpuToParticle[particle->first]]) {
+				vector<float> newParams = generateTrialPointSA();
+
+				vector<string> newParamsStr;
+				for (auto param = newParams.begin(); param != newParams.end(); ++param) {
+					newParamsStr.push_back(to_string(static_cast<long double>(*param)));
+				}
+				// Make sure we know this CPU will be running this Receiver
+				cpuToParticle[cpuToParticle[particle->first]] = receiver;
+
+				// Send the params to the CPU
+				swarmComm->sendToSwarm(0, particle->first, SEND_FINAL_PARAMS_TO_PARTICLE, false, newParamsStr);
+			}
+
+			// Launch the trial point or local search
+			launchParticle[particle->first];
+		}
 	}
 }
 
@@ -3352,6 +3439,38 @@ vector<float> Swarm::generateParticleRadii() {
 	return radii;
 }
 
+vector<float> Swarm::generateParticleFs() {
+	float min = 0.5;
+	float max = 1.5;
+
+	vector<float> Fs = vector<float>(options.swarmSize + 1, 0);
+
+	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
+		float r = (float)rand() / (float)RAND_MAX;
+		float diff = max - min;
+
+		Fs[p] = (r * diff) + min;
+	}
+
+	return Fs;
+}
+
+vector<float> Swarm::generateParticleCRs() {
+	float min = 0.1;
+	float max = 0.9;
+
+	vector<float> CRs = vector<float>(options.swarmSize + 1, 0);
+
+	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
+		float r = (float)rand() / (float)RAND_MAX;
+		float diff = max - min;
+
+		CRs[p] = (r * diff) + min;
+	}
+
+	return CRs;
+}
+
 unsigned int Swarm::pickWeightedSA() {
 
 	//Eq 6 Olensek et al
@@ -3382,6 +3501,49 @@ unsigned int Swarm::pickWeightedSA() {
 
 	// Fell off the end..return the worst particle.
 	return probabilities.rend()->second;
+}
+
+bool Swarm::metropolisSelection(unsigned int particle, double fit, float particleTemp) {
+	float p = min <float>(1, exp( (0 - (fit - particleBestFits_.at(particle))) / particleTemp ) );
+	float r = (float)rand() / (float)RAND_MAX;
+
+	if (r < p) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+void Swarm::swapTR(vector<float> particleRadii, vector<float> particleTemps) {
+	// Pick two random individuals
+	unsigned int r1 = rand() % options.swarmSize + 1;
+	unsigned int r2 = rand() % options.swarmSize + 1;
+
+	// Make sure they're different
+	while (r1 == r2) {
+		r2 = rand % options.swarmSize + 1;
+	}
+
+	// Choose probability and a random number [0,1]
+	float p = min <float>(1, exp( (particleBestFits_.at(r1) - particleBestFits_.at(r2) ) * ((1/particleRadii[r1]) - (1/particleRadii[r2]))));
+	float r = (float)rand() / (float)RAND_MAX;
+
+	// Swap
+	if (r < p) {
+		float r1Temp = particleRadii[r1];
+		float r1Radius = particleRadii[r1];
+
+		particleTemps[r1] = particleTemps[r2];
+		particleRadii[r1] = particleRadii[r2];
+
+		particleTemps[r2] = r1Temp;
+		particleRadii[r2] = r1Radius;
+	}
+}
+
+vector<double> Swarm::generateTrialPointSA() {
+
 }
 
 void Swarm::generateBootstrapMaps(vector<map<string, map<string, map<double,unsigned int>>>> &bootStrapMaps) {
@@ -3422,7 +3584,7 @@ void Swarm::generateBootstrapMaps(vector<map<string, map<string, map<double,unsi
 		bootStrapMaps.push_back(maps);
 	}
 
-
+	/*
 	unsigned int setCounter = 1;
 	for (auto bsSet = bootStrapMaps.begin(); bsSet != bootStrapMaps.end(); ++bsSet) {
 		cout << "Set " << setCounter << endl;
@@ -3436,6 +3598,5 @@ void Swarm::generateBootstrapMaps(vector<map<string, map<string, map<double,unsi
 			}
 		}
 	}
-
-	cout << "size: " << bootstrapMaps.size() << endl;
+	 */
 }
