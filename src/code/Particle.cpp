@@ -619,7 +619,7 @@ void Particle::calculateFit() {
 			for (std::map<double,double>::iterator timepoint = exp_col->second.begin(); timepoint != exp_col->second.end(); ++timepoint) {
 				// TODO: Need to handle missing points
 
-				double exp = timepoint->second;
+				//double exp = timepoint->second;
 				//cout << "exp: " << exp << endl;
 
 				if (swarm_->options.smoothing == 1) {
@@ -645,12 +645,12 @@ void Particle::calculateFit() {
 				double sum = (this->*objFuncPtr)(sim, timepoint->second, divisor);
 
 				if (swarm_->options.bootstrap) {
-					cout << "all sets: "<< swarm_->bootstrapMaps.size() << endl;
-					cout << "files: " << swarm_->bootstrapMaps[swarm_->bootstrapCounter].size() << endl;
-					cout << "cols: " << (swarm_->bootstrapMaps[swarm_->bootstrapCounter].begin())->first << endl;
+					//cout << "all sets: "<< swarm_->bootstrapMaps.size() << endl;
+					//cout << "files: " << swarm_->bootstrapMaps[swarm_->bootstrapCounter].size() << endl;
+					//cout << "cols: " << (swarm_->bootstrapMaps[swarm_->bootstrapCounter].begin())->first << endl;
 					//cout << "tps: " << swarm_->bootstrapMaps[swarm_->bootstrapCounter][exp_col->first][timepoint->first] << endl;
 					//cout << "multiplying " << colSum << " by " << swarm_->bootstrapMaps[swarm_->bootstrapCounter - 1][e->first][exp_col->first][timepoint->first] << endl;
-					cout << "m: " << colSum << " by " << swarm_->bootstrapMaps[swarm_->bootstrapCounter].at(e->first).at(exp_col->first).at(timepoint->first) << endl;
+					//cout << "m: " << colSum << " by " << swarm_->bootstrapMaps[swarm_->bootstrapCounter].at(e->first).at(exp_col->first).at(timepoint->first) << endl;
 					sum *= swarm_->bootstrapMaps[swarm_->bootstrapCounter][e->first][exp_col->first][timepoint->first];
 				}
 				colSum += sum;

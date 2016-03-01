@@ -326,8 +326,8 @@ private:
 	unsigned int pickWeighted(double weightSum, std::multimap<double, unsigned int> &weights, unsigned int extraWeight);
 	std::string mutateParamGA(FreeParam* fp, double paramValue);
 
-	std::vector<double> mutateParticleDE(unsigned int particle);
-	std::vector<double> crossoverParticleDE(unsigned int particle, std::vector<double> mutationSet);
+	std::vector<double> mutateParticleDE(unsigned int particle, float mutateFactor = 0);
+	std::vector<double> crossoverParticleDE(unsigned int particle, std::vector<double> mutationSet, float cr = 0);
 	void sendMigrationSetDE(unsigned int island, std::vector<std::vector<unsigned int>> islandTopology, std::map<unsigned int, std::vector<std::vector<double>>> &migrationSets);
 	void recvMigrationSetDE(unsigned int island, std::map<unsigned int, std::vector<std::vector<double>>> &migrationSets);
 
@@ -338,9 +338,9 @@ private:
 	unsigned int pickWeightedSA();
 	bool metropolisSelection(unsigned int particle, double fit, float particleTemp);
 	void swapTR(std::vector<float> particleRadii, std::vector<float> particleTemps);
-	std::vector<double> generateTrialPointSA();
+	std::vector<double> generateTrialPointSA(unsigned int controller, unsigned int receiver, std::vector<float> particleRadii, std::vector<float>particleCRs, std::vector<float>particleFs, std::vector<std::vector<float>> &trialParams);
 
-	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, int value);
+	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, unsigned int value);
 
 	std::set<int> runningParticles_;
 	std::set<int>::iterator runningParticlesIterator_;
