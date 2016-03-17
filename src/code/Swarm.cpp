@@ -3545,7 +3545,7 @@ void Swarm::swapTR(vector<float> particleRadii, vector<float> particleTemps) {
 	}
 }
 vector<double> Swarm::generateTrialPointSA(unsigned int controller, unsigned int receiver, vector<float> particleRadii, vector<float>particleCRs, vector<float>particleFs, vector<vector<float>> &trialParams) {
-	vector<double> currParams = particleCurrParamSets_.at(controller);
+	vector<double> currParams = normalizeParams(particleCurrParamSets_.at(controller));
 	float cr;
 	float f;
 
@@ -3584,7 +3584,7 @@ vector<double> Swarm::generateTrialPointSA(unsigned int controller, unsigned int
 		}
 	}
 
-	return currParams;
+	return deNormalizeParams(currParams);
 }
 
 void Swarm::generateBootstrapMaps(vector<map<string, map<string, map<double,unsigned int>>>> &bootStrapMaps) {
@@ -3680,4 +3680,26 @@ void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
 	message.push_back(serializedSimplex);
 
 	swarmComm->sendToSwarm(0, cpu, BEGIN_NELDER_MEAD, false, message);
+}
+
+vector<double> Swarm::normalizeParams(vector<double> oldParams) {
+	vector<double> newParams;
+
+	unsigned int d = 0;
+	for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
+		newParams.push_back(oldParams[d++] / (param->second->getGenMax() - param->second->getGenMin()));
+	}
+
+	return newParams;
+}
+
+vector<double> Swarm::deNormalizeParams(vector<double> oldParams) {
+	vector<double> newParams;
+
+	unsigned int d = 0;
+	for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
+		newParams.push_back(param->second->getGenMin() + oldParams[d++] * (param->second->getGenMax() - param->second->getGenMin()));
+	}
+
+	return newParams;
 }

@@ -341,6 +341,8 @@ private:
 	bool metropolisSelection(unsigned int particle, double fit, float particleTemp);
 	void swapTR(std::vector<float> particleRadii, std::vector<float> particleTemps);
 	std::vector<double> generateTrialPointSA(unsigned int controller, unsigned int receiver, std::vector<float> particleRadii, std::vector<float>particleCRs, std::vector<float>particleFs, std::vector<std::vector<float>> &trialParams);
+	std::vector<double> normalizeParams(std::vector<double> params);
+	std::vector<double> deNormalizeParams(std::vector<double> params);
 
 	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, unsigned int value);
 
