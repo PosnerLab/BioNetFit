@@ -169,9 +169,12 @@ void Particle::doParticle() {
 		else if (swarm_->options.fitType == "de") {
 			checkMessagesDE();
 		}
+		else if (swarm_->options.fitType == "sa") {
+			checkMessagesDE();
+		}
 
 		// Next generation
-		currentGeneration_++;
+		++currentGeneration_;
 	}
 }
 
@@ -551,6 +554,33 @@ void Particle::checkMessagesDE() {
 				return;
 			}
 
+			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(BEGIN_NELDER_MEAD);
+			if (smhRange.first != smhRange.second) {
+
+				if (swarm_->options.verbosity >= 3) {
+					cout << id_ << ": Beginning Nelder-Mead local search" << endl;
+				}
+
+				std::stringstream iss;
+				iss.str(smhRange.first->second.message[0]); // Simplex is serialized in the first indice of the message vector
+				boost::archive::text_iarchive ia(iss);
+				map<double, vector<double>> simplex;
+				ia >> simplex;
+
+				runNelderMead(simplex);
+
+				vector<string> paramsStr;
+				paramsStr.push_back(to_string(static_cast<long double>(fitCalcs[-1])));
+				for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
+					paramsStr.push_back(to_string(static_cast<long double>(p->second)));
+				}
+				swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, false, paramsStr);
+				swarm_->swarmComm->univMessageReceiver.clear();
+
+
+				return;
+			}
+
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEXT_GENERATION);
 			if (smhRange.first != smhRange.second) {
 
@@ -566,7 +596,7 @@ void Particle::checkMessagesDE() {
 	}
 }
 
-void Particle::calculateFit() {
+void Particle::calculateFit(bool local) {
 	if (swarm_->options.verbosity >= 3) {
 		cout << "Calculating fit" << endl;
 	}
@@ -664,7 +694,12 @@ void Particle::calculateFit() {
 	dataFiles_.clear();
 
 	// Store our fit calc
-	fitCalcs[currentGeneration_] = pow(totalSum,0.5);
+	if (!local) {
+		fitCalcs[currentGeneration_] = pow(totalSum, 0.5);
+	}
+	else {
+		fitCalcs[-1] = pow(totalSum, 0.5);
+	}
 
 	if (swarm_->options.verbosity >= 3) {
 		cout << "Fit calculation: " << pow(totalSum,0.5) << endl;
@@ -774,4 +809,150 @@ void Particle::smoothRuns() {
 	}
 	 */
 	//cout << id_ << " done smoothing" << endl;
+}
+
+void Particle::runNelderMead(map<double, vector<double>> simplex) {
+	// The transformation coefficients
+	float reflection = 1;
+	float expansion = 2;
+	float contraction = 0.5;
+	float shrink = 0.5;
+
+	bool search = true;
+	while (search) {
+		// Get our important vertices
+		auto sIt = simplex.end();
+		advance(sIt, - 1); // Last element
+		auto worst = sIt;
+		advance(sIt, - 1); // Second to last element
+		auto good = sIt;
+		auto best = simplex.begin();
+
+		vector<vector<double>> centroidVectors;
+		for (auto params = simplex.begin(); params != worst; ++params) {
+			centroidVectors.push_back(params->second);
+		}
+
+		// Calculate the centroid
+		vector<double> centroid = getCentroid(centroidVectors);
+
+		// Reflect
+		vector<double> R; // The transformation vector
+		for (unsigned int d = 0; d < centroid.size(); ++d) {
+			double r = centroid[d] + (reflection * (centroid[d] + worst->second[d]));
+			R.push_back(r);
+		}
+
+		auto tIt = R.begin();
+		for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
+			p->second = *tIt;
+			++tIt;
+		}
+
+		for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
+			runModel(i);
+		}
+		if (swarm_->options.smoothing > 1) {
+			smoothRuns();
+		}
+		double rCalc = fitCalcs[-1];
+
+		// R Better than good, but worse than best
+		if (rCalc > best->first && rCalc < good->first) {
+			simplex.erase(worst);
+			simplex.insert(pair<double, vector<double>> (rCalc, R));
+			continue;
+		}
+		// R Better than best
+		else if (rCalc < best->first) {
+			// Expand
+			vector<double> E;
+			for (unsigned int d = 0; d < centroid.size(); ++d) {
+				double e = centroid[d] + (expansion * (R[d] - centroid[d]));
+				E.push_back(e);
+			}
+
+			auto tIt = E.begin();
+			for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
+				p->second = *tIt;
+				++tIt;
+			}
+			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
+				runModel(i);
+			}
+			if (swarm_->options.smoothing > 1) {
+				smoothRuns();
+			}
+			double eCalc = fitCalcs[-1];
+
+			if (eCalc < rCalc) {
+				simplex.erase(worst);
+				simplex.insert(pair<double, vector<double>> (eCalc, E));
+				continue;
+			}
+			else {
+				simplex.erase(worst);
+				simplex.insert(pair<double, vector<double>> (rCalc, R));
+				continue;
+			}
+		}
+		// R worse than good
+		else if (rCalc > good->first) {
+			// Contraction
+			vector<double> C;
+			for (unsigned int d = 0; d < centroid.size(); ++d) {
+				double c = centroid[d] + (contraction * (worst->second[d] - centroid[d]));
+				C.push_back(c);
+			}
+
+			auto tIt = C.begin();
+			for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
+				p->second = *tIt;
+				++tIt;
+			}
+			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
+				runModel(i);
+			}
+			if (swarm_->options.smoothing > 1) {
+				smoothRuns();
+			}
+			double cCalc = fitCalcs[-1];
+
+			if (cCalc < worst->first) {
+				simplex.erase(worst);
+				simplex.insert(pair<double, vector<double>> (cCalc, C));
+				continue;
+			}
+			else {
+				// Shrink
+				for (auto sIt = simplex.begin()++; sIt != simplex.end(); ++sIt) {
+					for (unsigned int d = 0; d < centroid.size(); ++d) {
+						double s = simplex.begin()->second[d] + (shrink * (sIt->second[d] - best->second[d]));
+						sIt->second[d] = s;
+					}
+				}
+			}
+		}
+	}
+
+	fitCalcs[-1] = simplex.begin()->first;
+	unsigned int d = 0;
+	for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
+		p->second = simplex.begin()->second[d++];
+	}
+}
+
+vector<double> Particle::getCentroid(vector<vector<double>> centroidVectors) {
+	vector<double> centroid;
+
+	for (unsigned int d = 0; d < centroidVectors[0].size(); ++d) {
+		double sum = 0;
+		for (unsigned int set = 0; set < centroidVectors.size(); ++set) {
+			sum += centroidVectors[set][d];
+		}
+
+		centroid.push_back(sum / centroidVectors[0].size());
+	}
+
+	return centroid;
 }

@@ -24,7 +24,7 @@ class Particle {
 public:
 	Particle(Swarm * swarm, int id);
 	void setModel(Model * model);
-	void setParam(std::pair<std::string,double> myParams);
+	void setParam(std::pair<std::string, double> myParams);
 	std::map<std::string,double> getParams() { return simParams_; }
 	void setID(int id);
 	int getID() { return id_; }
@@ -42,7 +42,10 @@ private:
 	void checkMessagesPSO();
 	void checkMessagesDE();
 
-	void calculateFit();
+	void runNelderMead(std::map<double, std::vector<double>> simplex);
+	std::vector<double> getCentroid(std::vector<std::vector<double>>);
+
+	void calculateFit(bool local = false);
 	double objFunc_chiSquare(double sim, double exp, double stdev);
 	double objFunc_sumOfSquares(double sim, double exp, double dummyvar);
 	double objFunc_divByMeasured(double sim, double exp, double dummyvar);
@@ -56,12 +59,12 @@ private:
 	objFunc objFuncPtr;
 
 	Model * model_;
-	std::map<std::string, double> simParams_;
 	unsigned int id_;
 	std::map<std::string, std::map<int, Data*>> dataFiles_;
 	Swarm * swarm_;
 	unsigned int currentGeneration_;
 	unsigned int island_;
+	std::map<std::string, double> simParams_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

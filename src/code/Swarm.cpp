@@ -3350,13 +3350,14 @@ void Swarm::runASA() {
 				// Greedy acceptance
 				particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
 				insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
+				particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin() + 1, particle->second.end());
 
 				isLocal[cpuToParticle[particle->first]] = false;
 			}
 			else {
 				// If we pass metropolis selection, store the params for assignment to receiver
 				if (metropolisSelection(particle->first, particle->second[0], particleTemps[particle->first])) {
-					particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin()+ 1, particle->second.end());
+					particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin() + 1, particle->second.end());
 
 					// Update fitness
 					particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
@@ -3369,22 +3370,21 @@ void Swarm::runASA() {
 
 				// Do a local search at some probability
 				// Or if particle is best in swarm
-				/*
 				if (options.localSearchProbability < (float)rand() / (float)RAND_MAX || cpuToParticle[particle->first] == particleBestFitsByFit_.begin()->second) {
 					isLocal[cpuToParticle[particle->first]] = true;
 				}
-				*/
 			}
 
-			// Pick the controller
-			unsigned int controller = pickWeightedSA();
+			unsigned int receiver = rand() % options.swarmSize + 1;
+			vector<double> newParams;
 
 			// If we aren't going to do a local search, generate a new trial point
-			if (!isLocal[cpuToParticle[particle->first]]) {
-				unsigned int receiver = rand() % options.swarmSize + 1;
+			if (!isLocal[cpuToParticle[particle->first]] && particleBestFitsByFit_.begin()->second != receiver) {
+				// Pick the controller
+				unsigned int controller = pickWeightedSA();
 
 				// Generate a new trial vector
-				vector<double> newParams = generateTrialPointSA(controller, receiver, particleRadii, particleCRs, particleFs, trialParams);
+				newParams = generateTrialPointSA(controller, receiver, particleRadii, particleCRs, particleFs, trialParams);
 
 				// Make sure we know this CPU will be running this Receiver
 				cpuToParticle[particle->first] = receiver;
@@ -3396,19 +3396,17 @@ void Swarm::runASA() {
 
 				// Send the params to the CPU
 				swarmComm->sendToSwarm(0, particle->first, SEND_FINAL_PARAMS_TO_PARTICLE, false, newParamsStr);
+				launchParticle(particle->first);
 			}
 			else {
 				// Do local search stuff
-
+				runNelderMead(receiver, particle->first);
 			}
-
-			// Launch the trial point or local search
-			launchParticle(particle->first);
 		}
 	}
 }
 
-void runSSA() {
+void Swarm::runSSA() {
 
 }
 
@@ -3642,4 +3640,44 @@ void Swarm::generateBootstrapMaps(vector<map<string, map<string, map<double,unsi
 		}
 	}
 	 */
+}
+
+void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
+
+	// On the master side, we just need to construct the simplex, serialize it,
+	// then send it to the CPU..
+
+	// calc -> params
+	map<double, vector<double>> simplex {pair<double, vector<double>>(particleBestFits_.at(it), particleCurrParamSets_.at(it))};
+	vector<unsigned int> usedParticles {it};
+
+	// First fill simplex with param sets (n+1 vertices)
+	for (unsigned int i = 0; i < options.model->getNumFreeParams(); ++i) {
+		unsigned int particle = rand() % options.swarmSize + 1;
+		bool isDuplicate = false;
+
+		// Make sure we aren't selecting duplicates
+		do {
+			isDuplicate = false;
+			for (unsigned int p = 0; p < usedParticles.size(); ++p) {
+				if (particle == p) {
+					isDuplicate = true;
+					break;
+				}
+			}
+			particle = rand() % options.swarmSize + 1;
+		} while (isDuplicate);
+
+		simplex[particleBestFits_.at(particle)] = particleCurrParamSets_.at(particle);
+	}
+
+	std::stringstream oss;
+	boost::archive::text_oarchive oa(oss);
+	oa << simplex;
+	std::string serializedSimplex(oss.str());
+
+	vector<string> message;
+	message.push_back(serializedSimplex);
+
+	swarmComm->sendToSwarm(0, cpu, BEGIN_NELDER_MEAD, false, message);
 }

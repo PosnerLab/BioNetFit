@@ -89,6 +89,7 @@ public:
 	void runAGA();
 	void runAPSO();
 	void runADE();
+	void runSSA();
 	void runASA();
 
 	Particle *createParticle(unsigned int pID);
@@ -289,6 +290,7 @@ private:
 	void launchParticle(unsigned int pID, bool nextGen = false);
 	void runGeneration();
 	void breedGenerationGA(std::vector<unsigned int> children = std::vector<unsigned int>());
+	void runNelderMead(unsigned int receiver, unsigned int cpu);
 
 	void cleanupFiles(const char * path);
 	void finishFit();

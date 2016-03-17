@@ -72,6 +72,8 @@ class Swarm;
 #define SEND_NUMFLIGHTS_TO_PARTICLE 23
 #define MASTER_DIED 24
 #define NEW_BOOTSTRAP 25
+#define BEGIN_NELDER_MEAD 26
+#define END_NELDER_MEAD 27
 #define MESSAGE_END 1000
 
 class Pheromones {
