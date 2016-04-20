@@ -73,11 +73,13 @@ int main(int argc, char *argv[]) {
 		outputError("Error: Couldn't find a valid 'type' in your arguments.");
 	}
 
+	/*
 	cout << "type: " << type << endl;
 	cout << "action: " << action << endl;
 	cout << "config: " << configFile << endl;
 	cout << "pID: " << pID << endl;
 	cout << "generation: " << generation << endl;
+	*/
 
 	// Regardless of type or action, we need to set up the Swarm
 	//Timer tmr;

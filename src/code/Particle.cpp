@@ -560,19 +560,21 @@ void Particle::checkMessagesDE() {
 				if (swarm_->options.verbosity >= 3) {
 					cout << id_ << ": Beginning Nelder-Mead local search" << endl;
 				}
-
+				cout << "deserializing simplex" << endl;
 				std::stringstream iss;
 				iss.str(smhRange.first->second.message[0]); // Simplex is serialized in the first indice of the message vector
 				boost::archive::text_iarchive ia(iss);
 				map<double, vector<double>> simplex;
 				ia >> simplex;
 
+				cout << "running search" << endl;
 				runNelderMead(simplex);
 
 				vector<string> paramsStr;
 				paramsStr.push_back(to_string(static_cast<long double>(fitCalcs[-1])));
 				for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 					paramsStr.push_back(to_string(static_cast<long double>(p->second)));
+					cout << "new param: " << p->second << endl;
 				}
 				swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, false, paramsStr);
 				swarm_->swarmComm->univMessageReceiver.clear();
@@ -817,9 +819,10 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 	float expansion = 2;
 	float contraction = 0.5;
 	float shrink = 0.5;
+	unsigned int simulationCount = 0;
 
 	bool search = true;
-	while (search) {
+	while (simulationCount < 5) {
 		// Get our important vertices
 		auto sIt = simplex.end();
 		advance(sIt, - 1); // Last element
@@ -837,6 +840,7 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		vector<double> centroid = getCentroid(centroidVectors);
 
 		// Reflect
+		cout << "reflecting" << endl;
 		vector<double> R; // The transformation vector
 		for (unsigned int d = 0; d < centroid.size(); ++d) {
 			double r = centroid[d] + (reflection * (centroid[d] + worst->second[d]));
@@ -851,6 +855,7 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 
 		for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 			runModel(i);
+			++simulationCount;
 		}
 		if (swarm_->options.smoothing > 1) {
 			smoothRuns();
@@ -861,10 +866,12 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		if (rCalc > best->first && rCalc < good->first) {
 			simplex.erase(worst);
 			simplex.insert(pair<double, vector<double>> (rCalc, R));
+			cout << "reflection was worse than best and better than good. looping. " << rCalc << endl;
 			continue;
 		}
 		// R Better than best
 		else if (rCalc < best->first) {
+			cout << "reflection was better than best. expanding" << endl;
 			// Expand
 			vector<double> E;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
@@ -879,6 +886,7 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			}
 			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 				runModel(i);
+				++simulationCount;
 			}
 			if (swarm_->options.smoothing > 1) {
 				smoothRuns();
@@ -886,11 +894,13 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			double eCalc = fitCalcs[-1];
 
 			if (eCalc < rCalc) {
+				cout << "expansion was better than reflection. looping." << endl;
 				simplex.erase(worst);
 				simplex.insert(pair<double, vector<double>> (eCalc, E));
 				continue;
 			}
 			else {
+				cout << "expansion was worse than reflection. looping." << endl;
 				simplex.erase(worst);
 				simplex.insert(pair<double, vector<double>> (rCalc, R));
 				continue;
@@ -898,6 +908,7 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		}
 		// R worse than good
 		else if (rCalc > good->first) {
+			cout << "reflection was better than good. contracting." << endl;
 			// Contraction
 			vector<double> C;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
@@ -912,6 +923,7 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			}
 			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 				runModel(i);
+				++simulationCount;
 			}
 			if (swarm_->options.smoothing > 1) {
 				smoothRuns();
@@ -919,14 +931,17 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			double cCalc = fitCalcs[-1];
 
 			if (cCalc < worst->first) {
+				cout << "contraction was better than worst. looping." << endl;
 				simplex.erase(worst);
 				simplex.insert(pair<double, vector<double>> (cCalc, C));
 				continue;
 			}
 			else {
+				cout << "contraction was worse than worst. shrinking" << endl;
 				// Shrink
 				for (auto sIt = simplex.begin()++; sIt != simplex.end(); ++sIt) {
 					for (unsigned int d = 0; d < centroid.size(); ++d) {
+						cout << "contraction loop" << endl;
 						double s = simplex.begin()->second[d] + (shrink * (sIt->second[d] - best->second[d]));
 						sIt->second[d] = s;
 					}

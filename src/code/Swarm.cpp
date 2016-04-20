@@ -81,6 +81,11 @@ Swarm::Swarm() {
 	options.enhancedStop = false; // true
 	options.enhancedInertia = false; // true
 
+	options.minTemp = pow(10, -10);
+	options.minRadius = pow(10, -6);
+	options.localSearchProbability = 0.01;
+	options.randParamsProbability = 0.1;
+
 	options.verbosity = 1;
 	hasMutate = false;
 
@@ -209,7 +214,7 @@ void Swarm::setJobOutputDir(string path) {
 				}
 
 				if(runCommand(cmd) != 0) {
-					outputError("Error: Coudln't delete existing output directory with the command: " + cmd + ". Quitting.");
+					outputError("Error: Couldn't delete existing output directory with the command: " + cmd + ". Quitting.");
 				}
 				break;
 			}
@@ -273,9 +278,9 @@ void Swarm::doSwarm() {
 
 	system ("exec rm /home/brandon/projects/BioNetFit/Debug/pOUT");
 
-	for (bootstrapCounter = 0; bootstrapCounter < options.bootstrap; ++bootstrapCounter) {
+	for (bootstrapCounter = 0; bootstrapCounter <= options.bootstrap; ++bootstrapCounter) {
 		initFit();
-
+		// TODO: Test all synchronous fits on PC
 		// Main fit loops
 		if (options.synchronicity) {
 			// Synchronous genetic
@@ -284,10 +289,12 @@ void Swarm::doSwarm() {
 			}
 			else if (options.fitType == "pso") {
 				runSPSO();
-
 			}
 			else if (options.fitType == "de") {
 				runSDE();
+			}
+			else if (options.fitType == "sa") {
+				runSSA();
 			}
 		}
 
@@ -304,6 +311,9 @@ void Swarm::doSwarm() {
 			}
 			else if (options.fitType == "de") {
 				runADE();
+			}
+			else if (options.fitType == "sa") {
+				runASA();
 			}
 		}
 		finishFit();
@@ -328,7 +338,7 @@ bool Swarm::checkStopCriteria() {
 				++permanenceCounter_;
 				++inertiaUpdateCounter_;
 
-				double quotient = (double)(permanenceCounter_ / options.nmin);
+				double quotient = ((double)permanenceCounter_ / options.nmin);
 				// Check to see if quotient is a real number
 				if (floor(quotient) == quotient) {
 					double oldAvgPos = weightedAvgPos_;
@@ -1764,7 +1774,6 @@ void Swarm::initFit () {
 		}
 
 		if (options.fitType == "pso") {
-			// Initialize velocities to 0
 			for (unsigned int particle = 1; particle <= options.swarmSize; ++particle) {
 				particleParamVelocities_[particle] = params;
 				particleBestParamSets_[particle] = params;
@@ -1781,8 +1790,13 @@ void Swarm::initFit () {
 			for (unsigned int island = 0; island <= options.numIslands; ++island) {
 				islandToParticle_.push_back(vector<unsigned int>(options.swarmSize / options.numIslands,0));
 			}
-			for (unsigned int particle = 0; particle <= options.swarmSize; ++particle) {
+			for (unsigned int particle = 1; particle <= options.swarmSize; ++particle) {
 				particleToIsland_.push_back(0);
+				particleBestFitsByFit_.insert(pair<double, unsigned int>(0, particle));
+			}
+		}
+		if (options.fitType == "sa") {
+			for (unsigned int particle = 1; particle <= options.swarmSize; ++particle) {
 				particleBestFitsByFit_.insert(pair<double, unsigned int>(0, particle));
 			}
 		}
@@ -2421,8 +2435,13 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle, float mutateFactor
 	}
 
 	vector<double> mutatedParams;
-	unsigned int currIsland = particleToIsland_.at(particle);
-	int particlesPerIsland = options.swarmSize / options.numIslands;
+	unsigned int currIsland;;
+	unsigned int particlesPerIsland;
+
+	if (options.fitType == "de") {
+		currIsland = particleToIsland_.at(particle);
+		particlesPerIsland = options.swarmSize / options.numIslands;
+	}
 
 	// f between 0.1 and 0.9
 	//float f = 0.1 + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(0.9-0.1)));
@@ -2550,6 +2569,150 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle, float mutateFactor
 			double p3Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p3])[pi];
 			double p4Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p4])[pi];
 			double p5Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p5])[pi];
+
+			mutatedParams.push_back(p1Param + f * (p2Param - p3Param) + f * (p4Param - p5Param));
+			++pi;
+		}
+	}
+
+	return mutatedParams;
+}
+
+vector<double> Swarm::mutateParticleSA(unsigned int particle, float mutateFactor) {
+
+	if (options.verbosity >= 3) {
+		cout << "Mutating particle " << particle << endl;
+	}
+
+	vector<double> mutatedParams;
+
+	// f between 0.1 and 0.9
+	//float f = 0.1 + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(0.9-0.1)));
+	float f;
+	if (mutateFactor) {
+		f = mutateFactor;
+	}
+	else {
+		f = 0.9;
+	}
+
+	boost::random::uniform_int_distribution<int> unif(1, options.swarmSize);
+
+	if (options.mutateType == 1) {
+		int bestParticle = 0;
+		for (auto fitVal = particleBestFitsByFit_.begin(); fitVal != particleBestFitsByFit_.end(); ++fitVal) {
+			if (fitVal->first > 0 ) {
+				bestParticle = fitVal->second;
+				//cout << "setting particle " << fitVal->second << " as best with fit of " << fitVal -> first << endl;
+				break;
+			}
+		}
+
+		vector<double> bestParamSet = particleCurrParamSets_.at(bestParticle);
+		unsigned int pi = 0;
+		for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
+			int p1 = 0;
+			int p2 = 0;
+
+			while (p1 == p2) {
+				p1 = unif(randNumEngine);
+				p2 = unif(randNumEngine);
+			}
+
+			//cout << "p1: " << p1 << " p2: " << p2 << " pi: " << pi << endl;
+			double p1Param = particleCurrParamSets_.at(p1)[pi];
+			double p2Param = particleCurrParamSets_.at(p2)[pi];
+
+			mutatedParams.push_back(bestParamSet[pi] + f * (p1Param - p2Param));
+			++pi;
+		}
+	}
+	else if (options.mutateType == 2) {
+		unsigned int pi = 0;
+		int bestParticle = 0;
+		for (auto fitVal = particleBestFitsByFit_.begin(); fitVal != particleBestFitsByFit_.end(); ++fitVal) {
+			if (fitVal->first > 0) {
+				bestParticle = fitVal->second;
+			}
+		}
+		vector<double> bestParamSet = particleCurrParamSets_.at(bestParticle);
+		for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
+			int p1 = 0;
+			int p2 = 0;
+			int p3 = 0;
+			int p4 = 0;
+			while (p1 == p2 || p1 == p3 || p1 == p4 || p2 == p3 || p2 == p4 || p3 == p4) {
+				p1 = unif(randNumEngine);
+				p2 = unif(randNumEngine);
+				p3 = unif(randNumEngine);
+				p4 = unif(randNumEngine);
+			}
+
+			double p1Param = particleCurrParamSets_.at(p1)[pi];
+			double p2Param = particleCurrParamSets_.at(p2)[pi];
+			double p3Param = particleCurrParamSets_.at(p3)[pi];
+			double p4Param = particleCurrParamSets_.at(p4)[pi];
+
+			mutatedParams.push_back(bestParamSet[pi] + f * (p1Param - p2Param) + f * (p3Param - p4Param));
+			++pi;
+		}
+	}
+	else if (options.mutateType == 3) {
+		unsigned int pi = 0;
+		int bestParticle = 0;
+		for (auto fitVal = particleBestFitsByFit_.begin(); fitVal != particleBestFitsByFit_.end(); ++fitVal) {
+			if (fitVal->first > 0) {
+				bestParticle = fitVal->second;
+			}
+		}
+		vector<double> bestParamSet = particleCurrParamSets_.at(bestParticle);
+		for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
+			int p1 = 0;
+			int p2 = 0;
+			int p3 = 0;
+			while (p1 == p2 || p1 == p3 || p2 == p3) {
+				p1 = unif(randNumEngine);
+				p2 = unif(randNumEngine);
+				p3 = unif(randNumEngine);
+			}
+
+			double p1Param = particleCurrParamSets_.at(p1)[pi];
+			double p2Param = particleCurrParamSets_.at(p2)[pi];
+			double p3Param = particleCurrParamSets_.at(p3)[pi];
+
+			mutatedParams.push_back(p1Param + f * (p2Param - p3Param));
+			++pi;
+		}
+	}
+	else if (options.mutateType == 4) {
+		unsigned int pi = 0;
+		int bestParticle = 0;
+		for (auto fitVal = particleBestFitsByFit_.begin(); fitVal != particleBestFitsByFit_.end(); ++fitVal) {
+			if (fitVal->first > 0) {
+				bestParticle = fitVal->second;
+			}
+		}
+		vector<double> bestParamSet = particleCurrParamSets_.at(bestParticle);
+		for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
+			int p1 = 0;
+			int p2 = 0;
+			int p3 = 0;
+			int p4 = 0;
+			int p5 = 0;
+			// This (and above instances) should be optimized
+			while (p1 == p2 || p1 == p3 || p1 == p4 || p2 == p3 || p2 == p4 || p3 == p4 || p1 == p5 || p2 == p5 || p3 == p5 || p4 == p5) {
+				p1 = unif(randNumEngine);
+				p2 = unif(randNumEngine);
+				p3 = unif(randNumEngine);
+				p4 = unif(randNumEngine);
+				p5 = unif(randNumEngine);
+			}
+
+			double p1Param = particleCurrParamSets_.at(p1)[pi];
+			double p2Param = particleCurrParamSets_.at(p2)[pi];
+			double p3Param = particleCurrParamSets_.at(p3)[pi];
+			double p4Param = particleCurrParamSets_.at(p4)[pi];
+			double p5Param = particleCurrParamSets_.at(p5)[pi];
 
 			mutatedParams.push_back(p1Param + f * (p2Param - p3Param) + f * (p4Param - p5Param));
 			++pi;
@@ -3293,6 +3456,172 @@ void Swarm::runASA() {
 		cout << "Running an asynchronous PSADE fit" << endl;
 	}
 
+	if (!checkIfFileExists(options.jobOutputDir + "1")) {
+		string createDirCmd = "mkdir " + options.jobOutputDir + "1";
+		if (runCommand(createDirCmd) != 0) {
+			outputError("Error: Couldn't create first generation output directory with command: " + createDirCmd + ". Quitting.");
+		}
+	}
+
+	// Initialize and/or fill our parameter vectors
+	vector<unsigned int> isLocal = vector<unsigned int>(options.swarmSize, 0);
+	vector<double> particleTemps = vector<double>(options.swarmSize + 1, 0);
+	vector<double> particleRadii = vector<double>(options.swarmSize + 1, 0);
+	vector<float> particleFs = generateParticleFs();
+	vector<float> particleCRs = generateParticleCRs();
+	vector<float> cpuToParticle = vector<float>(options.swarmSize + 1, 0);
+	vector<vector<float>> trialParams = vector<vector<float>>(options.swarmSize + 1, vector<float>(2, 0));
+
+	// Launch the initialization population and map
+	// CPUs to particles
+	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
+		launchParticle(p);
+		cpuToParticle[p] = p;
+	}
+
+	unordered_map<unsigned int, vector<double>> finishedParticles;
+	unordered_map<unsigned int, vector<double>> initFinishedParticles;
+	unsigned int numFinishedParticles = 0;
+
+	// Wait for initialization population to finish simulations
+	while (numFinishedParticles < options.swarmSize) {
+		initFinishedParticles = checkMasterMessagesDE();
+		// Save finished particles in another map, we still need to process them in the main loop later on
+		if (initFinishedParticles.size()) {
+			finishedParticles.insert(initFinishedParticles.begin(), initFinishedParticles.end());
+			numFinishedParticles += initFinishedParticles.size();
+		}
+
+		// Process each finished particle
+		for (auto particle = initFinishedParticles.begin(); particle != initFinishedParticles.end(); ++particle) {
+			cout << "particle " << cpuToParticle[particle->first] << " on cpu " << particle->first << " finished" << endl;
+
+			// Update parameter values
+			unsigned int i = 0;
+			for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
+				particleCurrParamSets_[cpuToParticle[particle->first]][i++] = *param;
+				cout << "updating particle " << cpuToParticle[particle->first] << " to " << *param << " at " << i << endl;
+			}
+
+			// Update fit calcs
+			particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
+			insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
+			cout << "updating particle " << cpuToParticle[particle->first] << " calc to " << particle->second[0] << endl;
+			//cout << "count: " << particleBestFitsByFit_.count(particle->second[0]) << endl;
+
+			// Update F and CR
+			trialParams[cpuToParticle[particle->first]][0] = particleFs[cpuToParticle[particle->first]];
+			trialParams[cpuToParticle[particle->first]][1] = particleCRs[cpuToParticle[particle->first]];
+		}
+	}
+
+	// Generate our initial temps and radii
+	particleTemps = generateParticleTemps();
+	particleRadii = generateParticleRadii();
+
+	// Main loop
+	cout << "entering main loop" << endl;
+	bool stopCriteria = false;
+	while (!stopCriteria) {
+
+		// Check to make sure we aren't processing init swarm before checking for new
+		if (!finishedParticles.size()) {
+			cout << "checking" << endl;
+			finishedParticles = checkMasterMessagesDE();
+		}
+
+		// Process any finished particles
+		for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
+			cout << "particle " << cpuToParticle[particle->first] << " on cpu " << particle->first << " finished" << endl;
+
+			// If the particle finished their local search
+			if (isLocal[particle->first]) {
+				cout << "particle just finished local search" << endl;
+
+				cout << "greedy acceptance of fit of " << particle->second[0] << endl;
+				// Greedy acceptance
+				particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
+				insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
+				particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin() + 1, particle->second.end());
+
+				isLocal[cpuToParticle[particle->first]] = false;
+			}
+			else {
+				// If we pass metropolis selection, store the params for assignment to receiver
+				if (metropolisSelection(particle->first, particle->second[0], particleTemps[particle->first])) {
+					cout << "particle was accepted through metropolis selection" << endl;
+					particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin() + 1, particle->second.end());
+
+					// Update fitness
+					particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
+					insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
+					cout << "accepting params and fit of " << particle->second[0] << endl;
+					// Update CR and F
+
+					cout << "updating F to " << trialParams[cpuToParticle[particle->first]][0] << " and CR to " << trialParams[cpuToParticle[particle->first]][1] << endl;
+					particleFs[cpuToParticle[particle->first]] = trialParams[cpuToParticle[particle->first]][0];
+					particleCRs[cpuToParticle[particle->first]] = trialParams[cpuToParticle[particle->first]][1];
+				}
+
+				// Do a local search at some probability
+				// Or if particle is best in swarm
+				if (options.localSearchProbability > ((float)rand() / (float)RAND_MAX) || cpuToParticle[particle->first] == particleBestFitsByFit_.begin()->second) {
+					cout << "going to do a local search" << endl;
+					isLocal[cpuToParticle[particle->first]] = true;
+				}
+			}
+
+			if (flightCounter_ && flightCounter_ % options.outputEvery == 0) {
+				string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(flightCounter_)) + "_summary.txt";
+				outputRunSummary(outputPath);
+				//cout << "fc is " << flightCounter_ << ", outputting" << endl;
+			}
+
+			++flightCounter_;
+
+			unsigned int receiver = rand() % options.swarmSize + 1;
+			cout << "chose receiver of " << receiver << endl;
+			vector<double> newParams;
+
+			// If we aren't going to do a local search, generate a new trial point
+			if (!isLocal[cpuToParticle[particle->first]] && particleBestFitsByFit_.begin()->second != receiver) {
+				// Pick the controller
+				unsigned int controller = pickWeightedSA();
+				cout << "not doing local search. chose controller of " << controller << endl;
+				// Generate a new trial vector
+				newParams = generateTrialPointSA(controller, receiver, particleRadii, particleCRs, particleFs, trialParams);
+				cout << "generated new trial points" << endl;
+
+				// Make sure we know this CPU will be running this Receiver
+				cpuToParticle[particle->first] = receiver;
+				cout << "setting cpu " << particle->first << " as receiver " << receiver << endl;
+
+				vector<string> newParamsStr;
+				for (auto param = newParams.begin(); param != newParams.end(); ++param) {
+					newParamsStr.push_back(to_string(static_cast<long double>(*param)));
+					//cout << "new param: " << *param << endl;
+				}
+
+				cout << "running " << cpuToParticle[particle->first] << " with new params on cpu " << particle->first << endl;
+				// Send the params to the CPU
+				swarmComm->sendToSwarm(0, particle->first, SEND_FINAL_PARAMS_TO_PARTICLE, false, newParamsStr);
+				launchParticle(particle->first);
+			}
+			else {
+				cout << "running local search on cpu " << particle->first << endl;
+				// Do local search stuff
+				runNelderMead(receiver, particle->first);
+			}
+		}
+		finishedParticles.clear();
+	}
+}
+
+void Swarm::runSSA() {
+	if (options.verbosity >= 3) {
+		cout << "Running an asynchronous PSADE fit" << endl;
+	}
+
 	// Initialize and/or fill our parameter vectors
 	vector<unsigned int> isLocal = vector<unsigned int>(options.swarmSize, 0);
 	vector<float> particleTemps = vector<float>(options.swarmSize + 1, 0);
@@ -3314,129 +3643,43 @@ void Swarm::runASA() {
 
 	// Wait for initialization population to finish simulations
 	while (numFinishedParticles < options.swarmSize) {
-		finishedParticles = checkMasterMessagesDE();
-		numFinishedParticles += finishedParticles.size();
 
-		// Process each finished particle
-		for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
-			unsigned int i = 0;
 
-			// Update parameter values
-			for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
-				particleCurrParamSets_[cpuToParticle[particle->first]][i] = *param;
-			}
-
-			// Update fit calcs
-			particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
-			insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
-		}
-	}
-
-	// Generate our initial temps and radii
-	particleTemps = generateParticleTemps();
-	particleRadii = generateParticleRadii();
-
-	// Main loop
-	bool stopCriteria = false;
-	while (!stopCriteria) {
-		finishedParticles = checkMasterMessagesDE();
-
-		// Process any finished particles
-		for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
-
-			// If the particle finished their local search
-			if (isLocal[particle->first]) {
-
-				// Greedy acceptance
-				particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
-				insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
-				particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin() + 1, particle->second.end());
-
-				isLocal[cpuToParticle[particle->first]] = false;
-			}
-			else {
-				// If we pass metropolis selection, store the params for assignment to receiver
-				if (metropolisSelection(particle->first, particle->second[0], particleTemps[particle->first])) {
-					particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin() + 1, particle->second.end());
-
-					// Update fitness
-					particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
-					insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
-
-					// Update CR and F
-					particleFs[cpuToParticle[particle->first]] = trialParams[cpuToParticle[particle->first]][0];
-					particleCRs[cpuToParticle[particle->first]] = trialParams[cpuToParticle[particle->first]][1];
-				}
-
-				// Do a local search at some probability
-				// Or if particle is best in swarm
-				if (options.localSearchProbability < (float)rand() / (float)RAND_MAX || cpuToParticle[particle->first] == particleBestFitsByFit_.begin()->second) {
-					isLocal[cpuToParticle[particle->first]] = true;
-				}
-			}
-
-			unsigned int receiver = rand() % options.swarmSize + 1;
-			vector<double> newParams;
-
-			// If we aren't going to do a local search, generate a new trial point
-			if (!isLocal[cpuToParticle[particle->first]] && particleBestFitsByFit_.begin()->second != receiver) {
-				// Pick the controller
-				unsigned int controller = pickWeightedSA();
-
-				// Generate a new trial vector
-				newParams = generateTrialPointSA(controller, receiver, particleRadii, particleCRs, particleFs, trialParams);
-
-				// Make sure we know this CPU will be running this Receiver
-				cpuToParticle[particle->first] = receiver;
-
-				vector<string> newParamsStr;
-				for (auto param = newParams.begin(); param != newParams.end(); ++param) {
-					newParamsStr.push_back(to_string(static_cast<long double>(*param)));
-				}
-
-				// Send the params to the CPU
-				swarmComm->sendToSwarm(0, particle->first, SEND_FINAL_PARAMS_TO_PARTICLE, false, newParamsStr);
-				launchParticle(particle->first);
-			}
-			else {
-				// Do local search stuff
-				runNelderMead(receiver, particle->first);
-			}
-		}
 	}
 }
 
-void Swarm::runSSA() {
-
-}
-
-vector<float> Swarm::generateParticleTemps() {
+vector<double> Swarm::generateParticleTemps() {
 	// Eq 4 in Olensek et al
 
 	// maxTemp is the difference between highest and lowest fits
-	float maxTemp = particleBestFitsByFit_.rbegin()->first - particleBestFitsByFit_.begin()->first;
+	double maxTemp = particleBestFitsByFit_.rbegin()->first - particleBestFitsByFit_.begin()->first;
+	//cout << "maxtemp is " << maxTemp << endl;
+	//cout << "minTemp is " << options.minTemp << endl;
+	//cout << "ss is " << options.swarmSize - 1 << endl;
+	double ct = (1 / ((double)options.swarmSize - 1)) * log(maxTemp / options.minTemp);
 
-	float ct = (1 / (options.swarmSize - 1)) * log(maxTemp / options.minTemp);
 
-	vector<float> temps = vector<float>(options.swarmSize + 1, 0);
+	//cout << fixed << setprecision(10) << "ct is " << ct << endl;
+
+	vector<double> temps = vector<double>(options.swarmSize + 1, 0);
 	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
 		temps[p] = exp(0 - (ct * (p - 1)));
-		cout << "temp of " << p << " is " << temps[p] << endl;
+		//cout << fixed << setprecision(10) << "temp of " << p << " is " << temps[p] << endl;
 	}
 
 	return temps;
 }
 
-vector<float> Swarm::generateParticleRadii() {
+vector<double> Swarm::generateParticleRadii() {
 	// Eq 4 in Olensek et al
 
 	float rMax = 1;
-	float cr = (1 / (options.swarmSize - 1)) * log(rMax / options.minRadius);
+	float cr = (1 / ((double)options.swarmSize - 1)) * log(rMax / options.minRadius);
 
-	vector<float> radii = vector<float>(options.swarmSize + 1, 0);
+	vector<double> radii = vector<double>(options.swarmSize + 1, 0);
 	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
 		radii[p] = exp(0 - (cr * (p - 1)));
-		cout << "radius of " << p << " is " << radii[p] << endl;
+		//cout << "radius of " << p << " is " << radii[p] << endl;
 	}
 
 	return radii;
@@ -3544,13 +3787,14 @@ void Swarm::swapTR(vector<float> particleRadii, vector<float> particleTemps) {
 		particleRadii[r2] = r1Radius;
 	}
 }
-vector<double> Swarm::generateTrialPointSA(unsigned int controller, unsigned int receiver, vector<float> particleRadii, vector<float>particleCRs, vector<float>particleFs, vector<vector<float>> &trialParams) {
+vector<double> Swarm::generateTrialPointSA(unsigned int controller, unsigned int receiver, vector<double> particleRadii, vector<float>particleCRs, vector<float>particleFs, vector<vector<float>> &trialParams) {
 	vector<double> currParams = normalizeParams(particleCurrParamSets_.at(controller));
 	float cr;
 	float f;
 
 	// Choose either random F and CR or take from receiver
 	if ( ((float)rand() / (float)RAND_MAX) < options.randParamsProbability) {
+		cout << "choosing random F and CR" << endl;
 		float min = 0.5;
 		float max = 1.5;
 
@@ -3563,28 +3807,41 @@ vector<double> Swarm::generateTrialPointSA(unsigned int controller, unsigned int
 		r = (float)rand() / (float)RAND_MAX;
 		diff = max - min;
 		cr = (r * diff) + min;
+
+		//cout << "f is " << f << " and cr is " << cr << endl;
 	}
 	else {
 		f = particleFs[receiver];
 		cr = particleCRs[receiver];
+		//cout << "using receiver f and cr of " << f << " and " << cr << endl;
 	}
 
 	trialParams[receiver][0] = f;
 	trialParams[receiver][1] = cr;
 
-	currParams = mutateParticleDE(controller, f);
+	// Mutation functions pulls parameters from the global list
+	currParams = mutateParticleSA(controller, f);
+	// Crossover function uses params returned from mutation function
 	currParams = crossoverParticleDE(controller, currParams, cr);
 
+	//cout << "mutated and crossed over params" << endl;
+
+	vector<double> newParams;
 	for (auto param = currParams.begin(); param != currParams.end(); ++param) {
 		float r = (float)rand() / (float)RAND_MAX;
-		*param = *param + particleRadii[controller] * tan(3.141592654 * (r - 1/2));
+		//cout << "before: " << *param << endl;
+		float newParam = *param + particleRadii[controller] * tan(3.141592654 * (r - 0.5));
+		//cout << "after: " << newParam << endl;
 
-		if (*param <= 0 || *param > 1) {
-			*param = (double)rand() / (double)RAND_MAX;
+		if (newParam <= 0 || newParam > 1) {
+			newParam = (double)rand() / (double)RAND_MAX;
+			//cout << "new: " << newParam << endl;
 		}
+
+		newParams.push_back(newParam);
 	}
 
-	return deNormalizeParams(currParams);
+	return deNormalizeParams(newParams);
 }
 
 void Swarm::generateBootstrapMaps(vector<map<string, map<string, map<double,unsigned int>>>> &bootStrapMaps) {
@@ -3643,7 +3900,9 @@ void Swarm::generateBootstrapMaps(vector<map<string, map<string, map<double,unsi
 }
 
 void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
-
+	if (options.verbosity >= 3) {
+		cout << "Running Nelder-Meade local search for particle " << it << " on cpu " << cpu << endl;
+	}
 	// On the master side, we just need to construct the simplex, serialize it,
 	// then send it to the CPU..
 
@@ -3651,6 +3910,7 @@ void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
 	map<double, vector<double>> simplex {pair<double, vector<double>>(particleBestFits_.at(it), particleCurrParamSets_.at(it))};
 	vector<unsigned int> usedParticles {it};
 
+	cout << "constructing simplex" << endl;
 	// First fill simplex with param sets (n+1 vertices)
 	for (unsigned int i = 0; i < options.model->getNumFreeParams(); ++i) {
 		unsigned int particle = rand() % options.swarmSize + 1;
@@ -3671,6 +3931,7 @@ void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
 		simplex[particleBestFits_.at(particle)] = particleCurrParamSets_.at(particle);
 	}
 
+	cout << "serializing simplex" << endl;
 	std::stringstream oss;
 	boost::archive::text_oarchive oa(oss);
 	oa << simplex;
@@ -3679,6 +3940,7 @@ void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
 	vector<string> message;
 	message.push_back(serializedSimplex);
 
+	cout << "sending simplex to cpu " << cpu << endl;
 	swarmComm->sendToSwarm(0, cpu, BEGIN_NELDER_MEAD, false, message);
 }
 
@@ -3687,7 +3949,10 @@ vector<double> Swarm::normalizeParams(vector<double> oldParams) {
 
 	unsigned int d = 0;
 	for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
+		//cout << "denormalized: " << oldParams[d] << endl;
+		//cout << "max: " << param->second->getGenMax() << " min: " << param->second->getGenMin() << " diff: " << (param->second->getGenMax() - param->second->getGenMin()) << endl;
 		newParams.push_back(oldParams[d++] / (param->second->getGenMax() - param->second->getGenMin()));
+		//cout << "normalized: " << *(newParams.end() - 1) << endl;
 	}
 
 	return newParams;
@@ -3698,7 +3963,9 @@ vector<double> Swarm::deNormalizeParams(vector<double> oldParams) {
 
 	unsigned int d = 0;
 	for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
-		newParams.push_back(param->second->getGenMin() + oldParams[d++] * (param->second->getGenMax() - param->second->getGenMin()));
+		//cout << "normalized: " << oldParams[d] << endl;
+		newParams.push_back( param->second->getGenMin() + oldParams[d++] * (param->second->getGenMax() - param->second->getGenMin()));
+		//cout << "denormalized: " << *(newParams.end() - 1) << endl;
 	}
 
 	return newParams;
