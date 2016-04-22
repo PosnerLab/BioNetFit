@@ -151,6 +151,8 @@ void Particle::doParticle() {
 			swarm_->swarmComm->univMessageReceiver.clear();
 		}
 
+		cout << "loop " << currentGeneration_ << endl;
+
 		if (runModel) {
 			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 				runModel(i);
