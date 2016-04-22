@@ -144,21 +144,27 @@ void Particle::doParticle() {
 	}
 
 	bool doContinue = true;
+	bool runModel = true;
 	while(doContinue) {
 		if (swarm_->bootstrapCounter > 0 && currentGeneration_ == 1) {
 			swarm_->swarmComm->recvMessage(0, id_, NEXT_GENERATION, true, swarm_->swarmComm->univMessageReceiver);
 			swarm_->swarmComm->univMessageReceiver.clear();
 		}
 
-		for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
-			runModel(i);
-		}
+		if (runModel) {
+			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
+				runModel(i);
+			}
 
-		if (swarm_->options.smoothing > 1) {
-			smoothRuns();
-		}
+			if (swarm_->options.smoothing > 1) {
+				smoothRuns();
+			}
 
-		finalizeSim();
+			finalizeSim();
+		}
+		else {
+			runModel = true;
+		}
 
 		if (swarm_->options.fitType == "genetic") {
 			checkMessagesGenetic();
@@ -170,7 +176,7 @@ void Particle::doParticle() {
 			checkMessagesDE();
 		}
 		else if (swarm_->options.fitType == "sa") {
-			checkMessagesDE();
+			runModel = checkMessagesDE();
 		}
 
 		// Next generation
@@ -465,7 +471,7 @@ void Particle::checkMessagesPSO() {
 	}
 }
 
-void Particle::checkMessagesDE() {
+bool Particle::checkMessagesDE() {
 
 	while(1) {
 
@@ -493,7 +499,7 @@ void Particle::checkMessagesDE() {
 		while (numCheckedMessages < numMessages) {
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(SEND_FINAL_PARAMS_TO_PARTICLE);
 			if (smhRange.first != smhRange.second) {
-				//cout << "Receiving parameter list from master" << endl;
+				cout << "Receiving parameter list from master" << endl;
 				for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 
 					int messageIndex = 0;
@@ -551,14 +557,14 @@ void Particle::checkMessagesDE() {
 				currentGeneration_ = 0;
 
 				swarm_->swarmComm->univMessageReceiver.clear();
-				return;
+				return true;
 			}
 
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(BEGIN_NELDER_MEAD);
 			if (smhRange.first != smhRange.second) {
 
 				if (swarm_->options.verbosity >= 3) {
-					cout << id_ << ": Beginning Nelder-Mead local search" << endl;
+					cout << "Beginning Nelder-Mead local search" << endl;
 				}
 				cout << "deserializing simplex" << endl;
 				std::stringstream iss;
@@ -569,7 +575,7 @@ void Particle::checkMessagesDE() {
 
 				cout << "running search" << endl;
 				runNelderMead(simplex);
-
+				cout << "nelder mead finished. new calc: " << fitCalcs[-1] << endl;
 				vector<string> paramsStr;
 				paramsStr.push_back(to_string(static_cast<long double>(fitCalcs[-1])));
 				for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
@@ -579,8 +585,7 @@ void Particle::checkMessagesDE() {
 				swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, false, paramsStr);
 				swarm_->swarmComm->univMessageReceiver.clear();
 
-
-				return;
+				return false;
 			}
 
 			smhRange = swarm_->swarmComm->univMessageReceiver.equal_range(NEXT_GENERATION);
@@ -591,7 +596,7 @@ void Particle::checkMessagesDE() {
 				}
 
 				swarm_->swarmComm->univMessageReceiver.clear();
-				return;
+				return true;
 			}
 		}
 		swarm_->swarmComm->univMessageReceiver.clear();
@@ -821,7 +826,8 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 	float shrink = 0.5;
 	unsigned int simulationCount = 0;
 
-	bool search = true;
+	cout << "lowest: " << simplex.begin()->first << endl;
+
 	while (simulationCount < 5) {
 		// Get our important vertices
 		auto sIt = simplex.end();
@@ -860,13 +866,16 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		if (swarm_->options.smoothing > 1) {
 			smoothRuns();
 		}
+		calculateFit(true);
 		double rCalc = fitCalcs[-1];
+		cout << "reflection: " << rCalc << endl;
+		// NEED TO GENERATE MODEL FILE!!
 
 		// R Better than good, but worse than best
 		if (rCalc > best->first && rCalc < good->first) {
 			simplex.erase(worst);
 			simplex.insert(pair<double, vector<double>> (rCalc, R));
-			cout << "reflection was worse than best and better than good. looping. " << rCalc << endl;
+			cout << "reflection was worse than best and better than good. looping." << endl;
 			continue;
 		}
 		// R Better than best
@@ -891,7 +900,9 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			if (swarm_->options.smoothing > 1) {
 				smoothRuns();
 			}
+			calculateFit(true);
 			double eCalc = fitCalcs[-1];
+			cout << "expansion: " << eCalc << endl;
 
 			if (eCalc < rCalc) {
 				cout << "expansion was better than reflection. looping." << endl;
@@ -908,7 +919,7 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		}
 		// R worse than good
 		else if (rCalc > good->first) {
-			cout << "reflection was better than good. contracting." << endl;
+			cout << "reflection was worse than good. contracting." << endl;
 			// Contraction
 			vector<double> C;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
@@ -928,7 +939,9 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			if (swarm_->options.smoothing > 1) {
 				smoothRuns();
 			}
+			calculateFit(true);
 			double cCalc = fitCalcs[-1];
+			cout << "contraction: " << cCalc << endl;
 
 			if (cCalc < worst->first) {
 				cout << "contraction was better than worst. looping." << endl;
@@ -939,9 +952,8 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			else {
 				cout << "contraction was worse than worst. shrinking" << endl;
 				// Shrink
-				for (auto sIt = simplex.begin()++; sIt != simplex.end(); ++sIt) {
+				for (auto sIt = ++simplex.begin(); sIt != simplex.end(); ++sIt) {
 					for (unsigned int d = 0; d < centroid.size(); ++d) {
-						cout << "contraction loop" << endl;
 						double s = simplex.begin()->second[d] + (shrink * (sIt->second[d] - best->second[d]));
 						sIt->second[d] = s;
 					}
@@ -965,7 +977,6 @@ vector<double> Particle::getCentroid(vector<vector<double>> centroidVectors) {
 		for (unsigned int set = 0; set < centroidVectors.size(); ++set) {
 			sum += centroidVectors[set][d];
 		}
-
 		centroid.push_back(sum / centroidVectors[0].size());
 	}
 

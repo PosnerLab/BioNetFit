@@ -1535,7 +1535,6 @@ void Swarm::outputRunSummary(string outputPath) {
 		vector<string> paramVals;
 
 		for (auto i = allGenFits.begin(); i != allGenFits.end(); ++i) {
-			cout << "first: " << i->first << endl << "second: " << i->second << endl;
 			//cout << "about to split" << endl;
 			split(i->second, paramVals);
 			//cout << "split done" << endl;
@@ -3494,18 +3493,22 @@ void Swarm::runASA() {
 
 		// Process each finished particle
 		for (auto particle = initFinishedParticles.begin(); particle != initFinishedParticles.end(); ++particle) {
+			++flightCounter_;
 			cout << "particle " << cpuToParticle[particle->first] << " on cpu " << particle->first << " finished" << endl;
+			string paramString = to_string(static_cast<long long int>(flightCounter_)) + " ";
 
 			// Update parameter values
 			unsigned int i = 0;
 			for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
 				particleCurrParamSets_[cpuToParticle[particle->first]][i++] = *param;
 				cout << "updating particle " << cpuToParticle[particle->first] << " to " << *param << " at " << i << endl;
+				paramString += to_string(static_cast<long long int>(*param)) + " ";
 			}
 
 			// Update fit calcs
 			particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
 			insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
+			allGenFits.insert(pair<double, string>(particle->second[0], paramString));
 			cout << "updating particle " << cpuToParticle[particle->first] << " calc to " << particle->second[0] << endl;
 			//cout << "count: " << particleBestFitsByFit_.count(particle->second[0]) << endl;
 
@@ -3526,13 +3529,14 @@ void Swarm::runASA() {
 
 		// Check to make sure we aren't processing init swarm before checking for new
 		if (!finishedParticles.size()) {
-			cout << "checking" << endl;
 			finishedParticles = checkMasterMessagesDE();
 		}
 
 		// Process any finished particles
 		for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
 			cout << "particle " << cpuToParticle[particle->first] << " on cpu " << particle->first << " finished" << endl;
+
+			string paramString = to_string(static_cast<long long int>(flightCounter_ + 1)) + " ";
 
 			// If the particle finished their local search
 			if (isLocal[particle->first]) {
@@ -3542,7 +3546,15 @@ void Swarm::runASA() {
 				// Greedy acceptance
 				particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
 				insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
-				particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin() + 1, particle->second.end());
+
+				unsigned int i = 0;
+				for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
+					particleCurrParamSets_[cpuToParticle[particle->first]][i++] = *param;
+					cout << "updating particle " << cpuToParticle[particle->first] << " to " << *param << " at " << i << endl;
+					paramString += to_string(static_cast<long long int>(*param)) + " ";
+				}
+
+				allGenFits.insert(pair<double, string>(particle->second[0], paramString));
 
 				isLocal[cpuToParticle[particle->first]] = false;
 			}
@@ -3550,11 +3562,19 @@ void Swarm::runASA() {
 				// If we pass metropolis selection, store the params for assignment to receiver
 				if (metropolisSelection(particle->first, particle->second[0], particleTemps[particle->first])) {
 					cout << "particle was accepted through metropolis selection" << endl;
-					particleCurrParamSets_.at(cpuToParticle[particle->first]).assign(particle->second.begin() + 1, particle->second.end());
+					unsigned int i = 0;
+
+					for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
+						particleCurrParamSets_[cpuToParticle[particle->first]][i++] = *param;
+						cout << "updating particle " << cpuToParticle[particle->first] << " to " << *param << " at " << i << endl;
+						paramString += to_string(static_cast<long long int>(*param)) + " ";
+					}
 
 					// Update fitness
 					particleBestFits_[cpuToParticle[particle->first]] = particle->second[0];
 					insertKeyByValue(particleBestFitsByFit_, particle->second[0], cpuToParticle[particle->first]);
+					allGenFits.insert(pair<double, string>(particle->second[0], paramString));
+
 					cout << "accepting params and fit of " << particle->second[0] << endl;
 					// Update CR and F
 
@@ -3599,7 +3619,6 @@ void Swarm::runASA() {
 				vector<string> newParamsStr;
 				for (auto param = newParams.begin(); param != newParams.end(); ++param) {
 					newParamsStr.push_back(to_string(static_cast<long double>(*param)));
-					//cout << "new param: " << *param << endl;
 				}
 
 				cout << "running " << cpuToParticle[particle->first] << " with new params on cpu " << particle->first << endl;
@@ -3609,7 +3628,7 @@ void Swarm::runASA() {
 			}
 			else {
 				cout << "running local search on cpu " << particle->first << endl;
-				// Do local search stuff
+				// Do local search
 				runNelderMead(receiver, particle->first);
 			}
 		}
@@ -3920,7 +3939,7 @@ void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
 		do {
 			isDuplicate = false;
 			for (unsigned int p = 0; p < usedParticles.size(); ++p) {
-				if (particle == p) {
+				if (particle == p || simplex.find(particleBestFits_.at(particle)) != simplex.end()) {
 					isDuplicate = true;
 					break;
 				}
@@ -3928,6 +3947,7 @@ void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
 			particle = rand() % options.swarmSize + 1;
 		} while (isDuplicate);
 
+		usedParticles.push_back(particle);
 		simplex[particleBestFits_.at(particle)] = particleCurrParamSets_.at(particle);
 	}
 
@@ -3940,7 +3960,8 @@ void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
 	vector<string> message;
 	message.push_back(serializedSimplex);
 
-	cout << "sending simplex to cpu " << cpu << endl;
+	cout << "sending simplex to cpu " << cpu << " with starting calc of " << endl;
+	runningParticles_.insert(cpu);
 	swarmComm->sendToSwarm(0, cpu, BEGIN_NELDER_MEAD, false, message);
 }
 

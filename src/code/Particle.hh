@@ -40,7 +40,7 @@ private:
 	void runModel(int id = 0);
 	void checkMessagesGenetic();
 	void checkMessagesPSO();
-	void checkMessagesDE();
+	bool checkMessagesDE();
 
 	void runNelderMead(std::map<double, std::vector<double>> simplex);
 	std::vector<double> getCentroid(std::vector<std::vector<double>>);
