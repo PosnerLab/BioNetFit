@@ -61,7 +61,10 @@ void outputHelp() {
 
 bool createParticlePipe(const char * path) {
 
-	unlink(path);
+	if (checkIfFileExists(path)) {
+		unlink(path);
+	}
+
 	int fifo_status = mkfifo(path, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 	if (fifo_status) {
 		cout << "Warning: Couldn't create pipe with path: " << path << endl;

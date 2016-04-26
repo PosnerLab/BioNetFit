@@ -433,7 +433,12 @@ Swarm * Config::createSwarmFromConfig () {
 						swarm_->options.model->freeParams_.at(paramComponents[0])->setParameterName(paramComponents[0]);
 						swarm_->options.model->freeParams_.at(paramComponents[0])->setGenMin(stof(paramComponents[1]));
 						swarm_->options.model->freeParams_.at(paramComponents[0])->setGenMax(stof(paramComponents[2]));
-
+						if (pair->first == "lognormrandom_var" || pair->first == "loguniform_var") {
+							swarm_->options.model->freeParams_.at(paramComponents[0])->setIsLog(true);
+						}
+						else if (pair->first == "random_var") {
+							swarm_->options.model->freeParams_.at(paramComponents[0])->setIsLog(false);
+						}
 						//cout << "setting " << paramComponents[0] << " to " << pair->first << ":" << paramComponents[1] << ":" << paramComponents[2] << endl;
 					}
 					else {
@@ -579,6 +584,8 @@ void Config::checkConsistency() {
 	 *
 	 * Make sure we have SOME sort of stop criteria
 	 * QPSO requires maxNumSimulations to update beta_. the max num of iterations should be close to the expected. would be nice if the user had to guess. is there an adaptive beta_ algorithm like enhancedInertia?
+	 * In SA, make sure swarm size is n+1 for simplex creation
+	 * SA cannot be synchronous
 	 */
 
 	if (swarm_->options.fitType.empty()) {

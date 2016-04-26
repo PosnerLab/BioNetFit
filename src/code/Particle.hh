@@ -37,7 +37,7 @@ public:
 private:
 	friend class boost::serialization::access;
 
-	void runModel(int id = 0);
+	void runModel(int id = 0, bool localSearch = false);
 	void checkMessagesGenetic();
 	void checkMessagesPSO();
 	bool checkMessagesDE();

@@ -291,6 +291,7 @@ private:
 	void runGeneration();
 	void breedGenerationGA(std::vector<unsigned int> children = std::vector<unsigned int>());
 	void runNelderMead(unsigned int receiver, unsigned int cpu);
+	std::map<double, unsigned int> getNearestNeighbors(unsigned int it, unsigned int N);
 
 	void cleanupFiles(const char * path);
 	void finishFit();
@@ -330,7 +331,7 @@ private:
 
 	std::vector<double> mutateParticleDE(unsigned int particle, float mutateFactor = 0);
 	std::vector<double> mutateParticleSA(unsigned int particle, float mutateFactor = 0);
-	std::vector<double> crossoverParticleDE(unsigned int particle, std::vector<double> mutationSet, float cr = 0);
+	std::vector<double> crossoverParticleDE(unsigned int particle, std::vector<double> mutationSet, float cr = 0, bool normalize = false);
 	void sendMigrationSetDE(unsigned int island, std::vector<std::vector<unsigned int>> islandTopology, std::map<unsigned int, std::vector<std::vector<double>>> &migrationSets);
 	void recvMigrationSetDE(unsigned int island, std::map<unsigned int, std::vector<std::vector<double>>> &migrationSets);
 
@@ -340,10 +341,12 @@ private:
 	std::vector<float> generateParticleCRs();
 	unsigned int pickWeightedSA();
 	bool metropolisSelection(unsigned int particle, double fit, float particleTemp);
-	void swapTR(std::vector<float> particleRadii, std::vector<float> particleTemps);
+	void swapTR(std::vector<double> particleRadii, std::vector<double> particleTemps);
 	std::vector<double> generateTrialPointSA(unsigned int controller, unsigned int receiver, std::vector<double> particleRadii, std::vector<float>particleCRs, std::vector<float>particleFs, std::vector<std::vector<float>> &trialParams);
 	std::vector<double> normalizeParams(std::vector<double> params);
 	std::vector<double> deNormalizeParams(std::vector<double> params);
+	double normalizeParam(double oldParam, double min, double max, bool log);
+	double deNormalizeParam(double oldParam, double min, double max, bool log);
 
 	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, unsigned int value);
 

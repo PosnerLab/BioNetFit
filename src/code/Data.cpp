@@ -99,6 +99,7 @@ void Data::parseData(){
 		if (len < 0) {
 			perror("read error");
 		}
+
 		close(fd);
 	}
 	else {

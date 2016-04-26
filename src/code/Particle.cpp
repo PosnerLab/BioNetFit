@@ -144,7 +144,7 @@ void Particle::doParticle() {
 	}
 
 	bool doContinue = true;
-	bool runModel = true;
+	bool doRunModel = true;
 	while(doContinue) {
 		if (swarm_->bootstrapCounter > 0 && currentGeneration_ == 1) {
 			swarm_->swarmComm->recvMessage(0, id_, NEXT_GENERATION, true, swarm_->swarmComm->univMessageReceiver);
@@ -153,7 +153,7 @@ void Particle::doParticle() {
 
 		cout << "loop " << currentGeneration_ << endl;
 
-		if (runModel) {
+		if (doRunModel) {
 			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 				runModel(i);
 			}
@@ -165,7 +165,7 @@ void Particle::doParticle() {
 			finalizeSim();
 		}
 		else {
-			runModel = true;
+			doRunModel = true;
 		}
 
 		if (swarm_->options.fitType == "genetic") {
@@ -178,15 +178,17 @@ void Particle::doParticle() {
 			checkMessagesDE();
 		}
 		else if (swarm_->options.fitType == "sa") {
-			runModel = checkMessagesDE();
+			doRunModel = checkMessagesDE();
 		}
 
-		// Next generation
-		++currentGeneration_;
+		if (doRunModel == true) {
+			// Next generation
+			++currentGeneration_;
+		}
 	}
 }
 
-void Particle::runModel(int iteration) {
+void Particle::runModel(int iteration, bool localSearch) {
 
 	// First get our path and filename variables set up for use in model generation, sim command, etc
 	string bnglFilename = to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(iteration)) + ".bngl";
@@ -201,7 +203,7 @@ void Particle::runModel(int iteration) {
 
 	// Only need to generate files if we're in the first generation. In subsequent generations
 	// the model generation is handled by breeding parents
-	if (currentGeneration_ == 1 && swarm_->bootstrapCounter == 0) {
+	if (currentGeneration_ == 1 && swarm_->bootstrapCounter == 0 && !localSearch) {
 		if (swarm_->options.model->getHasGenerateNetwork()){
 			string netFilename = "base.net";
 			string netFullPath = swarm_->options.jobOutputDir + netFilename;
@@ -212,6 +214,19 @@ void Particle::runModel(int iteration) {
 			model_->outputModelWithParams(simParams_, path, bnglFilename, suffix, false, false, true, false, false);
 		}
 		else {
+			model_->outputModelWithParams(simParams_, path, bnglFilename, suffix, false, false, false, false, false);
+		}
+	}
+	else if (localSearch) {
+		cout << "regenerating models.." << endl;
+		// And generate our models
+		if (swarm_->options.model->getHasGenerateNetwork()){
+			// If we're using ODE solver, output .net file
+			bnglFilename = boost::regex_replace(bnglFilename, boost::regex("bngl$"), string("net"));
+			model_->outputModelWithParams(simParams_, path, bnglFilename, suffix, false, false, false, false, true);
+		}
+		else {
+			// If we're using network free simulation, output .bngl
 			model_->outputModelWithParams(simParams_, path, bnglFilename, suffix, false, false, false, false, false);
 		}
 	}
@@ -249,7 +264,6 @@ void Particle::runModel(int iteration) {
 
 	// Check for simulation command success
 	if (ret == 0) { // TODO: Need to check for simulation status when using pipes. Going by return code doesn't work there because we're using the & operator
-
 		//map<int, Data*> iterationMap;
 		string outputSuffix;
 		// Save our simulation outputs to data objects
@@ -260,17 +274,8 @@ void Particle::runModel(int iteration) {
 			else {
 				outputSuffix = ".gdat";
 			}
-
 			string dataPath = path + action->first + "_" + to_string(static_cast<long long int>(id_)) + "_" + to_string(static_cast<long long int>(iteration)) + outputSuffix;
-			//iterationMap.emplace(iteration, new Data(dataPath, swarm_, false));
-			//iterationMap.insert(pair<int, Data*>(iteration, new Data(dataPath, swarm_, false)));
-
 			dataFiles_[action->first].insert(pair<int, Data*>(iteration, new Data(dataPath, swarm_, false)));
-			//cout << id_ << " inserted " << iteration << " to " << action->first << endl;
-			//cout << id_ << " begin test: " << endl;
-			//cout << id_ << " " << dataFiles_[action->first].begin()->first << endl;
-			//cout << id_ << " end test" << endl;
-			//iterationMap.clear();
 		}
 	}
 	else {
@@ -828,9 +833,9 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 	float shrink = 0.5;
 	unsigned int simulationCount = 0;
 
-	cout << "lowest: " << simplex.begin()->first << endl;
+	cout << "lowest: " << simplex.begin()->first << " size: " << simplex.size() << endl;
 
-	while (simulationCount < 5) {
+	while (simulationCount < 10) {
 		// Get our important vertices
 		auto sIt = simplex.end();
 		advance(sIt, - 1); // Last element
@@ -851,18 +856,20 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		cout << "reflecting" << endl;
 		vector<double> R; // The transformation vector
 		for (unsigned int d = 0; d < centroid.size(); ++d) {
-			double r = centroid[d] + (reflection * (centroid[d] + worst->second[d]));
+			double r = centroid[d] + (reflection * (centroid[d] - worst->second[d]));
+			cout << "cen: " << centroid[d] << endl;
 			R.push_back(r);
 		}
 
 		auto tIt = R.begin();
 		for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 			p->second = *tIt;
+			cout << "changed to " << p->second << endl;
 			++tIt;
 		}
 
 		for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
-			runModel(i);
+			runModel(i, true);
 			++simulationCount;
 		}
 		if (swarm_->options.smoothing > 1) {
@@ -884,6 +891,13 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		else if (rCalc < best->first) {
 			cout << "reflection was better than best. expanding" << endl;
 			// Expand
+			/*
+			centroidVectors.clear();
+			for (auto params = simplex.begin(); params != worst; ++params) {
+				centroidVectors.push_back(params->second);
+			}
+			centroid = getCentroid(centroidVectors);
+			*/
 			vector<double> E;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
 				double e = centroid[d] + (expansion * (R[d] - centroid[d]));
@@ -893,10 +907,12 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			auto tIt = E.begin();
 			for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 				p->second = *tIt;
+				cout << "changed to " << p->second << endl;
 				++tIt;
 			}
 			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
-				runModel(i);
+				runModel(i, true);
+				cout << "done running" << endl;
 				++simulationCount;
 			}
 			if (swarm_->options.smoothing > 1) {
@@ -923,6 +939,13 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		else if (rCalc > good->first) {
 			cout << "reflection was worse than good. contracting." << endl;
 			// Contraction
+			/*
+			centroidVectors.clear();
+			for (auto params = simplex.begin(); params != worst; ++params) {
+				centroidVectors.push_back(params->second);
+			}
+			centroid = getCentroid(centroidVectors);
+			*/
 			vector<double> C;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
 				double c = centroid[d] + (contraction * (worst->second[d] - centroid[d]));
@@ -932,10 +955,11 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			auto tIt = C.begin();
 			for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 				p->second = *tIt;
+				cout << "changed to " << p->second << endl;
 				++tIt;
 			}
 			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
-				runModel(i);
+				runModel(i, true);
 				++simulationCount;
 			}
 			if (swarm_->options.smoothing > 1) {
@@ -957,6 +981,7 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 				for (auto sIt = ++simplex.begin(); sIt != simplex.end(); ++sIt) {
 					for (unsigned int d = 0; d < centroid.size(); ++d) {
 						double s = simplex.begin()->second[d] + (shrink * (sIt->second[d] - best->second[d]));
+						cout << "changed to " << s << endl;
 						sIt->second[d] = s;
 					}
 				}

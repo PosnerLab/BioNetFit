@@ -172,8 +172,13 @@ void Model::outputModelWithParams(map<string, double> params, string path, strin
 		return;
 	}
 
+	// Erase file if it already exists
+	string fullPath = path + "/" + filename;
+	if (checkIfFileExists(fullPath)) {
+		unlink(fullPath.c_str());
+	}
+
 	if (!usePipe) {
-		string fullPath = path + "/" + filename;
 		unlink(fullPath.c_str());
 
 		ofstream outFile;
@@ -186,7 +191,6 @@ void Model::outputModelWithParams(map<string, double> params, string path, strin
 				int numParamsToReplace = params.size();
 				int numReplacedParams = 0;
 
-				//for (string line : netContents_){
 				for (auto line = netContents_.begin(); line != netContents_.end(); ++line) {
 					if (*line == "end parameters" || numReplacedParams == numParamsToReplace) {
 						inParameterBlock = false;
