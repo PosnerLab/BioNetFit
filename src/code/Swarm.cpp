@@ -3468,7 +3468,7 @@ void Swarm::runASA() {
 	}
 
 	// Initialize and/or fill our parameter vectors
-	vector<bool> isLocal = vector<bool>(options.swarmSize + 1, false);
+	vector<unsigned int> isLocal = vector<unsigned int>(options.swarmSize + 1);
 	vector<double> particleTemps = vector<double>(options.swarmSize + 1, 0);
 	vector<double> particleRadii = vector<double>(options.swarmSize + 1, 0);
 	vector<float> particleFs = generateParticleFs();
@@ -3565,7 +3565,7 @@ void Swarm::runASA() {
 
 				allGenFits.insert(pair<double, string>(particle->second[0], paramString));
 
-				isLocal[particle->first] = false;
+				isLocal[particle->first] = 0;
 			}
 			else {
 				// If we pass metropolis selection, store the params for assignment to receiver
@@ -3601,9 +3601,9 @@ void Swarm::runASA() {
 				cout << "inserting " << paramString << endl;
 				// Do a local search at some probability
 				// Or if particle is best in swarm
-				if (options.localSearchProbability >= ((float)rand() / (float)RAND_MAX)) {
+				if (particle->second[0] < particleBestFits_.at(particleToController[cpuToParticle[particle->first]]) || options.localSearchProbability >= ((float)rand() / (float)RAND_MAX)) {
 					cout << "going to do a local search" << endl;
-					isLocal[particle->first] = true;
+					//isLocal[particle->first] = cpuToParticle[particle->first];
 				}
 			}
 
@@ -3649,8 +3649,7 @@ void Swarm::runASA() {
 			else {
 				cout << "running local search on cpu " << particle->first << endl;
 				// Do local search
-				isLocal[particle->first] = true;
-				runNelderMead(it, particle->first);
+				runNelderMead(isLocal[particle->first], particle->first);
 			}
 		}
 		finishedParticles.clear();

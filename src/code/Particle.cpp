@@ -582,7 +582,7 @@ bool Particle::checkMessagesDE() {
 
 				cout << "running search" << endl;
 				runNelderMead(simplex);
-				cout << "nelder mead finished. new calc: " << fitCalcs[-1] << endl;
+				cout << "nelder mead finished. old calc: " << simplex.begin()->first << " new calc: " << fitCalcs[-1] << endl;
 				vector<string> paramsStr;
 				paramsStr.push_back(to_string(static_cast<long double>(fitCalcs[-1])));
 				for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
@@ -827,8 +827,8 @@ void Particle::smoothRuns() {
 
 void Particle::runNelderMead(map<double, vector<double>> simplex) {
 	// The transformation coefficients
-	float reflection = 1;
-	float expansion = 2;
+	float reflection = 0.25;
+	float expansion = 2.0;
 	float contraction = 0.5;
 	float shrink = 0.5;
 	unsigned int simulationCount = 0;
@@ -856,13 +856,14 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		cout << "reflecting" << endl;
 		vector<double> R; // The transformation vector
 		for (unsigned int d = 0; d < centroid.size(); ++d) {
-			double r = centroid[d] + (reflection * (centroid[d] - worst->second[d]));
+			double r = centroid[d] + reflection * (centroid[d] - worst->second[d]);
 			cout << "cen: " << centroid[d] << endl;
 			R.push_back(r);
 		}
 
 		auto tIt = R.begin();
 		for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
+			cout << p->second << " ";
 			p->second = *tIt;
 			cout << "changed to " << p->second << endl;
 			++tIt;
@@ -900,7 +901,7 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			*/
 			vector<double> E;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
-				double e = centroid[d] + (expansion * (R[d] - centroid[d]));
+				double e = centroid[d] + expansion * (R[d] - centroid[d]);
 				E.push_back(e);
 			}
 
