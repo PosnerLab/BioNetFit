@@ -103,6 +103,7 @@ private:
 		ar & genMin_;
 		ar & genMax_;
 		ar & hasMutation_;
+		ar & isLog_;
 	}
 };
 

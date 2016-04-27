@@ -833,8 +833,6 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 	float shrink = 0.5;
 	unsigned int simulationCount = 0;
 
-	cout << "lowest: " << simplex.begin()->first << " size: " << simplex.size() << endl;
-
 	while (simulationCount < 10) {
 		// Get our important vertices
 		auto sIt = simplex.end();
@@ -843,6 +841,7 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		advance(sIt, - 1); // Second to last element
 		auto good = sIt;
 		auto best = simplex.begin();
+		bool invalid = false;
 
 		vector<vector<double>> centroidVectors;
 		for (auto params = simplex.begin(); params != worst; ++params) {
@@ -857,29 +856,36 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		vector<double> R; // The transformation vector
 		for (unsigned int d = 0; d < centroid.size(); ++d) {
 			double r = centroid[d] + reflection * (centroid[d] - worst->second[d]);
+			if (r <= 0) {
+				invalid = true;
+			}
 			cout << "cen: " << centroid[d] << endl;
 			R.push_back(r);
 		}
 
 		auto tIt = R.begin();
 		for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
-			cout << p->second << " ";
 			p->second = *tIt;
-			cout << "changed to " << p->second << endl;
 			++tIt;
 		}
 
-		for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
-			runModel(i, true);
-			++simulationCount;
+		double rCalc;
+		if (!invalid) {
+			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
+				runModel(i, true);
+				++simulationCount;
+			}
+			if (swarm_->options.smoothing > 1) {
+				smoothRuns();
+			}
+			calculateFit(true);
+			rCalc = fitCalcs[-1];
 		}
-		if (swarm_->options.smoothing > 1) {
-			smoothRuns();
+		else {
+			invalid = false;
+			rCalc = pow(10, 10);
 		}
-		calculateFit(true);
-		double rCalc = fitCalcs[-1];
 		cout << "reflection: " << rCalc << endl;
-		// NEED TO GENERATE MODEL FILE!!
 
 		// R Better than good, but worse than best
 		if (rCalc > best->first && rCalc < good->first) {
@@ -892,36 +898,39 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		else if (rCalc < best->first) {
 			cout << "reflection was better than best. expanding" << endl;
 			// Expand
-			/*
-			centroidVectors.clear();
-			for (auto params = simplex.begin(); params != worst; ++params) {
-				centroidVectors.push_back(params->second);
-			}
-			centroid = getCentroid(centroidVectors);
-			*/
+
 			vector<double> E;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
 				double e = centroid[d] + expansion * (R[d] - centroid[d]);
+				if (e <= 0) {
+					invalid = true;
+				}
 				E.push_back(e);
 			}
 
 			auto tIt = E.begin();
 			for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 				p->second = *tIt;
-				cout << "changed to " << p->second << endl;
 				++tIt;
 			}
-			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
-				runModel(i, true);
-				cout << "done running" << endl;
-				++simulationCount;
+
+			double eCalc;
+			if (!invalid) {
+				for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
+					runModel(i, true);
+					++simulationCount;
+				}
+				if (swarm_->options.smoothing > 1) {
+					smoothRuns();
+				}
+				calculateFit(true);
+				eCalc = fitCalcs[-1];
+				cout << "expansion: " << eCalc << endl;
 			}
-			if (swarm_->options.smoothing > 1) {
-				smoothRuns();
+			else {
+				eCalc = pow(10,10);
+				invalid = false;
 			}
-			calculateFit(true);
-			double eCalc = fitCalcs[-1];
-			cout << "expansion: " << eCalc << endl;
 
 			if (eCalc < rCalc) {
 				cout << "expansion was better than reflection. looping." << endl;
@@ -940,35 +949,38 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		else if (rCalc > good->first) {
 			cout << "reflection was worse than good. contracting." << endl;
 			// Contraction
-			/*
-			centroidVectors.clear();
-			for (auto params = simplex.begin(); params != worst; ++params) {
-				centroidVectors.push_back(params->second);
-			}
-			centroid = getCentroid(centroidVectors);
-			*/
 			vector<double> C;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
 				double c = centroid[d] + (contraction * (worst->second[d] - centroid[d]));
+				if (c <= 0) {
+					invalid = true;
+				}
 				C.push_back(c);
 			}
 
 			auto tIt = C.begin();
 			for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 				p->second = *tIt;
-				cout << "changed to " << p->second << endl;
 				++tIt;
 			}
-			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
-				runModel(i, true);
-				++simulationCount;
+
+			double cCalc;
+			if (!invalid) {
+				for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
+					runModel(i, true);
+					++simulationCount;
+				}
+				if (swarm_->options.smoothing > 1) {
+					smoothRuns();
+				}
+				calculateFit(true);
+				cCalc = fitCalcs[-1];
+				cout << "contraction: " << cCalc << endl;
 			}
-			if (swarm_->options.smoothing > 1) {
-				smoothRuns();
+			else {
+				invalid = false;
+				cCalc = pow(10, 10);
 			}
-			calculateFit(true);
-			double cCalc = fitCalcs[-1];
-			cout << "contraction: " << cCalc << endl;
 
 			if (cCalc < worst->first) {
 				cout << "contraction was better than worst. looping." << endl;
@@ -977,12 +989,11 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 				continue;
 			}
 			else {
-				cout << "contraction was worse than worst. shrinking" << endl;
+				//cout << "contraction was worse than worst. shrinking" << endl;
 				// Shrink
 				for (auto sIt = ++simplex.begin(); sIt != simplex.end(); ++sIt) {
 					for (unsigned int d = 0; d < centroid.size(); ++d) {
 						double s = simplex.begin()->second[d] + (shrink * (sIt->second[d] - best->second[d]));
-						cout << "changed to " << s << endl;
 						sIt->second[d] = s;
 					}
 				}

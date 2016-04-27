@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
 			s->resumingSavedSwarm = true;
 
 			if (s->options.useCluster) {
-				setenv("OMPI_MCA_mpi_warn_on_fork","0", 1);
+				setenv("OMPI_MCA_mpi_warn_on_fork","0", 0);
 				int randNum = rand();
 				string serializedSwarmPath = to_string(static_cast<long long int>(randNum)) + ".sconf";
 
@@ -285,7 +285,6 @@ int main(int argc, char *argv[]) {
 			pID = s->swarmComm->getRank();
 		}
 
-		cout << "seeding with: " << s->options.seed + pID << endl;
 		s->initRNGS(s->options.seed + pID);
 
 		Particle *p = s->createParticle(pID);

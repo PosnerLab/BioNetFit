@@ -133,7 +133,7 @@ Swarm::Swarm() {
 void Swarm::initRNGS(int seed) {
 	if (seed) {
 		srand(seed);
-		//cout << "seeding rng with: " << seed << endl;
+		cout << "seeding rng with: " << seed << endl;
 	}
 	else {
 		// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
@@ -3603,7 +3603,8 @@ void Swarm::runASA() {
 				// Or if particle is best in swarm
 				if (particle->second[0] < particleBestFits_.at(particleToController[cpuToParticle[particle->first]]) || options.localSearchProbability >= ((float)rand() / (float)RAND_MAX)) {
 					cout << "going to do a local search" << endl;
-					//isLocal[particle->first] = cpuToParticle[particle->first];
+					// This receiver will go on to do a local search
+					isLocal[particle->first] = cpuToParticle[particle->first];
 				}
 			}
 
@@ -3648,7 +3649,7 @@ void Swarm::runASA() {
 			}
 			else {
 				cout << "running local search on cpu " << particle->first << endl;
-				// Do local search
+				// Do local search using PREVIOUS receiver
 				runNelderMead(isLocal[particle->first], particle->first);
 			}
 		}
@@ -3835,6 +3836,8 @@ void Swarm::swapTR(vector<double> particleRadii, vector<double> particleTemps) {
 }
 vector<double> Swarm::generateTrialPointSA(unsigned int controller, unsigned int receiver, vector<double> particleRadii, vector<float>particleCRs, vector<float>particleFs, vector<vector<float>> &trialParams) {
 	vector<double> currParams = normalizeParams(particleCurrParamSets_.at(controller));
+	vector<double> testParams = deNormalizeParams(currParams);
+
 	float cr;
 	float f;
 
@@ -3883,7 +3886,7 @@ vector<double> Swarm::generateTrialPointSA(unsigned int controller, unsigned int
 
 		if (newParam <= 0 || newParam > 1) {
 			newParam = (double)rand() / (double)RAND_MAX;
-			cout << "new: " << newParam << endl;
+			//cout << "new: " << newParam << endl;
 		}
 
 		newParams.push_back(newParam);
@@ -3985,8 +3988,9 @@ vector<double> Swarm::normalizeParams(vector<double> oldParams) {
 		//cout << "denormalized: " << oldParams[d] << endl;
 		//cout << "max: " << param->second->getGenMax() << " min: " << param->second->getGenMin() << " diff: " << (param->second->getGenMax() - param->second->getGenMin()) << endl;
 		//newParams.push_back((oldParams[d++] - param->second->getGenMin()) / (param->second->getGenMax() - param->second->getGenMin()));
-		newParams.push_back(normalizeParam(oldParams[d++], param->second->getGenMin(), param->second->getGenMax(), param->second->getIsLog()));
+		newParams.push_back(normalizeParam(oldParams[d], param->second->getGenMin(), param->second->getGenMax(), param->second->getIsLog()));
 		//cout << "normalized: " << *(newParams.end() - 1) << endl;
+		++d;
 	}
 
 	return newParams;
@@ -3994,7 +3998,8 @@ vector<double> Swarm::normalizeParams(vector<double> oldParams) {
 
 double Swarm::normalizeParam(double oldParam, double min, double max, bool log) {
 	if (log) {
-		return (oldParam - min) / (max - min);
+		return (log10(oldParam) - log10(min)) / (log10(max) - log10(min));
+		//return (oldParam - min) / (max - min);
 	}
 	else {
 		return (oldParam - min) / (max - min);
@@ -4009,8 +4014,9 @@ vector<double> Swarm::deNormalizeParams(vector<double> oldParams) {
 		//cout << "normalized: " << oldParams[d] << endl;
 		//newParams.push_back(pow(10, log10(param->second->getGenMin()) + oldParams[d++] * (log10(param->second->getGenMax()) - log10(param->second->getGenMin() ))));
 		//newParams.push_back( param->second->getGenMin() + oldParams[d++] * (param->second->getGenMax() - param->second->getGenMin()));
-		newParams.push_back(deNormalizeParam(oldParams[d++], param->second->getGenMin(), param->second->getGenMax(), param->second->getIsLog()));
+		newParams.push_back(deNormalizeParam(oldParams[d], param->second->getGenMin(), param->second->getGenMax(), param->second->getIsLog()));
 		//cout << "denormalized: " << *(newParams.end() - 1) << endl;
+		++d;
 	}
 
 	return newParams;
