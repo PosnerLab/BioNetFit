@@ -34,7 +34,6 @@ void Particle::setID(int id) {
 }
 
 void Particle::generateParams() {
-	// TODO: See here: http://www.johndcook.com/blog/cpp_TR1_random/
 	// for a possibly better way to generate numbers
 	// freeParams_ is a map with the first element being a parameter name, and the second element being a pointer to a FreeParam object
 	for (map<string,FreeParam*>::iterator i = model_->freeParams_.begin(); i != model_->freeParams_.end(); ++i) {
@@ -151,8 +150,6 @@ void Particle::doParticle() {
 			swarm_->swarmComm->univMessageReceiver.clear();
 		}
 
-		cout << "loop " << currentGeneration_ << endl;
-
 		if (doRunModel) {
 			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 				runModel(i);
@@ -264,7 +261,7 @@ void Particle::runModel(int iteration, bool localSearch) {
 
 	// Check for simulation command success
 	if (ret == 0) { // TODO: Need to check for simulation status when using pipes. Going by return code doesn't work there because we're using the & operator
-		//map<int, Data*> iterationMap;
+					// really not sure how we can do this easily
 		string outputSuffix;
 		// Save our simulation outputs to data objects
 		for (std::map<std::string,Model::action>::iterator action = model_->actions.begin(); action != model_->actions.end(); ++action) {
@@ -662,7 +659,9 @@ void Particle::calculateFit(bool local) {
 			//cout << "col loop " << exp_col->first << endl;
 			colSum = 0;
 			for (std::map<double,double>::iterator timepoint = exp_col->second.begin(); timepoint != exp_col->second.end(); ++timepoint) {
-				// TODO: Need to handle missing points
+				if (std::isnan(timepoint->second)) {
+					continue;
+				}
 
 				//double exp = timepoint->second;
 				//cout << "exp: " << exp << endl;
@@ -687,6 +686,7 @@ void Particle::calculateFit(bool local) {
 				else {
 					sim = dataFiles_.at(e->first).at(swarm_->options.smoothing+1)->dataCurrent->at(exp_col->first).at(timepoint->first);
 				}
+
 				double sum = (this->*objFuncPtr)(sim, timepoint->second, divisor);
 
 				if (swarm_->options.bootstrap) {

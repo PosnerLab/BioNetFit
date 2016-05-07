@@ -11,9 +11,6 @@
 #include "Utils.hh"
 #include "Swarm.hh"
 
-// TODO: Is this acceptable?
-#define NaN 123456789
-
 class Swarm;
 class Data {
 

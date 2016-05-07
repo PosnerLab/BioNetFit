@@ -4,7 +4,7 @@
  *  Created on: Jul 17, 2015
  *      Author: brandon
  */
-// TODO: Auto average best fit gdat for results?
+// Auto average best fit gdat for results?
 
 #include "Swarm.hh"
 
@@ -33,7 +33,6 @@ Swarm::Swarm() {
 	options.maxGenerations = 0;
 	options.swarmSize = 0;
 	options.minFit = 0;
-	options.maxFit = 0;
 	options.bootstrap = 0;
 	options.parallelCount = 0;
 	options.seed = 0;
@@ -168,15 +167,15 @@ void Swarm::addExp(string path) {
 }
 
 void Swarm::setModel(string path) {
-	Timer tmr;
+	//Timer tmr;
 
 	path = convertToAbsPath(path);
 	//cout << "setting model" << endl;
 	this->options.model = new Model(this, path);
 	//cout << "model set" << endl;
 
-	double t = tmr.elapsed();
-	cout << "Adding .bngl took " << t << " seconds" << endl;
+	//double t = tmr.elapsed();
+	//cout << "Adding .bngl took " << t << " seconds" << endl;
 }
 
 void Swarm::setfitType(string type) {
@@ -235,8 +234,6 @@ void Swarm::addMutate(std::string mutateString) {
 	vector<string> mutComponents;
 	split(mutateString, mutComponents);
 
-	//cout << "mut" << endl;
-	// TODO: Should the parsing belong in the Config class? Maybe.
 	// Make sure we have three components to work with
 	if (mutComponents.size() == 3) {
 		// Make sure first parameter name exists as a free parameter
@@ -869,7 +866,7 @@ vector<double> Swarm::calcParticlePosPSO(unsigned int particle) {
 		// Set up formula variables
 		double currVelocity = options.inertia * particleParamVelocities_.at(particle)[i];
 		//cout << "cv: " << currVelocity << endl;
-		double r1 = ((double) rand() / (RAND_MAX)); // TODO: These need to be inclusive
+		double r1 = ((double) rand() / (RAND_MAX));
 		//cout << "r1: " << r1 << endl;
 		double r2 = ((double) rand() / (RAND_MAX));
 		//cout << "r2: " << r2 << endl;
@@ -1304,8 +1301,6 @@ void Swarm::breedGenerationGA(vector<unsigned int> children) {
 
 		unsigned int p1;
 		unsigned int p2;
-		//unsigned int maxFitCounter = 0;
-		// TODO: maxfit needs to be implemented. to do this we need to be able to lookup the chosen particles fit value...
 		// Pick the fit values (particle parents) used in breeding
 		//do {
 		p1 = pickWeighted(weightSum, weightDiffs, options.extraWeight);
@@ -2213,7 +2208,6 @@ string Swarm::generateTorqueBatchScript(string cmd) {
 string Swarm::generateSlurmCommand(string cmd, bool multiProg, int nCPU) {
 	string command;
 
-	//TODO: Need to generate job submission name
 	//TODO: Need to display terminal output from cluster jobs
 
 	// srun submits the job to the cluster
@@ -2272,7 +2266,6 @@ string Swarm::generateSlurmBatchFile(string runCmd) {
 	ofstream sbatch(sbatchPath, ios::out);
 
 	if (sbatch.is_open()) {
-		//TODO: Need to generate job submission name
 		//TODO: Need to display terminal output from cluster jobs
 
 		sbatch << "#!/bin/sh" << endl << endl;
@@ -3388,7 +3381,6 @@ void Swarm::runADE() {
 				islandFinishedParticles[particleToIsland_.at(particle->first)] += 1;
 				cout << particle->first << " in island " << particleToIsland_.at(particle->first) << " finished." << endl;
 
-				// TODO: Need to put this (and synch version) in a function
 				// Let's process params and update any fit values
 				string paramsString;
 				paramsString = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(particle->first)) + " ";

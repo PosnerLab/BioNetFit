@@ -132,8 +132,7 @@ public:
 		bool synchronicity;		// 1 for synchronous
 		unsigned int maxGenerations;// maximum number of generations
 		unsigned int swarmSize;		// how many particles in the swarm
-		float minFit;		// we won't accept any fits in breeding if they are over this value // TODO: Implement this
-		float maxFit;		// we stop fitting if we reach this value // TODO: Implement this
+		float minFit;		// we stop fitting if we reach this value
 		unsigned int parallelCount;	// how many particles to run in parallel
 		unsigned int objFunc;		// which objective function to use
 		bool usePipes;	// whether or not to use pipes to gather simulation output
@@ -158,7 +157,6 @@ public:
 
 		unsigned long maxFitTime;	// Maximum amount of time to let the fit run
 		unsigned long maxNumSimulations; // Maximum number of simulations to run
-		unsigned long maxNumIterations; // Maximum number of iterations a particle can run // TODO: Implement
 
 		// PSO options
 		float inertia; // 0.72
@@ -197,9 +195,9 @@ public:
 
 		// Cluster options
 		std::string clusterSoftware;// which cluster software to use
-		std::string clusterAccount;	// user account to specify in cluster submission commands // TODO: Parse
-		bool saveClusterOutput;		// whether or not to save output during a cluster fit // TODO: Parse
-		std::string clusterQueue;	// The cluster queue to submit to // TODO: Parse
+		std::string clusterAccount;	// user account to specify in cluster submission commands
+		bool saveClusterOutput;		// whether or not to save output during a cluster fit
+		std::string clusterQueue;	// The cluster queue to submit to
 		bool emailWhenFinished;
 		std::string emailAddress;
 		std::string hostfile;
@@ -222,7 +220,6 @@ public:
 			ar & maxGenerations;
 			ar & swarmSize;
 			ar & minFit;
-			ar & maxFit;
 			ar & bootstrap;
 			ar & parallelCount;
 			ar & objFunc;
@@ -246,7 +243,6 @@ public:
 
 			ar & maxFitTime;
 			ar & maxNumSimulations;
-			ar & maxNumIterations;
 
 			ar & inertia;
 			ar & cognitive;
@@ -367,7 +363,6 @@ private:
 
 	std::vector<std::vector<unsigned int> > populationTopology_;
 
-	// TODO: These need to be initialized with 0s
 	// Maybe we can change them to vectors, too
 	std::map<unsigned int, double> particleBestFits_;
 	std::multimap<double, unsigned int> particleBestFitsByFit_;

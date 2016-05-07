@@ -17,8 +17,6 @@ Config::Config(string configFile) {
 	configPath_ = convertToAbsPath(configFile);
 }
 
-// TODO: Make "max_flocks" synonymous with max_generations
-
 Swarm * Config::createSwarmFromConfig () {
 	swarm_ = new Swarm();
 
@@ -138,8 +136,6 @@ Swarm * Config::createSwarmFromConfig () {
 
 			swarm_->options.useCluster = (stoi(pairs.find("use_cluster")->second) == 1) ? true : false;
 			swarm_->getClusterInformation();
-			//cout << "setting useCluster to " << swarm_->options.useCluster << endl;
-			// TODO: Set parallel count accordingly
 
 			if (pairs.find("email_when_finished") != pairs.end() && stoi(pairs.find("email_when_finished")->second)) {
 				swarm_->options.emailWhenFinished = true;
@@ -151,12 +147,18 @@ Swarm * Config::createSwarmFromConfig () {
 		}
 	}
 
-	// TODO: Need to ensure path gets made
 	// Tell the swarm if we should save cluster output
 	if(pairs.find("save_cluster_output") != pairs.end()) {
-		cout << "Processing save cluster output" << endl;
 		swarm_->options.saveClusterOutput = (stoi(pairs.find("save_cluster_output")->second) == 1) ? true : false;
 	}
+
+	if(pairs.find("cluster_account") != pairs.end()) {
+		swarm_->options.clusterAccount = pairs.find("cluster_account")->second;
+	}
+
+	if(pairs.find("cluster_queue") != pairs.end()) {
+			swarm_->options.clusterQueue = pairs.find("cluster_queue")->second;
+		}
 
 	if(pairs.find("hostfile") != pairs.end()) {
 		//cout << "Processing use cluster" << endl;
@@ -165,43 +167,36 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Update seed
 	if(pairs.find("seed") != pairs.end()) {
-		cout << "Processing seed" << endl;
 		swarm_->options.seed = stoi(pairs.find("seed")->second);
 	}
 
 	// Update swap rate
 	if(pairs.find("swap_rate") != pairs.end()) {
-		cout << "Processing swap rate" << endl;
 		swarm_->options.swapRate = stof(pairs.find("swap_rate")->second);
 	}
 
 	// Update number of parents to keep unchanged in breeding
 	if(pairs.find("keep_parents") != pairs.end()) {
-		cout << "Processing keep parents" << endl;
 		swarm_->options.keepParents = stoi(pairs.find("keep_parents")->second);
 	}
 
 	// Update extra weight
 	if(pairs.find("extra_weight") != pairs.end()) {
-		cout << "Processing extra weight" << endl;
 		swarm_->options.extraWeight = stoi(pairs.find("extra_weight")->second);
 	}
 
 	// Whether or not to force difference parents
 	if(pairs.find("force_different_parents") != pairs.end()) {
-		cout << "Processing force different parents" << endl;
 		swarm_->options.forceDifferentParents = (stoi(pairs.find("force_different_parents")->second) == 1) ? true : false;
 	}
 
 	// How many retries when breeding
 	if(pairs.find("max_breeding_retries") != pairs.end()) {
-		cout << "Processing max breeding retries" << endl;
 		swarm_->options.maxRetryDifferentParents = stoi(pairs.find("max_breeding_retries")->second);
 	}
 
 	// Set fit value that will cause fit to end
 	if(pairs.find("smoothing") != pairs.end()) {
-		cout << "Processing smoothing" << endl;
 		swarm_->options.smoothing = stoi(pairs.find("smoothing")->second);
 
 		if (swarm_->options.smoothing == 0) {
@@ -211,13 +206,11 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Set output directory
 	if(pairs.find("output_dir") != pairs.end()) {
-		cout << "Processing output dir" << endl;
 		swarm_->options.outputDir = convertToAbsPath(pairs.find("output_dir")->second);
 	}
 
 	// Set job name
 	if(pairs.find("job_name") != pairs.end()) {
-		cout << "Processing job name" << endl;
 		swarm_->options.jobName = pairs.find("job_name")->second;
 	}
 
@@ -226,32 +219,22 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Set verbosity
 	if(pairs.find("verbosity") != pairs.end()) {
-		cout << "Processing verbosity" << endl;
 		swarm_->options.verbosity = stoi(pairs.find("verbosity")->second);
 	}
 
 	// Set fit value that will cause fit to end
 	if(pairs.find("min_fit") != pairs.end()) {
-		cout << "Processing minfit" << endl;
 		swarm_->options.minFit = stod(pairs.find("min_fit")->second);
-	}
-
-	// Set the maximum fit value to consider in breeding
-	if(pairs.find("max_fit") != pairs.end()) {
-		cout << "Processing maxfit" << endl;
-		swarm_->options.maxFit = stod(pairs.find("max_fit")->second);
 	}
 
 	// Set maximum number of simulations in an asynchronous genetic fit
 	if(pairs.find("max_num_simulations") != pairs.end()) {
-		cout << "Processing max num sims" << endl;
 		swarm_->options.maxNumSimulations = stol(pairs.find("max_num_simulations")->second);
 	}
 
 	// Set maximum fitting time
 	// TODO: Implement this in synchronous genetic fitting
 	if(pairs.find("max_fit_time") != pairs.end()) {
-		cout << "Processing max fit time" << endl;
 		vector<string> timeElements;
 		split(pairs.find("max_fit_time")->second, timeElements, ":");
 		long timeInSeconds = (stol(timeElements[0]) * 3600) + (stol(timeElements[1]) * 60) + stol(timeElements[2]);
@@ -260,8 +243,9 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Update the maximum number of parallel threads (non-cluster only)
 	if(pairs.find("parallel_count") != pairs.end()) {
-		cout << "Processing parallel count" << endl;
-		// TODO: Make sure PC isn't higher than swarm size
+		if (stoi(pairs.find("parallel_count")->second) > swarm_->options.swarmSize) {
+			outputError("Error: Parallel_count is set higher than swarm_size.");
+		}
 		if (swarm_->options.useCluster) {
 			swarm_->options.parallelCount = swarm_->options.swarmSize;
 		}
@@ -272,7 +256,6 @@ Swarm * Config::createSwarmFromConfig () {
 	}
 	// Whether or not to divide by value at t=0
 	if(pairs.find("divide_by_init") != pairs.end()) {
-		cout << "Processing divide by init" << endl;
 		swarm_->options.divideByInit = (stoi(pairs.find("divide_by_init")->second.c_str()) == 1) ? true : false;
 	}
 
@@ -293,7 +276,6 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Update fit calculation method
 	if(pairs.find("objfunc") != pairs.end()) {
-		cout << "Processing objfunc" << endl;
 		swarm_->options.objFunc = stoi(pairs.find("objfunc")->second);
 	}
 
@@ -303,42 +285,34 @@ Swarm * Config::createSwarmFromConfig () {
 	//////////////////////////////////////////////////////////////////
 
 	if (pairs.find("inertia") != pairs.end()) {
-		cout << "Processing inertia" << endl;
 		swarm_->options.inertia = stof(pairs.find("inertia")->second);
 	}
 
 	if (pairs.find("cognitive") != pairs.end()) {
-		cout << "Processing cognitive" << endl;
 		swarm_->options.cognitive = stof(pairs.find("cognitive")->second);
 	}
 
 	if (pairs.find("social") != pairs.end()) {
-		cout << "Processing social" << endl;
 		swarm_->options.social = stof(pairs.find("social")->second);
 	}
 
 	if (pairs.find("inertia") != pairs.end()) {
-		cout << "Processing inertia" << endl;
 		swarm_->options.inertia = stof(pairs.find("inertia")->second);
 	}
 
 	if (pairs.find("nmin") != pairs.end()) {
-		cout << "Processing nmin" << endl;
 		swarm_->options.nmin = stoi(pairs.find("nmin")->second);
 	}
 
 	if (pairs.find("nmax") != pairs.end()) {
-		cout << "Processing nmax" << endl;
 		swarm_->options.nmax = stoi(pairs.find("nmax")->second);
 	}
 
 	if (pairs.find("inertia_init") != pairs.end()) {
-		cout << "Processing inertia_init" << endl;
 		swarm_->options.inertiaInit = stof(pairs.find("inertia_init")->second);
 	}
 
 	if (pairs.find("inertia_final") != pairs.end()) {
-		cout << "Processing inertia_final" << endl;
 		swarm_->options.inertiaFinal = stof(pairs.find("inertia_final")->second);
 	}
 
@@ -422,7 +396,7 @@ Swarm * Config::createSwarmFromConfig () {
 	// Add any init param generation options
 	//for (auto pair: pairs) {
 	for (unordered_multimap<string, string>::iterator pair = pairs.begin(); pair != pairs.end(); ++pair) {
-		// TODO: Implement a map.equalrange to speed this part up
+		// We should use a map.equalrange to speed this part up
 		if (pair->first == "random_var" || pair->first == "lognormrandom_var" || pair->first == "loguniform_var") {
 			vector<string> paramComponents;
 			split(pair->second,paramComponents);

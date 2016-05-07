@@ -128,7 +128,7 @@ void Data::parseData(){
 		swarm_->outputError("Error: Your data file (" + dataPath + ") doesn't contain (#) as the first value.");
 	}
 
-	// TODO: Do we need to store columns that aren't in .exp?  Maybe not.
+	// Do we need to store columns that aren't in .exp?  Maybe not.
 	vector<string> columns;
 	split(allLines[0], columns, " \t");
 
@@ -142,6 +142,15 @@ void Data::parseData(){
 			// Skip column if we encounter a hash, a 'time' column, or a column corresponding to a scan parameter name
 			if (*col == "#" || *col == "time" || *col == swarm_->options.model->actions.at(basename).scanParam){
 				continue;
+			}
+
+			double value;
+			// Replace any NaN's with our own NaN constant
+			if (values[i] == "NaN") {
+				value = nan("1");
+			}
+			else {
+				value = stod(values[i]);
 			}
 
 			// If our column name ends in "_SD" we need to store the value in our stdev map
@@ -189,7 +198,7 @@ void Data::standardizeData() {
 		// Here we get the riemann sum squared for use in the stdev calculation
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "sd loop" << endl;
-			if (v->second == NaN) {
+			if (std::isnan(v->second)) {
 				continue;
 			}
 			sqtotal += pow(mean - v->second, 2);
@@ -202,8 +211,8 @@ void Data::standardizeData() {
 		// Loop through and set values according to formula: val_new = (val_old - column_mean) / (column_stdev)
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "stand loop" << endl;
-			if (v->second == NaN) {
-				dataStandardized_[c->first][v->first] = NaN;
+			if (std::isnan(v->second)) {
+				dataStandardized_[c->first][v->first] = nan("1");
 				continue;
 			}
 			//cout << "inserting: " << (v->second - mean) / stdev << endl;
@@ -218,8 +227,8 @@ void Data::divideByInit() {
 			if (v->second == 0) {
 				swarm_->outputError("You chose to divide_by_init, but the first value in the column '" + c->first + "' is 0. We cannot divide by 0.");
 			}
-			if (v->second == NaN) {
-				dataDividedByInit_[c->first][v->first] = NaN;
+			if (std::isnan(v->second)) {
+				dataDividedByInit_[c->first][v->first] = nan("1");
 				continue;
 			}
 			dataDividedByInit_[c->first][v->first] = v->second / c->second.begin()->first;
@@ -239,7 +248,7 @@ void Data::getColumnAverages() {
 
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "gca tp loop" << endl;
-			if (v->second == NaN) {
+			if (std::isnan(v->second)) {
 				continue;
 			}
 			sum += v->second;
@@ -255,8 +264,8 @@ void Data::logTransformData() {
 			if (v->second == 0) {
 				swarm_->outputError("You chose to log transform simulation output, but the first value in the column '" + c->first + "' is 0. We cannot take the log of 0.");
 			}
-			else if (v->second == NaN) {
-				dataLogTransformed_[c->first][v->first] = NaN;
+			else if (std::isnan(v->second)) {
+				dataLogTransformed_[c->first][v->first] = nan("1");
 				continue;
 			}
 			dataLogTransformed_[c->first][v->first] = log10(v->second)/log10(swarm_->options.logTransformSimData);

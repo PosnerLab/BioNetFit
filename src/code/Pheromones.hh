@@ -54,7 +54,6 @@ class Swarm;
 #define NONBLOCK FALSE
 #define BLOCK TRUE
 
-// TODO Streamline tag and ID conversion
 #define ANY_TAG 10
 #define GET_RUNNING_PARTICLES 11
 #define SEND_RUNNING_PARTICLES 12

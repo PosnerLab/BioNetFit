@@ -216,7 +216,6 @@ void Model::outputModelWithParams(map<string, double> params, string path, strin
 						}
 						//cout << "matches took " << tt << " seconds" << endl;
 					}
-					//cout << line;
 					outFile << *line;
 				}
 			}
