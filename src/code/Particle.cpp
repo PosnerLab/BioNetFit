@@ -349,6 +349,7 @@ void Particle::checkMessagesGenetic() {
 
 
 		if (swarm_->swarmComm->univMessageReceiver.find(FIT_FINISHED) != swarm_->swarmComm->univMessageReceiver.end()) {
+			swarm_->swarmComm->~Pheromones();
 			exit(0);
 		}
 

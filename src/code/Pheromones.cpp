@@ -21,7 +21,14 @@ Pheromones::Pheromones() {
 }
 
 Pheromones::~Pheromones() {
-	env_->~environment();
+	if (swarm_->options.useCluster) {
+		env_->~environment();
+	}
+	else {
+		for (auto mq = smq_.begin(); mq != smq_.end(); ++mq) {
+			(*mq)->~message_queue();
+		}
+	}
 }
 
 void Pheromones::init(Swarm *s) {

@@ -2461,9 +2461,13 @@ void Swarm::initPSOswarm(bool resumeFit) {
 void Swarm::outputError(string errorMessage) {
 	cout << errorMessage << endl;
 
+	// Tell all particles to die
 	killAllParticles(FIT_FINISHED);
 
-	exit (1);
+	// Deconstruct our communicator
+	swarmComm->~Pheromones();
+
+	exit (EXIT_FAILURE);
 }
 
 vector<double> Swarm::mutateParticleDE(unsigned int particle, float mutateFactor) {

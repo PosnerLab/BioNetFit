@@ -302,5 +302,7 @@ int main(int argc, char *argv[]) {
 		p->doParticle();
 	}
 
+	s->swarmComm->~Pheromones();
+
 	return 0;
 }
