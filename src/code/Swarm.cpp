@@ -1104,7 +1104,7 @@ void Swarm::launchParticle(unsigned int pID, bool nextGen) {
 	if (currentGeneration == 1 && !options.useCluster && !nextGen && bootstrapCounter == 0) {
 
 		// Construct command needed to run the particle
-		string command = exePath_ + " particle " + to_string(static_cast<long long int>(pID)) + " run " + to_string(static_cast<long long int>(currentGeneration)) + " " + sConf_;
+		string command = exePath_ + " particle " + to_string(pID) + " run " + to_string(currentGeneration) + " " + sConf_;
 		command = command + " >> pOUT 2>&1";
 		command = command + " &";
 
@@ -1541,7 +1541,7 @@ void Swarm::outputRunSummary(string outputPath) {
 		outputFile.close();
 	}
 	else {
-		cout << "Warning: couldn't open: " << outputFile << " to write fit summary." << endl;
+		cout << "Warning: couldn't open: " << outputPath << " to write fit summary." << endl;
 	}
 }
 
@@ -1605,7 +1605,7 @@ void Swarm::outputBootstrapSummary() {
 		outputFile.close();
 	}
 	else {
-		cout << "Warning: couldn't open: " << outputFile << " to write fit summary." << endl;
+		cout << "Warning: couldn't open: " << outputPath << " to write fit summary." << endl;
 	}
 }
 
