@@ -20,6 +20,10 @@ Pheromones::Pheromones() {
 	world_ = 0;
 }
 
+Pheromones::~Pheromones() {
+	env_->~environment();
+}
+
 void Pheromones::init(Swarm *s) {
 	swarm_ = s;
 

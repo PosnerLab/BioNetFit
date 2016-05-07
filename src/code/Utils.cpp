@@ -106,12 +106,13 @@ int runCommand(string cmd) {
 
 	//cout << "Running command: " << cmd << endl;
 
-	/*
+
 	int ret = system(cmd.c_str());
 	return ret;
-	*/
 
 
+
+	/*
 	FILE *in;
 
 	//cout << "Running command: " << cmd << endl;
@@ -123,6 +124,7 @@ int runCommand(string cmd) {
 	//printf("Exit code: %d\n", WEXITSTATUS(status));
 
 	return status;
+	*/
 
 	/*
 	char *c_cmd = new char[cmd.length()+1];

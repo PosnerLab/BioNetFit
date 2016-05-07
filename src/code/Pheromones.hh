@@ -79,6 +79,7 @@ class Swarm;
 class Pheromones {
 public:
 	Pheromones();
+	~Pheromones();
 
 	void init(Swarm *s);
 

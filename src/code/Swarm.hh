@@ -92,13 +92,18 @@ public:
 	void runSSA();
 	void runASA();
 
+	std::vector<double> normalizeParams(std::vector<double> params);
+	std::vector<double> deNormalizeParams(std::vector<double> params);
+
 	Particle *createParticle(unsigned int pID);
 
 	void getClusterInformation();
+	std::string getClusterCommand(std::string cmd);
 	std::string generateTorqueBatchScript(std::string cmd);
 	std::string generateSlurmCommand(std::string cmd, bool multiProg = true, int nCPU = 0);
 	std::string generateSlurmMultiProgCmd(std::string runCmd);
 	std::string generateSlurmBatchFile(std::string runCmd);
+	std::string generateMPICommand(std::string runCmd);
 
 	Pheromones *swarmComm;
 
@@ -197,6 +202,7 @@ public:
 		std::string clusterQueue;	// The cluster queue to submit to // TODO: Parse
 		bool emailWhenFinished;
 		std::string emailAddress;
+		std::string hostfile;
 
 		template<class Archive>
 		void serialize(Archive &ar, const unsigned int version)
@@ -278,6 +284,7 @@ public:
 			ar & clusterAccount;
 			ar & saveClusterOutput;
 			ar & clusterQueue;
+			ar & hostfile;
 		}
 	};
 	SwarmOpts options;
@@ -343,8 +350,6 @@ private:
 	bool metropolisSelection(unsigned int particle, double fit, float particleTemp);
 	void swapTR(std::vector<double> particleRadii, std::vector<double> particleTemps);
 	std::vector<double> generateTrialPointSA(unsigned int controller, unsigned int receiver, std::vector<double> particleRadii, std::vector<float>particleCRs, std::vector<float>particleFs, std::vector<std::vector<float>> &trialParams);
-	std::vector<double> normalizeParams(std::vector<double> params);
-	std::vector<double> deNormalizeParams(std::vector<double> params);
 	double normalizeParam(double oldParam, double min, double max, bool log);
 	double deNormalizeParam(double oldParam, double min, double max, bool log);
 

@@ -827,25 +827,28 @@ void Particle::smoothRuns() {
 
 void Particle::runNelderMead(map<double, vector<double>> simplex) {
 	// The transformation coefficients
-	float reflection = 0.25;
+	float reflection = 1.0;
 	float expansion = 2.0;
 	float contraction = 0.5;
 	float shrink = 0.5;
 	unsigned int simulationCount = 0;
 
-	while (simulationCount < 10) {
+	while (simulationCount < 20) {
 		// Get our important vertices
 		auto sIt = simplex.end();
 		advance(sIt, - 1); // Last element
+		cout << "worst is: " << sIt->first << endl;
 		auto worst = sIt;
 		advance(sIt, - 1); // Second to last element
+		cout << "second worst is: " << sIt->first << endl;
 		auto good = sIt;
 		auto best = simplex.begin();
+		cout << "best is: " << best->first << endl;
 		bool invalid = false;
 
 		vector<vector<double>> centroidVectors;
 		for (auto params = simplex.begin(); params != worst; ++params) {
-			centroidVectors.push_back(params->second);
+			centroidVectors.push_back(swarm_->normalizeParams(params->second));
 		}
 
 		// Calculate the centroid
@@ -856,14 +859,16 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 		vector<double> R; // The transformation vector
 		for (unsigned int d = 0; d < centroid.size(); ++d) {
 			double r = centroid[d] + reflection * (centroid[d] - worst->second[d]);
-			if (r <= 0) {
+			if (r <= 0 || r > 1) {
 				invalid = true;
 			}
-			cout << "cen: " << centroid[d] << endl;
+			cout << "creating new pt with eq " << centroid[d] << " + " << reflection << " * (" << centroid[d] << " - " << worst->second[d] << "): " << r << endl;
 			R.push_back(r);
 		}
 
-		auto tIt = R.begin();
+		vector<double> deNormalizedReflection = swarm_->deNormalizeParams(R);
+
+		auto tIt = deNormalizedReflection.begin();
 		for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 			p->second = *tIt;
 			++tIt;
@@ -889,9 +894,12 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 
 		// R Better than good, but worse than best
 		if (rCalc > best->first && rCalc < good->first) {
+			cout << "reflection was worse than best and better than good. erasing worst of " << worst->first << endl;
 			simplex.erase(worst);
+			cout << "sim size: " << simplex.size() << endl;
 			simplex.insert(pair<double, vector<double>> (rCalc, R));
-			cout << "reflection was worse than best and better than good. looping." << endl;
+			cout << "inserting rCalc of " << rCalc << endl;
+
 			continue;
 		}
 		// R Better than best
@@ -902,13 +910,16 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			vector<double> E;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
 				double e = centroid[d] + expansion * (R[d] - centroid[d]);
-				if (e <= 0) {
+				if (e <= 0 || e > 1) {
 					invalid = true;
 				}
 				E.push_back(e);
+				cout << "creating new pt with eq " << centroid[d] << " + " << expansion << " * (" << R[d] << " - " << centroid[d] << "): " << e << endl;
 			}
 
-			auto tIt = E.begin();
+			vector<double> deNormalizedExpansion = swarm_->deNormalizeParams(E);
+
+			auto tIt = deNormalizedExpansion.begin();
 			for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 				p->second = *tIt;
 				++tIt;
@@ -951,14 +962,17 @@ void Particle::runNelderMead(map<double, vector<double>> simplex) {
 			// Contraction
 			vector<double> C;
 			for (unsigned int d = 0; d < centroid.size(); ++d) {
-				double c = centroid[d] + (contraction * (worst->second[d] - centroid[d]));
-				if (c <= 0) {
+				double c = centroid[d] + contraction * (worst->second[d] - centroid[d]);
+				if (c <= 0 || c > 1) {
 					invalid = true;
 				}
 				C.push_back(c);
+				cout << "creating new pt with eq " << centroid[d] << " + " << contraction << " * (" << worst->second[d] << " - " << centroid[d] << "): " << c << endl;
 			}
 
-			auto tIt = C.begin();
+			vector<double> deNormalizedContraction = swarm_->deNormalizeParams(C);
+
+			auto tIt = deNormalizedContraction.begin();
 			for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
 				p->second = *tIt;
 				++tIt;

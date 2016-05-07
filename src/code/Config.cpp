@@ -158,6 +158,11 @@ Swarm * Config::createSwarmFromConfig () {
 		swarm_->options.saveClusterOutput = (stoi(pairs.find("save_cluster_output")->second) == 1) ? true : false;
 	}
 
+	if(pairs.find("hostfile") != pairs.end()) {
+		//cout << "Processing use cluster" << endl;
+		swarm_->options.hostfile = pairs.find("hostfile")->second;
+	}
+
 	// Update seed
 	if(pairs.find("seed") != pairs.end()) {
 		cout << "Processing seed" << endl;

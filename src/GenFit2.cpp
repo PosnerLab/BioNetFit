@@ -127,11 +127,12 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (action == "cluster") {
-			string runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
+			string runCmd = s->getClusterCommand(string(convertToAbsPath(argv[0])));
+			//string runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
 
 			if (s->options.saveClusterOutput) {
 				string outputPath = s->options.outputDir + "/" + s->options.jobName + "_cluster_output";
-				cout << "string: " << outputPath << endl;
+				//cout << "string: " << outputPath << endl;
 				if (!checkIfFileExists(outputPath)) {
 					string makeClusterOutputDirCmd = "mkdir " + outputPath;
 					if (runCommand(makeClusterOutputDirCmd) != 0) {

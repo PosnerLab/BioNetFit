@@ -276,8 +276,6 @@ void Swarm::addMutate(std::string mutateString) {
 
 void Swarm::doSwarm() {
 
-	system ("exec rm /home/brandon/projects/BioNetFit/Debug/pOUT");
-
 	for (bootstrapCounter = 0; bootstrapCounter <= options.bootstrap; ++bootstrapCounter) {
 		initFit();
 		// TODO: Test all synchronous fits on PC
@@ -403,10 +401,7 @@ bool Swarm::checkStopCriteria() {
 		return true;
 	}
 
-	//cout << "Fitcompare" << endl;
-	//cout << particleBestFitsByFit_.begin()->first << endl;
-	//cout << options.minFit << endl;
-	if (particleBestFitsByFit_.begin()->first <= options.minFit) {
+	if ( (swarmBestFits_.size() && swarmBestFits_.begin()->first <= options.minFit) || (particleBestFitsByFit_.size() && particleBestFitsByFit_.begin()->first <= options.minFit) ) {
 		cout << "Stopped according to swarmBestFit (" << particleBestFitsByFit_.begin()->first << ") <= options.minFit (" << options.minFit << ")" << endl;
 		return true;
 	}
@@ -974,7 +969,7 @@ vector<double> Swarm::calcParticlePosQPSO(unsigned int particle, vector<double> 
 	vector<double> neighborhoodBests = getNeighborhoodBestPositions(particle);
 	for (unsigned int d = 0; d < mBests.size(); ++d) {
 		//cout << particle << " before: " << particleCurrParamSets_[particle][d] << endl;
-		cout << particle << " mbest: " << mBests[d] << endl;
+		//cout << particle << " mbest: " << mBests[d] << endl;
 		//cout << particle << " best: " << particleBestParamSets_[particle][d] << endl;
 		//cout << particle << " swarmbest: " << getNeighborhoodBestPositions(particle)[d] << endl;
 		double fi1 = ((double) rand() / (RAND_MAX));
@@ -1620,7 +1615,7 @@ void Swarm::outputBootstrapSummary() {
 
 void Swarm::killAllParticles(int tag) {
 	for (unsigned int p = 1; p <= options.swarmSize; ++p) {
-		cout << "killing " << p << " with tag: " << tag << endl;
+		//cout << "killing " << p << " with tag: " << tag << endl;
 		swarmComm->sendToSwarm(0, p, tag, false, swarmComm->univMessageSender);
 	}
 	swarmComm->univMessageSender.clear();
@@ -1632,17 +1627,18 @@ void Swarm::getClusterInformation() {
 	if (options.clusterSoftware.size() == 0) {
 		// Test for slurm
 		string output;
+		string output2;
+		string output3;
+
 		runCommand("which srun", output);
 		if (output.length() > 0) {
 			options.clusterSoftware = "slurm";
 		}
 		// Test for PBS-type
-
 		else{
 			runCommand("which qsub", output);
 			if(output.length() > 0) {
 				// Test for Torque/PBS
-				string output2;
 				runCommand("which maui", output);
 				runCommand("which moab", output2);
 				if(output.length() > 0 || output2.length() > 0) {
@@ -1652,17 +1648,30 @@ void Swarm::getClusterInformation() {
 				else {
 					string output3;
 					runCommand("which sge_execd", output);
-					runCommand("which qconf", output);
-					runCommand("which qmon", output);
+					runCommand("which qconf", output2);
+					runCommand("which qmon", output3);
 					if (output.length() > 0 || output2.length() > 0 || output3.length() > 0) {
-						outputError("Error: BioNetFit doesn't support for GridEngine clusters. If you are not running on a GridEngine cluster, specify the cluster platform in the .conf file using the 'cluster_software' option.");
+						outputError("Error: BioNetFit doesn't support GridEngine clusters. If you are not running on a GridEngine cluster, specify the cluster platform in the .conf file using the 'cluster_software' option.");
+					}
+				}
+			}
+			// Test for mpi
+			else {
+				output.clear();
+				runCommand("which mpirun", output);
+
+				if (output.length() > 0) {
+					options.clusterSoftware = "mpi";
+
+					if (options.hostfile.size() <= 0) {
+						cout << "Warning: You are using mpi, but failed to specify a hostfile in your .conf file.." << endl;
 					}
 				}
 			}
 		}
 	}
 	else {
-		if (options.clusterSoftware != "slurm" && options.clusterSoftware != "torque") {
+		if (options.clusterSoftware != "slurm" && options.clusterSoftware != "torque" && options.clusterSoftware != "mpi") {
 			outputError("You specified an unrecognized cluster type in your .conf file. BioNetFit only supports 'torque' or 'slurm' cluster types.");
 		}
 	}
@@ -2112,6 +2121,36 @@ void Swarm::checkExternalMessages() {
 		string delCmd = "rm " + messagePath;
 		runCommand(delCmd);
 	}
+}
+
+string Swarm::getClusterCommand(string runCmd) {
+	if (options.clusterSoftware == "slurm") {
+		return generateSlurmMultiProgCmd(runCmd);
+	}
+	else if (options.clusterSoftware == "torque") {
+		return generateTorqueBatchScript(runCmd);
+	}
+	else if (options.clusterSoftware == "mpi") {
+		return generateMPICommand(runCmd);
+	}
+}
+
+string Swarm::generateMPICommand(string cmd) {
+	//sbatch << "mpirun -prepend-rank -np 1 " << runCmd << " load " << sConf_ << " : -np " << options.swarmSize << " " << runCmd << " particle 0 run " << sConf_ << endl;
+	string newCmd = "mpirun -nooversubscribe ";
+	if (options.hostfile.size()) {
+		newCmd += "-hostfile " + options.hostfile + " ";
+	}
+	newCmd += "-tag-output -np 1 " + cmd + " load " + sConf_ + " : -nooversubscribe ";
+	if (options.hostfile.size()) {
+		newCmd += "-hostfile " + options.hostfile + " ";
+	}
+	newCmd += "-tag-output -np " + to_string(static_cast<long long int>(options.swarmSize)) + " " + cmd + " particle 0 run " + sConf_;
+
+	if (options.saveClusterOutput) {
+		newCmd += " > " + options.outputDir + "/" + options.jobName + "_cluster_output/" + options.jobName + " 2>&1";
+	}
+	return newCmd;
 }
 
 string Swarm::generateSlurmMultiProgCmd(string runCmd) {
@@ -3958,14 +3997,18 @@ void Swarm::runNelderMead(unsigned int it, unsigned int cpu) {
 	// then send it to the CPU..
 
 	// calc -> params
-	map<double, vector<double>> simplex {pair<double, vector<double>>(particleBestFits_.at(it), particleCurrParamSets_.at(it))};
+	map<double, vector<double>> simplex {pair<double, vector<double>>(particleBestFits_.at(it), normalizeParams(particleCurrParamSets_.at(it)))};
 
 	// Get our nearest neighbors in parameter space
 	map<double, unsigned int> neighbors = getNearestNeighbors(it, options.model->getNumFreeParams());
 
 	// Fill our simplex
 	for (auto particle = neighbors.begin(); particle != neighbors.end(); ++particle) {
-		simplex[particleBestFits_.at(particle->second)] = particleCurrParamSets_.at(particle->second);
+		cout << "chose neighbor: " << particle->second << " with fit of " <<  particleBestFits_.at(particle->second) << endl;
+		simplex[particleBestFits_.at(particle->second)] = normalizeParams(particleCurrParamSets_.at(particle->second));
+		for (auto param = simplex[particleBestFits_.at(particle->second)].begin(); param != simplex[particleBestFits_.at(particle->second)].end(); ++ param) {
+			cout << "p: " << *param << endl;
+		}
 	}
 
 	std::stringstream oss;
@@ -4047,13 +4090,15 @@ map<double, unsigned int> Swarm::getNearestNeighbors(unsigned int it, unsigned i
 		// Calculate sum of squares
 		double sum = 0;
 		vector<double> pParams = normalizeParams(particleCurrParamSets_.at(paramSet->first));
-		auto itIt = particleCurrParamSets_.at(it).begin();
+		auto itIt = itParams.begin();
 		for (auto param = pParams.begin(); param != pParams.end(); ++param) {
 			sum += pow((*itIt - *param), 2);
+			++itIt;
 		}
 
 		// Insert sum and id to map. It is automatically ordered.
 		neighbors.insert(pair<double, unsigned int>(sum, paramSet->first));
+		cout << "inserting " << sum << endl;
 	}
 
 	// We only need the top N, so delete the rest
