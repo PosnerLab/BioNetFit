@@ -828,7 +828,8 @@ void Swarm::processParticlesPSO(vector<unsigned int> particles, bool newFlight) 
 		// Convert positions to string so they can be sent to the particle
 		vector<string> nextPositionsStr;
 		for (auto param = particleCurrParamSets_.at(*particle).begin(); param != particleCurrParamSets_.at(*particle).end(); ++param) {
-			nextPositionsStr.push_back(to_string(static_cast<long double>(*param)));
+			//nextPositionsStr.push_back(to_string(static_cast<long double>(*param)));
+			nextPositionsStr.push_back(to_string(*param));
 			//cout << *param << endl;
 		}
 
