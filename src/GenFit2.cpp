@@ -92,7 +92,6 @@ int main(int argc, char *argv[]) {
 	Swarm *s;
 	if (type == "master") {
 		Config myconfig(configFile);
-
 		if (action != "load" && action != "resume") {
 			s = myconfig.createSwarmFromConfig();
 
@@ -213,7 +212,6 @@ int main(int argc, char *argv[]) {
 
 				if (s->options.saveClusterOutput) {
 					string outputPath = s->options.outputDir + "/" + s->options.jobName + "_cluster_output";
-					cout << "string: " << outputPath << endl;
 					if (!checkIfFileExists(outputPath)) {
 						string makeClusterOutputDirCmd = "mkdir " + outputPath;
 						if (runCommand(makeClusterOutputDirCmd) != 0) {

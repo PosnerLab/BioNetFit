@@ -394,7 +394,6 @@ Swarm * Config::createSwarmFromConfig () {
 	}
 
 	// Add any init param generation options
-	//for (auto pair: pairs) {
 	for (unordered_multimap<string, string>::iterator pair = pairs.begin(); pair != pairs.end(); ++pair) {
 		// We should use a map.equalrange to speed this part up
 		if (pair->first == "random_var" || pair->first == "lognormrandom_var" || pair->first == "loguniform_var") {
@@ -434,7 +433,6 @@ Swarm * Config::createSwarmFromConfig () {
 		}
 	}
 
-	//for (auto i : swarm_->options.model->freeParams_) {
 	for (map<string, FreeParam*>::iterator i = swarm_->options.model->freeParams_.begin(); i != swarm_->options.model->freeParams_.end(); ++i) {
 		if (!i->second) {
 			outputError("Error: We found a free parameter '" + i->first + "' specified in your model file but can't find a matching parameter generator in your .conf file.");
@@ -480,32 +478,26 @@ Swarm * Config::createSwarmFromConfig () {
 	vector<string> prefixedActions;
 	vector<Model::action> toDeleteActs;
 
-	for (map<string, Model::action>::iterator i = swarm_->options.model->actions.begin(); i != swarm_->options.model->actions.end();)
-		//for (vector<Model::action>::iterator i = swarm_->options.model->actions.begin(); i != swarm_->options.model->actions.end();)
-	{
+	for (map<string, Model::action>::iterator i = swarm_->options.model->actions.begin(); i != swarm_->options.model->actions.end();) {
 		prefixedActions.push_back(i->first);
 
 		if (swarm_->options.expFiles.count(i->first) == 1) {
 			if (swarm_->options.verbosity >=3 ) {
-				cout << "Linking action " << i->first << " with exp file: " << swarm_->options.expFiles[i->first]->getPath() << endl;
+				//cout << "Linking action " << i->first << " with exp file: " << swarm_->options.expFiles[i->first]->getPath() << endl;
 			}
 			i->second.dataSet = swarm_->options.expFiles[i->first];
 			++i;
 		}
 		else { // Have a prefix but no .exp file
 			cout << "Warning: The model file specifies an action with the prefix '" << i->first << "' but there isn't a matching .exp file specified in your .conf file. We will ignore this action command." << endl;
-			//i = swarm_->options.model->actions.erase(i);
-			swarm_->options.model->actions.erase(++i);
+			i = swarm_->options.model->actions.erase(++i);
 		}
 	}
 
-	//vector<Data*> toDeleteExp;
-	//for (auto &i : swarm_->options.expFiles){ // Have .exp but no prefix
 	for (map<string, Data*>::iterator i = swarm_->options.expFiles.begin(); i != swarm_->options.expFiles.end(); ++i) {
+		// Have exp but no prefix
 		if(std::find(prefixedActions.begin(), prefixedActions.end(), i->first) == prefixedActions.end() ) {
 			cout << "Warning: The .conf file specifies an .exp file '" << i->first << "' but there isn't a matching action command in your model file specified with the prefix=> argument." << endl;
-			//toDeleteExp.push_back(swarm_->options.expFiles[i->first]);
-			//i = swarm_->options.expFiles.erase(i);
 			swarm_->options.expFiles.erase(++i);
 		}
 	}

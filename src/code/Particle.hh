@@ -33,6 +33,7 @@ public:
 	void generateParams();
 
 	std::map<int, double> fitCalcs;
+	std::map<std::string, double> simParams_;
 
 private:
 	friend class boost::serialization::access;
@@ -64,7 +65,6 @@ private:
 	Swarm * swarm_;
 	unsigned int currentGeneration_;
 	unsigned int island_;
-	std::map<std::string, double> simParams_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {

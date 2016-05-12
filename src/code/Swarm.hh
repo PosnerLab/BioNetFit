@@ -111,7 +111,8 @@ public:
 	std::vector<std::map<std::string, std::map<std::string, std::map<double,unsigned int>>>> bootstrapMaps;
 
 	bool isMaster;
-	boost::random::mt19937 randNumEngine;
+	boost::random::mt19937 generalRand;
+	boost::random::mt19937 parameterGenRand;
 	unsigned int currentGeneration;
 	unsigned int bootstrapCounter;
 	bool resumingSavedSwarm;
@@ -307,6 +308,7 @@ private:
 	std::unordered_map<unsigned int, std::vector<double>> checkMasterMessagesDE();
 	void checkExternalMessages();
 	void resetVariables();
+	void generateBestFitModel(std::string outputDirectory);
 
 	void initPSOswarm(bool resumeFit = false);
 	void processParticlesPSO(std::vector<unsigned int> particles, bool nextFlight = false);

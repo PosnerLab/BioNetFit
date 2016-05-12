@@ -28,7 +28,7 @@ int checkIfFileExists(std::string path);
 void split(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " ");
 void outputHelp();
 bool createParticlePipe(const char * path);
-//double pickWeighted(double weightSum, std::multimap<double,double>& weights, int extraWeight, boost::random::mt19937 &randNumEngine);
+//double pickWeighted(double weightSum, std::multimap<double,double>& weights, int extraWeight, boost::random::mt19937 &generalRand);
 bool isFloat(std::string number);
 double mutateParamGA(FreeParam* fp, double paramValue);
 int runCommand(std::string cmd, std::string &result);

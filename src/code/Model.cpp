@@ -92,23 +92,23 @@ void Model::parseModel() {
 
 	// Go through the model and store important things
 	boost::smatch smatches;
-	//for (string i : fullContents_) {
+
 	for (vector<string>::iterator i = fullContents_.begin(); i != fullContents_.end(); ++i) {
-		if (boost::regex_search(*i, boost::regex("^simulate|^simulate_nf|^simulate_ode|^simulate_ssa|^simulate_pla|^parameter_scan"))) {
+		if (boost::regex_search(*i, boost::regex("^\\s*simulate|^\\s*simulate_nf|^\\s*simulate_ode|^\\s*simulate_ssa|^\\s*simulate_pla|^\\s*parameter_scan"))) {
 			action newAction;
 			string prefix;
 			bool isParScan = 0;
 
 			// If the action is a normal "simulate", find the method in the arguments and store it
-			if (boost::regex_search(*i, smatches, boost::regex("^simulate\\(\\{.*method=>(\"|')(\\w{2,3})(\"|')"))) {
+			if (boost::regex_search(*i, smatches, boost::regex("^\\s*simulate\\(\\{.*method=>(\"|')(\\w{2,3})(\"|')"))) {
 				newAction.type = smatches[2];
 			}
 			// If we the action command is simulate_xx, store the sim type
-			else if (boost::regex_search(*i, smatches, boost::regex("^simulate_(\\w{2})\\(\\{"))) {
+			else if (boost::regex_search(*i, smatches, boost::regex("^\\s*simulate_(\\w{2})\\(\\{"))) {
 				newAction.type = smatches[1];
 			}
 			// If we found a parameter_scan command, store the type, scan parameter, and t_end
-			else if (boost::regex_search(*i, smatches, boost::regex("^parameter_scan\\(\\{.*method=>(\"|')(\\w{2,3})(\"|')"))) {
+			else if (boost::regex_search(*i, smatches, boost::regex("^\\s*parameter_scan\\(\\{.*method=>(\"|')(\\w{2,3})(\"|')"))) {
 				isParScan = 1;
 				newAction.type = smatches[2];
 
@@ -126,7 +126,7 @@ void Model::parseModel() {
 			}
 
 			// Remove any suffixes from the command
-			*i = boost::regex_replace(*i,boost::regex(",suffix=>('|\")\\w+('|\")"), string(""));
+			*i = boost::regex_replace(*i,boost::regex(",\\s*suffix=>('|\")\\w+('|\")"), string(""));
 
 			// Find any prefixes and store them
 			if (boost::regex_search(*i, smatches, boost::regex("prefix=>('|\")(\\w+)('|\")"))) {
@@ -140,17 +140,16 @@ void Model::parseModel() {
 
 			newAction.full = *i;
 			if (!prefix.empty()) {
-				actions.insert(pair<string,action>(prefix,newAction));
+				actions.insert(pair<string, action>(prefix, newAction));
 			}
 		}
 		// Save any free parameters
 		else if (boost::regex_search(*i, smatches, boost::regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
-			//freeParams_.insert(pair<string,string>(smatches[2],""));
 			FreeParam * fp = new FreeParam(smatches[2]);
 			freeParams_.insert(pair<string,FreeParam*>(smatches[2],fp));
 		}
 		// Make sure we know if we need to do network generation
-		else if (boost::regex_search(*i, smatches, boost::regex("^generate_network"))) {
+		else if (boost::regex_search(*i, smatches, boost::regex("^\\s*generate_network"))) {
 			hasGenerateNetwork_ = true;
 		}
 	}
@@ -226,11 +225,10 @@ void Model::outputModelWithParams(map<string, double> params, string path, strin
 					outFile << line;
 				}
 
-				//for (string line : fullContents_){
 				for (auto line = fullContents_.begin(); line != fullContents_.end(); ++line) {
 					if (onlyActions) {
 						string actionLine = *line;
-						if (boost::regex_search(*line, boost::regex("^simulate|^simulate_nf|^simulate_ode|^simulate_ssa|^simulate_pla|^parameter_scan|^setConcentration|^addConcentration|^saveConcentration|^resetConcentrations|^setParameter|^saveParameters|^resetParameters|^quit|^substanceUnits|^version|^setOption"))) {
+						if (boost::regex_search(*line, boost::regex("^\\s*simulate|^\\s*simulate_nf|^\\s*simulate_ode|^\\s*simulate_ssa|^\\s*simulate_pla|^\\s*parameter_scan|^\\s*setConcentration|^\\s*addConcentration|^\\s*saveConcentration|^\\s*resetConcentrations|^\\s*setParameter|^\\s*saveParameters|^\\s*resetParameters|^\\s*quit|^\\s*substanceUnits|^\\s*version|^\\s*setOption"))) {
 							if (!suffix.empty()) {
 								string suffixLine = ",suffix=>\"" + suffix + "\"})";
 								actionLine = boost::regex_replace(actionLine, boost::regex("\\}\\)"), suffixLine);
@@ -254,7 +252,7 @@ void Model::outputModelWithParams(map<string, double> params, string path, strin
 						// TODO: Next line is never working. Same as above for .net file?
 						if (*line == "end parameters" || numReplacedParams == numParamsToReplace) {
 							inParameterBlock = false;
-							cout << "out of parameter block" << endl;
+							//cout << "out of parameter block" << endl;
 						}
 
 						//cout << *line << endl;
@@ -270,7 +268,7 @@ void Model::outputModelWithParams(map<string, double> params, string path, strin
 						}
 						// Add in the unique suffix
 						if (!suffix.empty()) {
-							if (boost::regex_search(*line, boost::regex("^simulate|^simulate_nf|^simulate_ode|^simulate_ssa|^simulate_pla|^parameter_scan"))) {
+							if (boost::regex_search(*line, boost::regex("^\\s*simulate|^\\s*simulate_nf|^\\s*simulate_ode|^\\s*simulate_ssa|^\\s*simulate_pla|^\\s*parameter_scan"))) {
 								string suffixLine = ",suffix=>\"" + suffix + "\"})";
 								newLine = boost::regex_replace(*line, boost::regex("\\}\\)"), suffixLine);
 								newLine = newLine + "\n";

@@ -107,13 +107,13 @@ Swarm::Swarm() {
 	cauchyMutator_ = 0.2;
 
 	auto seed = chrono::high_resolution_clock::now().time_since_epoch().count();
-	randNumEngine.seed(seed);
-	randNumEngine.discard(700000);
+	generalRand.seed(seed);
+	generalRand.discard(700000);
 
 	/*
 	if (options.seed) {
-		randNumEngine.seed(options.seed);
-		randNumEngine.discard(700000);
+		generalRand.seed(options.seed);
+		generalRand.discard(700000);
 
 		srand(options.seed);
 	}
@@ -121,8 +121,8 @@ Swarm::Swarm() {
 		// TODO: Make sure everything is being seeded properly and in the proper place. Also let's do away with rand()
 		// Seed our random number engine
 		auto seed = chrono::high_resolution_clock::now().time_since_epoch().count();
-		randNumEngine.seed(seed);
-		randNumEngine.discard(700000);
+		generalRand.seed(seed);
+		generalRand.discard(700000);
 
 		srand (std::tr1::random_device{}());
 	}
@@ -278,8 +278,7 @@ void Swarm::doSwarm() {
 		// TODO: Test all synchronous fits on PC
 		// Main fit loops
 		if (options.synchronicity) {
-			// Synchronous genetic
-			if (options.fitType == "genetic") {
+			if (options.fitType == "ga") {
 				runSGA();
 			}
 			else if (options.fitType == "pso") {
@@ -297,7 +296,7 @@ void Swarm::doSwarm() {
 		// Asynchronous fit loops
 		else {
 			// Genetic fit
-			if (options.fitType == "genetic") {
+			if (options.fitType == "ga") {
 				runAGA();
 			}
 			// PSO fit
@@ -356,6 +355,7 @@ bool Swarm::checkStopCriteria() {
 				}
 			}
 		}
+		/*
 		else if (options.nmax) {
 			if (abs(particleBestFitsByFit_.begin()->first - optimum_) < options.absTolerance + (options.relTolerance * particleBestFitsByFit_.begin()->first) ) {
 				if (options.verbosity >= 3) {
@@ -380,8 +380,9 @@ bool Swarm::checkStopCriteria() {
 				}
 			}
 		}
+		 */
 	}
-	else if ((options.fitType == "genetic" || options.fitType == "de") && options.synchronicity) {
+	else if ((options.fitType == "ga" || options.fitType == "de") && options.synchronicity) {
 		if (options.verbosity >= 3) {
 			cout << "Checking if we've reached max generation. Current is " << currentGeneration << " and max is " << options.maxGenerations << endl;
 		}
@@ -485,7 +486,7 @@ vector<double> Swarm::calcQPSOmBests() {
 		// TODO: Adaptive mutation ala Liu 2005
 		if (options.mutateQPSO) {
 			boost::random::cauchy_distribution<double> dist(0, cauchyMutator_);
-			double mutator = dist(randNumEngine);
+			double mutator = dist(generalRand);
 			mean += mutator;
 			//cout << mean << " mutated by: " << mutator << endl;
 		}
@@ -519,7 +520,6 @@ double Swarm::calcParticleWeight(unsigned int particle) {
 
 Particle * Swarm::createParticle(unsigned int pID) {
 	Particle * p = new Particle(this, pID);
-	//p->setBasePath(particleBasePath_);
 
 	return p;
 }
@@ -952,7 +952,7 @@ vector<double> Swarm::calcParticlePosBBPSO(unsigned int particle, bool exp) {
 			boost::random::normal_distribution<double> dist(mean, std);
 
 			// Pick our next position randomly from distribution
-			nextPositions[i] = dist(randNumEngine);
+			nextPositions[i] = dist(generalRand);
 			cout << "picked: " << nextPositions[i] << endl;
 		}
 		++i;
@@ -1367,7 +1367,7 @@ void Swarm::breedGenerationGA(vector<unsigned int> children) {
 
 			//cout << "p1: " << p1Param << endl;
 			//cout << "p2: " << p2Param << endl;
-			if (unif(randNumEngine) < (options.swapRate * 100) ) {
+			if (unif(generalRand) < (options.swapRate * 100) ) {
 
 				// TODO: Make sure individual mutation rates work
 				if (hasMutate && p->second->isHasMutation()) {
@@ -1486,16 +1486,13 @@ void Swarm::finishFit() {
 		string outputFilePath = outputDir + "all_fits.txt";
 		outputRunSummary(outputFilePath);
 
+		generateBestFitModel(outputDir);
+
 		killAllParticles(FIT_FINISHED);
 
 		cout << "Finished fitting in " << tmr_.elapsed() << " seconds. Results can be found in " << options.jobOutputDir << "Results" << endl;
 	}
-
-
-	//generateBestFitModels(outputDir);
 	//copyBestFitToResults(outputDir);
-
-
 }
 
 void Swarm::resetVariables() {
@@ -1718,7 +1715,7 @@ void Swarm::initFit () {
 		// We need to set current generation to the iteration counter because the saved swarm
 		// currentGeneration may not be accurate due to it changed between runGeneration() and
 		// breedGenerationGA()
-		if (options.fitType == "genetic") {
+		if (options.fitType == "ga") {
 			currentGeneration = currentGeneration - 1;
 		}
 	}
@@ -1748,7 +1745,7 @@ void Swarm::initFit () {
 
 			// Construct our simulation command and run the network generator
 			string modelPath = options.jobOutputDir + "/base.bngl";
-			string command = options.bngCommand + " --outdir " + options.jobOutputDir + " " + modelPath + " >> " + options.jobOutputDir + "netgen_output 2>&1";
+			string command = options.bngCommand + " --outdir " + options.jobOutputDir + " " + modelPath + " > " + options.jobOutputDir + "netgen_output 2>&1";
 			cout << "Generating initial .net file with command: " << command << endl;
 
 			if (options.useCluster) {
@@ -1848,7 +1845,7 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 			unsigned int gen = currentGeneration;
 			string paramsString;
 			if (options.synchronicity == 1) {
-				if (options.fitType == "genetic") {
+				if (options.fitType == "ga") {
 					paramsString = "gen" + to_string(static_cast<long long int>(gen)) + "perm" + to_string(static_cast<long long int>(pID)) + " ";
 				}
 				else if (options.fitType == "pso") {
@@ -1876,7 +1873,7 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 			for (vector<string>::iterator m = sm->second.message.begin() + 1; m != sm->second.message.end(); ++m) {
 				paramsString += *m + " ";
 				paramsVec.push_back(stod(*m));
-				if (options.fitType == "genetic") {
+				if (options.fitType == "ga") {
 					particleCurrParamSets_[pID][i] = stod(*m);
 				}
 				//cout << "pushed back: " << *m << endl;
@@ -2323,13 +2320,14 @@ unsigned int Swarm::pickWeighted(double weightSum, multimap<double, unsigned int
 	double lowerBound = 0;
 	double upperBound = weightSum;
 
+	// TODO: Better error handling here?
 	if (upperBound <= 0) {
 		return 0;
 	}
 
 	boost::random::uniform_real_distribution<double> unif(lowerBound, upperBound);
 
-	double random = unif(randNumEngine);
+	double random = unif(generalRand);
 	double chosen = random * ( 1 - (extraWeight / 10 ));
 
 	//cout << "chosen: " << chosen << endl;
@@ -2367,7 +2365,7 @@ string Swarm::mutateParamGA(FreeParam* fp, double paramValue) {
 	boost::random::uniform_real_distribution<double> unif(0,1);
 
 	// Generate a random number and see if it's less than our mutation rate.  If is, we mutate.
-	if (unif(randNumEngine) < fp->getMutationRate()) {
+	if (unif(generalRand) < fp->getMutationRate()) {
 		// Store our mutation factor
 		float maxChange = paramValue * fp->getMutationFactor();
 
@@ -2379,7 +2377,7 @@ string Swarm::mutateParamGA(FreeParam* fp, double paramValue) {
 		boost::random::uniform_real_distribution<double> unif(0.0, maxChange * 2);
 
 		// Ger our new random number between 0 and maxChange, subtract maxChange.
-		double change = unif(randNumEngine) - maxChange;
+		double change = unif(generalRand) - maxChange;
 
 		// Add/subtract the value from the parameter
 		paramValue+= change;
@@ -2508,8 +2506,8 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle, float mutateFactor
 			int p2 = 0;
 
 			while (p1 == p2) {
-				p1 = unif(randNumEngine);
-				p2 = unif(randNumEngine);
+				p1 = unif(generalRand);
+				p2 = unif(generalRand);
 			}
 
 			double p1Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p1])[pi];
@@ -2534,10 +2532,10 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle, float mutateFactor
 			int p3 = 0;
 			int p4 = 0;
 			while (p1 == p2 || p1 == p3 || p1 == p4 || p2 == p3 || p2 == p4 || p3 == p4) {
-				p1 = unif(randNumEngine);
-				p2 = unif(randNumEngine);
-				p3 = unif(randNumEngine);
-				p4 = unif(randNumEngine);
+				p1 = unif(generalRand);
+				p2 = unif(generalRand);
+				p3 = unif(generalRand);
+				p4 = unif(generalRand);
 			}
 
 			double p1Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p1])[pi];
@@ -2563,9 +2561,9 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle, float mutateFactor
 			int p2 = 0;
 			int p3 = 0;
 			while (p1 == p2 || p1 == p3 || p2 == p3) {
-				p1 = unif(randNumEngine);
-				p2 = unif(randNumEngine);
-				p3 = unif(randNumEngine);
+				p1 = unif(generalRand);
+				p2 = unif(generalRand);
+				p3 = unif(generalRand);
 			}
 
 			double p1Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p1])[pi];
@@ -2593,11 +2591,11 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle, float mutateFactor
 			int p5 = 0;
 			// This (and above instances) should be optimized
 			while (p1 == p2 || p1 == p3 || p1 == p4 || p2 == p3 || p2 == p4 || p3 == p4 || p1 == p5 || p2 == p5 || p3 == p5 || p4 == p5) {
-				p1 = unif(randNumEngine);
-				p2 = unif(randNumEngine);
-				p3 = unif(randNumEngine);
-				p4 = unif(randNumEngine);
-				p5 = unif(randNumEngine);
+				p1 = unif(generalRand);
+				p2 = unif(generalRand);
+				p3 = unif(generalRand);
+				p4 = unif(generalRand);
+				p5 = unif(generalRand);
 			}
 
 			double p1Param = particleCurrParamSets_.at(islandToParticle_.at(currIsland)[p1])[pi];
@@ -2650,8 +2648,8 @@ vector<double> Swarm::mutateParticleSA(unsigned int particle, float mutateFactor
 			int p2 = 0;
 
 			while (p1 == p2) {
-				p1 = unif(randNumEngine);
-				p2 = unif(randNumEngine);
+				p1 = unif(generalRand);
+				p2 = unif(generalRand);
 			}
 
 			//cout << "p1: " << p1 << " p2: " << p2 << " pi: " << pi << endl;
@@ -2676,10 +2674,10 @@ vector<double> Swarm::mutateParticleSA(unsigned int particle, float mutateFactor
 			int p3 = 0;
 			int p4 = 0;
 			while (p1 == p2 || p1 == p3 || p1 == p4 || p2 == p3 || p2 == p4 || p3 == p4) {
-				p1 = unif(randNumEngine);
-				p2 = unif(randNumEngine);
-				p3 = unif(randNumEngine);
-				p4 = unif(randNumEngine);
+				p1 = unif(generalRand);
+				p2 = unif(generalRand);
+				p3 = unif(generalRand);
+				p4 = unif(generalRand);
 			}
 
 			double p1Param = normalizeParam(particleCurrParamSets_.at(p1)[pi], param->second->getGenMin(), param->second->getGenMax(), param->second->getIsLog());
@@ -2705,9 +2703,9 @@ vector<double> Swarm::mutateParticleSA(unsigned int particle, float mutateFactor
 			int p2 = 0;
 			int p3 = 0;
 			while (p1 == p2 || p1 == p3 || p2 == p3) {
-				p1 = unif(randNumEngine);
-				p2 = unif(randNumEngine);
-				p3 = unif(randNumEngine);
+				p1 = unif(generalRand);
+				p2 = unif(generalRand);
+				p3 = unif(generalRand);
 			}
 
 			double p1Param = normalizeParam(particleCurrParamSets_.at(p1)[pi], param->second->getGenMin(), param->second->getGenMax(), param->second->getIsLog());
@@ -2735,11 +2733,11 @@ vector<double> Swarm::mutateParticleSA(unsigned int particle, float mutateFactor
 			int p5 = 0;
 			// This (and above instances) should be optimized
 			while (p1 == p2 || p1 == p3 || p1 == p4 || p2 == p3 || p2 == p4 || p3 == p4 || p1 == p5 || p2 == p5 || p3 == p5 || p4 == p5) {
-				p1 = unif(randNumEngine);
-				p2 = unif(randNumEngine);
-				p3 = unif(randNumEngine);
-				p4 = unif(randNumEngine);
-				p5 = unif(randNumEngine);
+				p1 = unif(generalRand);
+				p2 = unif(generalRand);
+				p3 = unif(generalRand);
+				p4 = unif(generalRand);
+				p5 = unif(generalRand);
 			}
 
 			double p1Param = normalizeParam(particleCurrParamSets_.at(p1)[pi], param->second->getGenMin(), param->second->getGenMax(), param->second->getIsLog());
@@ -2763,7 +2761,7 @@ vector<double> Swarm::crossoverParticleDE(unsigned int particle, vector<double> 
 
 	// Uses binomial crossover
 	boost::random::uniform_int_distribution<int> intDist(0, options.model->getNumFreeParams() - 1);
-	unsigned int randParam = intDist(randNumEngine);
+	unsigned int randParam = intDist(generalRand);
 	boost::random::uniform_real_distribution<float> floatDist(0, 1);
 
 	float cr;
@@ -2779,7 +2777,7 @@ vector<double> Swarm::crossoverParticleDE(unsigned int particle, vector<double> 
 	unsigned int p = 0;
 	for (auto param = options.model->getFreeParams_().begin(); param != options.model->getFreeParams_().end(); ++param) {
 		//for (unsigned int p = 0; p < options.model->getNumFreeParams(); ++p) {
-		float rand = floatDist(randNumEngine);
+		float rand = floatDist(generalRand);
 		//cout << "p: " << p << ". rand: " << rand << endl;
 
 		if (rand < cr || p == randParam) {
@@ -2822,7 +2820,7 @@ void Swarm::sendMigrationSetDE(unsigned int island, vector<vector<unsigned int>>
 	}
 
 	// Choose the index of our receiver
-	unsigned int receivingIslandIndex = unif(randNumEngine);
+	unsigned int receivingIslandIndex = unif(generalRand);
 
 	// Loop through particles to send
 	vector<double> migrationSet;
@@ -4095,7 +4093,6 @@ map<double, unsigned int> Swarm::getNearestNeighbors(unsigned int it, unsigned i
 
 		// Insert sum and id to map. It is automatically ordered.
 		neighbors.insert(pair<double, unsigned int>(sum, paramSet->first));
-		cout << "inserting " << sum << endl;
 	}
 
 	// We only need the top N, so delete the rest
@@ -4104,4 +4101,20 @@ map<double, unsigned int> Swarm::getNearestNeighbors(unsigned int it, unsigned i
 	neighbors.erase(nIt, neighbors.end());
 
 	return neighbors;
+}
+
+void Swarm::generateBestFitModel(string outputDir) {
+	map<string, double> paramSet;
+
+	vector<string> paramVals;
+	auto best = allGenFits.begin();
+	split(best->second, paramVals);
+
+	auto fp = options.model->getFreeParams_().begin();
+	for (unsigned int i = 1; i < paramVals.size(); i++) {
+		paramSet.insert(pair<string, double> (fp->first, stod(paramVals[i])));
+		++fp;
+	}
+
+	options.model->outputModelWithParams(paramSet, outputDir, (options.jobName + ".bngl"), "", false, false, false, false, false);
 }

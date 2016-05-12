@@ -1,0 +1,22 @@
+unset multiplot
+
+set term 'png' size 2600,1200
+set output '3.png'
+set key bottom right
+set xlabel "time"
+
+set multiplot layout 2,3 title ""
+
+set ylabel "MKK4"
+plot "tc.exp" using 1:2 title "dr_tc_exp" with points ps 2 pt 5 , \
+"tc.gdat" using 1:48 title "dr_tc_sim" with lines lw 2
+
+set ylabel "MKK7"
+plot "tc.exp" using 1:3 title "dr_tc_exp" with points ps 2 pt 5 , \
+"tc.gdat" using 1:49 title "dr_tc_sim" with lines lw 2
+
+set ylabel "JNK"
+plot "tc.exp" using 1:4 title "dr_tc_exp" with points ps 2 pt 5 , \
+"tc.gdat" using 1:50 title "dr_tc_sim" with lines lw 2
+
+unset multiplot

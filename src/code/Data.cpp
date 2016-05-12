@@ -139,8 +139,12 @@ void Data::parseData(){
 		int i = 1;
 		for(vector<string>::iterator col = columns.begin(); col != columns.end(); ++col) {
 
+			//cout << "col: " << *col << endl;
+
+			// TODO: Haven't done prefix/exp consistency checks yet so it's possible we're missing
+			// a scan parameter.  This needs fixed..
 			// Skip column if we encounter a hash, a 'time' column, or a column corresponding to a scan parameter name
-			if (*col == "#" || *col == "time" || *col == swarm_->options.model->actions.at(basename).scanParam){
+			if (*col == "#" || *col == "time" || (swarm_->options.model->actions.find(basename) != swarm_->options.model->actions.end() && *col == swarm_->options.model->actions.at(basename).scanParam)){
 				continue;
 			}
 
@@ -165,11 +169,10 @@ void Data::parseData(){
 			}
 			// Insert value into data map
 			else {
-				//cout << "inserting val to col " << *col << ": " << values[0] << " " << values[i] << endl;
-				dataOrig_[*col][stod(values[0])] = stod(values[i]);
-				//dataOrig_[col].insert(make_pair(stof(values[0]),stof(values[i])));
+				//cout << "inserting val to col " << *col << ": " << values[0] << " " << value << endl;
+				dataOrig_[*col][stod(values[0])] = value;
 			}
-			i++;
+			++i;
 		}
 	}
 }
