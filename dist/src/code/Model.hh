@@ -11,16 +11,18 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include <boost/regex.hpp>
+#include <regex>
 #include <cstdlib>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <fcntl.h>
 
 #include "Utils.hh"
 #include "Data.hh"
 #include "FreeParam.hh"
 
 class FreeParam;
-class Data;
-class Swarm;
 
 class Model {
 	friend class Config;
@@ -28,7 +30,7 @@ class Model {
 	friend class Particle;
 
 public:
-	Model(Swarm *swarm, std::string path);
+	Model(std::string path);
 	Model();
 
 	std::string getLocation();
@@ -36,7 +38,6 @@ public:
 	void outputModelWithParams(std::map<std::string,double> params, std::string path, std::string filename, std::string suffix, bool stopAtNetGen, bool onlyActions, bool netAndBngl, bool usePipe, bool isNetFile);
 	void parseNet(std::string path);
 	bool getHasGenerateNetwork() {return hasGenerateNetwork_;}
-	unsigned int getNumFreeParams() { return freeParams_.size(); }
 
 	struct action {
 		std::string full;
@@ -46,7 +47,7 @@ public:
 		//double o_steps;
 
 		std::string type;
-		std::string scanParam;
+		std::string scanParam = "";
 
 		Data *dataSet;
 
@@ -62,7 +63,7 @@ public:
 		}
 	};
 
-	const std::map<std::string, FreeParam*>& getFreeParams_() const {
+	const std::map<std::string, FreeParam*>& getfreeParams_() const {
 		return freeParams_;
 	}
 
@@ -74,19 +75,17 @@ private:
 
 	void parseModel();
 
-	Swarm *swarm_;
-
 	std::string modelPath_;
 	std::vector<std::string> fullContents_;
 	std::vector<std::string> netContents_;
 
-	bool hasGenerateNetwork_;
+	bool hasGenerateNetwork_ = false;
+	//std::map<std::string,std::string> freeParams_;
 	std::map<std::string, FreeParam*> freeParams_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
 		//std::cout << " serializing model" << std::endl;
-		ar & swarm_;
 
 		ar & freeParams_;
 

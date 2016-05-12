@@ -1455,6 +1455,7 @@ void Swarm::finishFit() {
 		// Reset variables
 		resetVariables();
 
+		cout << "counter: " << bootstrapCounter << " bootstrap " << options.bootstrap << endl;
 		if ((bootstrapCounter + 1) < options.bootstrap) {
 			cout << "Deleting last fitting run and beginning next fit.." << endl;
 

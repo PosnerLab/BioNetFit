@@ -5,7 +5,10 @@
  *      Author: brandon
  */
 
+
+//TODO: Add checks for sim length equality
 //TODO: Test all these methods
+//TODO: Is sos correct terminology? Maybe objFunc would be better
 #include "Data.hh"
 
 using namespace std;
@@ -13,22 +16,23 @@ using namespace std;
 Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	swarm_ = swarm;
 	isExp_ = isExp;
-
 	dataPath = convertToAbsPath(path);
+
 	Data::parseData();
 
-	dataCurrent = &dataOrig_;
-
 	if ( (swarm_->options.objFunc == 4 && isExp)) {
+		//cout << "soscalc is 4" << endl;
 		getColumnAverages();
 	}
 
 	if (swarm_->options.divideByInit && !isExp) {
+		//cout << "div by init" << endl;
 		divideByInit();
 		dataCurrent = &dataDividedByInit_;
 	}
 
 	if (swarm_->options.logTransformSimData > 0 && !isExp) {
+		//cout << "logsim" << endl;
 		logTransformData();
 		dataCurrent = &dataLogTransformed_;
 	}
@@ -36,6 +40,7 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	if (swarm_->options.standardizeSimData && !isExp) {
 		cout << "stand sim" << endl;
 		if (swarm_->options.objFunc != 4) {
+			//cout << "gca sim" << endl;
 			getColumnAverages();
 		}
 		standardizeData();
@@ -45,6 +50,7 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	if (swarm_->options.standardizeExpData && isExp) {
 		cout << "stand exp" << endl;
 		if (swarm_->options.objFunc != 4) {
+			//cout << "gca exp" << endl;
 			getColumnAverages();
 		}
 		standardizeData();
@@ -52,20 +58,7 @@ Data::Data(std::string path, Swarm * swarm, bool isExp) {
 	}
 }
 
-Data::Data(map<string, map<double, double>> &dataSet) {
-	dataOrig_ = dataSet;
-	dataCurrent = &dataOrig_;
-	isExp_ = false;
-	swarm_ = 0;
-}
-
-Data::Data() {
-	map<string, map<double, double>> dummySet;
-	dataOrig_ = dummySet;
-	dataCurrent = 0;
-	isExp_ = false;
-	swarm_ = 0;
-}
+Data::Data() {}
 
 std::string Data::getPath() {
 	if (!dataPath.empty())
@@ -80,11 +73,10 @@ void Data::parseData(){
 	if (swarm_->options.usePipes){
 		char buf[5120];
 		string line;
-
 		int fd = open(dataPath.c_str(), O_RDONLY);
 
 		if (fd < 0) {
-			cout << "Warning: couldn't open " << dataPath << " to gather simulation output." << endl;
+			cout << "couldn't open " << dataPath << endl;
 		}
 
 		int len;
@@ -99,7 +91,6 @@ void Data::parseData(){
 		if (len < 0) {
 			perror("read error");
 		}
-
 		close(fd);
 	}
 	else {
@@ -112,23 +103,24 @@ void Data::parseData(){
 		if (dataFile.is_open()) {
 			while (getline(dataFile, line)) {
 				allLines.push_back(line);
-				//cout << "line: " << line << endl;
 			}
 		}
 		else {
-			swarm_->outputError("Error: Couldn't open data file " + dataPath + " for parsing.");
+			errMsg = "Error: Couldn't open data file " + dataPath + " for parsing.";
+			outputError(errMsg);
 		}
 		dataFile.close();
 	}
 
-	string replacement = "";
-	string basename = boost::regex_replace(getFilename(dataPath),boost::regex("_\\d+_\\d+$"),replacement);
+	string basename = regex_replace(getFilename(dataPath),regex("_\\d+$"),"");
+
 
 	if(allLines[0].at(0) != '#') {
-		swarm_->outputError("Error: Your data file (" + dataPath + ") doesn't contain (#) as the first value.");
+		string errMsg = "Error: Your data file (" + dataPath + ") doesn't contain (#) as the first value.";
+		outputError(errMsg);
 	}
 
-	// Do we need to store columns that aren't in .exp?  Maybe not.
+	// TODO: Do we need to store columns that aren't in .exp?  Maybe not.
 	vector<string> columns;
 	split(allLines[0], columns, " \t");
 
@@ -139,27 +131,14 @@ void Data::parseData(){
 		int i = 1;
 		for(vector<string>::iterator col = columns.begin(); col != columns.end(); ++col) {
 
-			//cout << "col: " << *col << endl;
-
-			// TODO: Haven't done prefix/exp consistency checks yet so it's possible we're missing
-			// a scan parameter.  This needs fixed..
 			// Skip column if we encounter a hash, a 'time' column, or a column corresponding to a scan parameter name
-			if (*col == "#" || *col == "time" || (swarm_->options.model->actions.find(basename) != swarm_->options.model->actions.end() && *col == swarm_->options.model->actions.at(basename).scanParam)){
+			if (*col == "#" || *col == "time" || *col == swarm_->options.model->actions.at(basename).scanParam){
 				continue;
-			}
-
-			double value;
-			// Replace any NaN's with our own NaN constant
-			if (values[i] == "NaN") {
-				value = nan("1");
-			}
-			else {
-				value = stod(values[i]);
 			}
 
 			// If our column name ends in "_SD" we need to store the value in our stdev map
 			if (col->size() > 3 && col->find("_SD") == col->size()-3) {
-				string colWithoutSD = boost::regex_replace(*col,boost::regex("_SD$"),string(""));
+				string colWithoutSD = regex_replace(*col,regex("_SD$"),"");
 				//cout << "inserting sd at col " << colWithoutSD << ": " << stof(values[0]) << " " << stof(values[i]) << endl;
 				//standardDeviations[col].insert(make_pair(stof(values[0]),stof(values[i])));
 				standardDeviations[colWithoutSD][stod(values[0])] = stod(values[i]);
@@ -169,12 +148,16 @@ void Data::parseData(){
 			}
 			// Insert value into data map
 			else {
-				//cout << "inserting val to col " << *col << ": " << values[0] << " " << value << endl;
-				dataOrig_[*col][stod(values[0])] = value;
+				//cout << "inserting val to col " << *col << ": " << values[0] << " " << values[i] << endl;
+				dataOrig_[*col][stod(values[0])] = stod(values[i]);
+				//dataOrig_[col].insert(make_pair(stof(values[0]),stof(values[i])));
 			}
-			++i;
+			i++;
 		}
 	}
+
+	// Always keep dataCurrent pointing to the most recent version of the data.
+	dataCurrent = &dataOrig_;
 }
 
 void Data::standardizeData() {
@@ -201,7 +184,7 @@ void Data::standardizeData() {
 		// Here we get the riemann sum squared for use in the stdev calculation
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "sd loop" << endl;
-			if (std::isnan(v->second)) {
+			if (v->second == NaN) {
 				continue;
 			}
 			sqtotal += pow(mean - v->second, 2);
@@ -214,8 +197,8 @@ void Data::standardizeData() {
 		// Loop through and set values according to formula: val_new = (val_old - column_mean) / (column_stdev)
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "stand loop" << endl;
-			if (std::isnan(v->second)) {
-				dataStandardized_[c->first][v->first] = nan("1");
+			if (v->second == NaN) {
+				dataStandardized_[c->first][v->first] = NaN;
 				continue;
 			}
 			//cout << "inserting: " << (v->second - mean) / stdev << endl;
@@ -228,10 +211,11 @@ void Data::divideByInit() {
 	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			if (v->second == 0) {
-				swarm_->outputError("You chose to divide_by_init, but the first value in the column '" + c->first + "' is 0. We cannot divide by 0.");
+				string errMsg = "You chose to divide_by_init, but the first value in the column '" + c->first + "' is 0. We cannot divide by 0.";
+				outputError(errMsg);
 			}
-			if (std::isnan(v->second)) {
-				dataDividedByInit_[c->first][v->first] = nan("1");
+			if (v->second == NaN) {
+				dataDividedByInit_[c->first][v->first] = NaN;
 				continue;
 			}
 			dataDividedByInit_[c->first][v->first] = v->second / c->second.begin()->first;
@@ -244,14 +228,14 @@ void Data::getColumnAverages() {
 	double sum;
 	int counter;
 	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
-		//cout << "gca col loop" << endl;
+		cout << "gca col loop" << endl;
 
 		sum = 0;
 		counter = 0;
 
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			//cout << "gca tp loop" << endl;
-			if (std::isnan(v->second)) {
+			if (v->second == NaN) {
 				continue;
 			}
 			sum += v->second;
@@ -265,10 +249,11 @@ void Data::logTransformData() {
 	for(map<string,map<double,double> >::iterator c = dataCurrent->begin(); c != dataCurrent->end(); ++c) {
 		for(map<double,double>::iterator v = c->second.begin(); v != c->second.end(); ++v) {
 			if (v->second == 0) {
-				swarm_->outputError("You chose to log transform simulation output, but the first value in the column '" + c->first + "' is 0. We cannot take the log of 0.");
+				string errMsg = "You chose to log transform simulation output, but the first value in the column '" + c->first + "' is 0. We cannot take the log of 0.";
+				outputError(errMsg);
 			}
-			else if (std::isnan(v->second)) {
-				dataLogTransformed_[c->first][v->first] = nan("1");
+			else if (v->second == NaN) {
+				dataLogTransformed_[c->first][v->first] = NaN;
 				continue;
 			}
 			dataLogTransformed_[c->first][v->first] = log10(v->second)/log10(swarm_->options.logTransformSimData);

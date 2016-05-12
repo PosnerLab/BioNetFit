@@ -9,13 +9,9 @@
 #define CODE_PHEROMONES_HH_
 
 #include <iostream>
-#include <string.h>
-#include <stdio.h>
 
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
-
-#include <boost/interprocess/ipc/message_queue.hpp>
 
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/vector.hpp>
@@ -23,6 +19,8 @@
 #include <boost/serialization/unordered_map.hpp>
 #include <boost/serialization/set.hpp>
 
+//#include <boost/interprocess/shared_memory_object.hpp>
+//#include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/string.hpp>
@@ -54,31 +52,26 @@ class Swarm;
 #define NONBLOCK FALSE
 #define BLOCK TRUE
 
-#define ANY_TAG 10
-#define GET_RUNNING_PARTICLES 11
-#define SEND_RUNNING_PARTICLES 12
-#define SIMULATION_END 13
-#define SIMULATION_FAIL 14
-#define INIT_BREEDING 15
-#define DO_BREED 16
-#define RECIPROCATE_BREED 16
-#define DONE_BREEDING 17
-#define NEXT_GENERATION 18
-#define GET_PARAMS_FROM_PARTICLE 19
-#define FINISHED_WITH_FIT 20
-#define SEND_FINAL_PARAMS_TO_PARTICLE 21
-#define FIT_FINISHED 22
-#define SEND_NUMFLIGHTS_TO_PARTICLE 23
-#define MASTER_DIED 24
-#define NEW_BOOTSTRAP 25
-#define BEGIN_NELDER_MEAD 26
-#define END_NELDER_MEAD 27
-#define MESSAGE_END 1000
+// TODO Streamline tag and ID conversion
+#define ANY_TAG -10
+#define GET_RUNNING_PARTICLES -11
+#define SEND_RUNNING_PARTICLES -12
+#define SIMULATION_END -13
+#define SIMULATION_FAIL -14
+#define INIT_BREEDING -15
+#define DO_BREED -16
+#define RECIPROCATE_BREED -16
+#define DONE_BREEDING -17
+#define NEXT_GENERATION -18
+#define GET_PARAMS_FROM_PARTICLE -19
+#define FINISHED_WITH_FIT -20
+#define SEND_FINAL_PARAMS_TO_PARTICLE -21
+#define FIT_FINISHED -22
+#define MESSAGE_END -1000
 
 class Pheromones {
 public:
-	Pheromones();
-	~Pheromones();
+	Pheromones() {}
 
 	void init(Swarm *s);
 
@@ -89,47 +82,21 @@ public:
 		int sender;
 
 		std::vector<std::string> message;
-
-		friend class boost::serialization::access;
-
-		template<class Archive>
-		void serialize(Archive & ar, const unsigned int version)
-		{
-			ar & tag;
-
-			ar & id;
-			ar & sender;
-
-			ar & message;
-		}
 	};
 
 	typedef std::unordered_multimap<int, swarmMessage> swarmMsgHolder;
 	typedef swarmMsgHolder::iterator swarmMsgHolderIt;
 
-	void sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message, int messageID = -1);
+	void sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message);
 	//int recvMessage(signed int senderID, const int receiverID, int tag, bool block, std::vector<std::vector<std::string>> &messageHolder, bool eraseMessage = true);
-	int recvMessage(signed int senderID, const int receiverID, int tag, bool block, swarmMsgHolder &messageHolder, bool eraseMessage = true, int messageID = -1);
-
-	int getRank();
+	int recvMessage(signed int senderID, const int receiverID, int tag, bool block, swarmMsgHolder &messageHolder, bool eraseMessage = true);
 
 	std::vector<std::string> univMessageSender;
 	//std::vector<std::vector<std::string>> univMessageReceiver;
 	swarmMsgHolder univMessageReceiver;
 
-
 private:
-	friend class Swarm;
-	friend class Particle;
-
-	void clearSwarmMessage(swarmMessage& sm);
-	std::string serializeSwarmMessage(swarmMessage sm);
-	swarmMessage deserializeSwarmMessage(std::string sm);
-
 	Swarm *swarm_;
-
-	// We use pointers for communication objects because we don't necessarily want to initialize
-	// the objects in every case
 
 	// MPI Stuff
 	boost::mpi::environment * env_;
@@ -138,13 +105,9 @@ private:
 	// IPC Stuff
 
 	// Our shared memory object
-	//boost::interprocess::managed_shared_memory *segment_;
-
-	// MQ Stuff
-	std::vector<boost::interprocess::message_queue *> smq_;
+	boost::interprocess::managed_shared_memory *segment_;
 
 
-	/*
 	typedef boost::interprocess::allocator<char, boost::interprocess::managed_shared_memory::segment_manager>
 	CharAllocator;
 	typedef boost::interprocess::basic_string<char, std::char_traits<char>, CharAllocator>
@@ -172,14 +135,12 @@ private:
 	MyMap_ *swarmMap_;
 	MyVector_ *swarmVec_;
 
-	*/
-
 	boost::mpi::request recvRequest_;
 	boost::mpi::status	recvStatus_;
 
-	//boost::interprocess::interprocess_mutex *mutex_;
+	boost::interprocess::interprocess_mutex *mutex_;
 
-	//void putArrayInSHM(std::vector<std::string> theArray);
+	void putArrayInSHM(std::vector<std::string> theArray);
 
 };
 

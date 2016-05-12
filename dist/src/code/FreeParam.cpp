@@ -17,7 +17,6 @@ FreeParam::FreeParam(string parameterName) {
 	mutationFactor_ = 0;
 	genMin_ = 0;
 	genMax_ = 0;
-	isLog_ = false;
 }
 
 FreeParam::FreeParam() {
@@ -28,5 +27,4 @@ FreeParam::FreeParam() {
 	mutationFactor_ = 0;
 	genMin_ = 0;
 	genMax_ = 0;
-	isLog_ = false;
 }

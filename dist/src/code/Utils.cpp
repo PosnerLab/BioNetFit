@@ -10,6 +10,12 @@
 using namespace boost::filesystem;
 using namespace std;
 
+void outputError(string errorMessage) {
+	cout << errorMessage << endl;
+
+	exit (1);
+}
+
 string convertToAbsPath(string relPath) {
 	path fullPath;
 
@@ -61,10 +67,7 @@ void outputHelp() {
 
 bool createParticlePipe(const char * path) {
 
-	if (checkIfFileExists(path)) {
-		unlink(path);
-	}
-
+	unlink(path);
 	int fifo_status = mkfifo(path, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 	if (fifo_status) {
 		cout << "Warning: Couldn't create pipe with path: " << path << endl;
@@ -75,6 +78,37 @@ bool createParticlePipe(const char * path) {
 	}
 }
 
+double pickWeighted(double weightSum, multimap<double,double> &weights, int extraWeight, mt19937 &randNumEngine) {
+	double lowerBound = 0;
+	double upperBound = weightSum;
+
+	uniform_real_distribution<double> unif(lowerBound,upperBound);
+
+	double random = unif(randNumEngine);
+	double chosen = random * ( 1 - (extraWeight / 10 ));
+
+	//cout << "random: " << random << " chosen: " << chosen << endl;
+	double currentSum = 0;
+	for (map<double,double>::iterator w = weights.begin(); w != weights.end(); ++w) {
+		currentSum += w->second;
+
+		if (currentSum >= chosen) {
+			return w->first;
+		}
+	}
+	//cout << "fell off the end" << endl;
+	return weights.rbegin()->first;
+}
+
+/*
+void saveParticle(const Particle &p, const char * filename) {
+    // make an archive
+    std::ofstream ofs(filename);
+    boost::archive::text_oarchive oa(ofs);
+    oa << p;
+}
+ */
+
 bool isFloat(string number) {
 	istringstream iss(number);
 	float f;
@@ -83,75 +117,19 @@ bool isFloat(string number) {
 	return iss.eof() && !iss.fail();
 }
 
-int runCommand(string cmd, string &result) {
+std::string getOutputFromCommand(string cmd) {
 
 	std::shared_ptr<FILE> pipe(popen(cmd.c_str(), "r"), pclose);
 
-	if (!pipe) {
-		return 1;
-	}
+	if (!pipe) return "ERROR";
 
-	char buffer[1024];
-	result.clear();
+	char buffer[128];
+	std::string result = "";
 
 	while (!feof(pipe.get())) {
-		if (fgets(buffer, 1024, pipe.get()) != NULL)
+		if (fgets(buffer, 128, pipe.get()) != NULL)
 			result += buffer;
 	}
 
-	return 0;
-}
-
-int runCommand(string cmd) {
-
-	//cout << "Running command: " << cmd << endl;
-
-
-	int ret = system(cmd.c_str());
-	return ret;
-
-
-
-	/*
-	FILE *in;
-
-	//cout << "Running command: " << cmd << endl;
-
-	if(!(in = popen(cmd.c_str(), "r"))){
-		return 1;
-	}
-	int status = pclose(in);
-	//printf("Exit code: %d\n", WEXITSTATUS(status));
-
-	return status;
-	*/
-
-	/*
-	char *c_cmd = new char[cmd.length()+1];
-	std::strcpy(c_cmd, cmd.c_str());
-
-	pid_t pid;
-	char *argv[] = {"bash", "-c", c_cmd, NULL};
-	int status;
-	printf("Run command: %s\n", c_cmd);
-	status = posix_spawn(&pid, "/bin/bash", NULL, NULL, argv, environ);
-	if (status == 0) {
-		printf("Child pid: %i\n", pid);
-		if (waitpid(pid, &status, 0) != -1) {
-			printf("Child exited with status %i\n", status);
-		} else {
-			perror("waitpid");
-		}
-	} else {
-		printf("posix_spawn: %s\n", strerror(status));
-	}
-
-	return status;
-	*/
-}
-
-void outputError(string errorMessage) {
-	cout << errorMessage << endl;
-
-	exit (1);
+	return result;
 }

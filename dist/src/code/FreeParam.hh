@@ -8,6 +8,8 @@
 #ifndef CODE_FREEPARAM_HH_
 #define CODE_FREEPARAM_HH_
 
+#include <string>
+
 #include "Swarm.hh"
 
 class FreeParam {
@@ -21,10 +23,6 @@ public:
 
 	void setGenerationMethod(const std::string& generationMethod) {
 		generationMethod_ = generationMethod;
-	}
-
-	std::string getGenerationMethod() {
-		return generationMethod_;
 	}
 
 	float getMutationFactor() const {
@@ -75,11 +73,6 @@ public:
 		hasMutation_ = hasMutation;
 	}
 
-	void setIsLog(bool log) {
-		isLog_ = log;
-	}
-	bool getIsLog() { return isLog_; }
-
 private:
 	friend class boost::serialization::access;
 
@@ -90,7 +83,6 @@ private:
 	float genMin_;
 	float genMax_;
 	bool hasMutation_;
-	bool isLog_;
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
@@ -103,7 +95,6 @@ private:
 		ar & genMin_;
 		ar & genMax_;
 		ar & hasMutation_;
-		ar & isLog_;
 	}
 };
 

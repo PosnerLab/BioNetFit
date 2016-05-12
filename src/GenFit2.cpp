@@ -73,12 +73,6 @@ int main(int argc, char *argv[]) {
 		outputError("Error: Couldn't find a valid 'type' in your arguments.");
 	}
 
-	configFile = convertToAbsPath(configFile);
-
-	chdir("../");
-	string cwd = cwd();
-	cout << "cwd: " << cwd << endl;
-
 	/*
 	cout << "type: " << type << endl;
 	cout << "action: " << action << endl;
