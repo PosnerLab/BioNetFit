@@ -1,0 +1,4 @@
+readFile({file=>"/home/brandon/projects/BioNetFit/Debug/output/example5/7/4_1.net"})
+simulate({method=>"ode",t_start=>0,t_end=>600,n_steps=>1,suffix=>"4_1"})
+setParameter("Ligand_isPresent",1)
+simulate({method=>"ode",t_start=>0,t_end=>60,n_steps=>60,prefix=>"example5",suffix=>"4_1"})

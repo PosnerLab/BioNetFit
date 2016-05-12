@@ -8,16 +8,13 @@
 #ifndef CONFIG_HH_
 #define CONFIG_HH_
 
-#include <iostream>
-#include <fstream>
-#include <regex>
-#include <vector>
-
 #include "Parser.hh"
 #include "Utils.hh"
 #include "Data.hh"
 #include "Swarm.hh"
 #include "Model.hh"
+
+class Swarm;
 
 class Config {
 public:
@@ -25,18 +22,22 @@ public:
 
 	std::string getLocation();
 	int makeCopy(std::string newLocation);
-	Swarm * createSwarmFromConfig(bool isMaster);
-	void createConfigFromSwarm ();
+	Swarm * createSwarmFromConfig();
 
 private:
 	friend class boost::serialization::access;
 
+	void checkConsistency();
+
+	Swarm * swarm_;
 	std::string configPath_;
 
+	/*
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
 		ar & configPath_;
 	}
+	*/
 };
 
 #endif /* CONFIG_HH_ */

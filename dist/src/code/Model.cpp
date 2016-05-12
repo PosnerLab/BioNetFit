@@ -9,14 +9,26 @@
 
 using namespace std;
 
-Model::Model(string path) {
+Model::Model(Swarm * swarm, string path) {
+
+	swarm_ = swarm;
+	hasGenerateNetwork_ = false;
 	modelPath_ = convertToAbsPath(path);
 	parseModel();
 }
 
-Model::Model() {}
+Model::Model() {
+	swarm_ = 0;
+	hasGenerateNetwork_ = false;
+	modelPath_ = "";
+}
 
 void Model::parseNet(string path) {
+
+	if (swarm_->options.verbosity >= 3) {
+		cout << "Parsing .net file" << endl;
+	}
+
 	string line;
 	ifstream modelFile(path);
 
@@ -31,8 +43,7 @@ void Model::parseNet(string path) {
 		}
 	}
 	else {
-		string errMsg = "Error: Couldn't open model file " + path + " for parsing.";
-		outputError(errMsg);
+		swarm_->outputError("Error: Couldn't open model file " + path + " for parsing.");
 	}
 	modelFile.close();
 }
@@ -49,8 +60,7 @@ void Model::parseModel() {
 		}
 	}
 	else {
-		string errMsg = "Error: Couldn't open model file " + modelPath_ + " for parsing.";
-		outputError(errMsg);
+		swarm_->outputError("Error: Couldn't open model file " + modelPath_ + " for parsing.");
 	}
 	modelFile.close();
 
@@ -58,16 +68,16 @@ void Model::parseModel() {
 	for (unsigned i = 0 ; i < model_vector.size(); i++) {
 		int j = 0;
 		while(1) {
-			if (regex_search(model_vector[i-j],regex("\\\\"))) {
-				model_vector[i-j] = regex_replace(model_vector[i-j],regex("\\\\\\W*"),"");
+			if (boost::regex_search(model_vector[i-j],boost::regex("\\\\"))) {
+				model_vector[i-j] = boost::regex_replace(model_vector[i-j],boost::regex("\\\\\\W*"),string(""));
 				model_vector[i-j] = model_vector[i-j] + model_vector[i+1];
-				model_vector[i-j] = regex_replace(model_vector[i-j],regex("\\s*"),"");
-				if (!regex_search(model_vector[i-j],regex("\\\\"))) {
+				model_vector[i-j] = boost::regex_replace(model_vector[i-j],boost::regex("\\s*"),string(""));
+				if (!boost::regex_search(model_vector[i-j],boost::regex("\\\\"))) {
 					fullContents_.push_back(model_vector[i-j]);
 				}
 				i++;
 				j++;
-				if (!regex_search(model_vector[i-j],regex("\\\\"))) {
+				if (!boost::regex_search(model_vector[i-j],boost::regex("\\\\"))) {
 					break;
 				}
 			}
@@ -81,33 +91,34 @@ void Model::parseModel() {
 	}
 
 	// Go through the model and store important things
-	smatch smatches;
-	for (string i : fullContents_) {
-		if (regex_search(i, regex("^simulate|^simulate_nf|^simulate_ode|^simulate_ssa|^simulate_pla|^parameter_scan"))) {
+	boost::smatch smatches;
+
+	for (vector<string>::iterator i = fullContents_.begin(); i != fullContents_.end(); ++i) {
+		if (boost::regex_search(*i, boost::regex("^\\s*simulate|^\\s*simulate_nf|^\\s*simulate_ode|^\\s*simulate_ssa|^\\s*simulate_pla|^\\s*parameter_scan"))) {
 			action newAction;
 			string prefix;
 			bool isParScan = 0;
 
 			// If the action is a normal "simulate", find the method in the arguments and store it
-			if (regex_search(i, smatches, regex("^simulate\\(\\{.*method=>(\"|')(\\w{2,3})(\"|')"))) {
+			if (boost::regex_search(*i, smatches, boost::regex("^\\s*simulate\\(\\{.*method=>(\"|')(\\w{2,3})(\"|')"))) {
 				newAction.type = smatches[2];
 			}
 			// If we the action command is simulate_xx, store the sim type
-			else if (regex_search(i, smatches, regex("^simulate_(\\w{2})\\(\\{"))) {
+			else if (boost::regex_search(*i, smatches, boost::regex("^\\s*simulate_(\\w{2})\\(\\{"))) {
 				newAction.type = smatches[1];
 			}
 			// If we found a parameter_scan command, store the type, scan parameter, and t_end
-			else if (regex_search(i, smatches, regex("^parameter_scan\\(\\{.*method=>(\"|')(\\w{2,3})(\"|')"))) {
+			else if (boost::regex_search(*i, smatches, boost::regex("^\\s*parameter_scan\\(\\{.*method=>(\"|')(\\w{2,3})(\"|')"))) {
 				isParScan = 1;
 				newAction.type = smatches[2];
 
-				if (regex_search(i, smatches, regex("parameter=>('|\")(\\w+)('|\")"))) {
+				if (boost::regex_search(*i, smatches, boost::regex("parameter=>('|\")(\\w+)('|\")"))) {
 					newAction.scanParam = smatches[2];
 				}
-				if (regex_search(i, smatches, regex("par_max=>(\\w+)"))) {
+				if (boost::regex_search(*i, smatches, boost::regex("par_max=>(\\w+)"))) {
 					newAction.t_end = atof(smatches[1].str().c_str());
 				}
-				if (regex_search(i, smatches, regex("par_scan_vals=>\\[(.+)\\]"))) {
+				if (boost::regex_search(*i, smatches, boost::regex("par_scan_vals=>\\[(.+)\\]"))) {
 					vector<string> values;
 					split(smatches[1].str(), values, ",");
 					newAction.t_end = atof(values.back().c_str());
@@ -115,130 +126,158 @@ void Model::parseModel() {
 			}
 
 			// Remove any suffixes from the command
-			i = regex_replace(i,regex("suffix=>('|\")\\w+('|\")"), "");
+			*i = boost::regex_replace(*i,boost::regex(",\\s*suffix=>('|\")\\w+('|\")"), string(""));
 
 			// Find any prefixes and store them
-			if (regex_search(i, smatches, regex("prefix=>('|\")(\\w+)('|\")"))) {
+			if (boost::regex_search(*i, smatches, boost::regex("prefix=>('|\")(\\w+)('|\")"))) {
 				prefix = smatches[2];
 			}
 
 			// If we find a non parameter_scan action, store the t_end value
-			if (regex_search(i, smatches, regex("t_end=>(\\w+)")) && !isParScan) {
+			if (boost::regex_search(*i, smatches, boost::regex("t_end=>(\\w+)")) && !isParScan) {
 				newAction.t_end = atof(smatches[1].str().c_str());
 			}
 
-			newAction.full = i;
+			newAction.full = *i;
 			if (!prefix.empty()) {
-				actions.insert(pair<string,action>(prefix,newAction));
+				actions.insert(pair<string, action>(prefix, newAction));
 			}
 		}
-		else if (regex_search(i, smatches, regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
-			//freeParams_.insert(pair<string,string>(smatches[2],""));
+		// Save any free parameters
+		else if (boost::regex_search(*i, smatches, boost::regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
 			FreeParam * fp = new FreeParam(smatches[2]);
 			freeParams_.insert(pair<string,FreeParam*>(smatches[2],fp));
 		}
-		else if (regex_search(i, smatches, regex("^generate_network"))) {
+		// Make sure we know if we need to do network generation
+		else if (boost::regex_search(*i, smatches, boost::regex("^\\s*generate_network"))) {
 			hasGenerateNetwork_ = true;
 		}
 	}
 
 	if (actions.size() == 0) {
-		outputError("Error: We didn't find any action commands containing prefixes in your model file. Your model must contain an action command that uses a prefix which corresponds to the name of the .exp file to be fit to the data generated by that action command.");
+		swarm_->outputError("Error: We didn't find any action commands containing prefixes in your model file. Your model must contain an action command that uses a prefix which corresponds to the name of the .exp file to be fit to the data generated by that action command.");
 	}
 }
 
-void Model::outputModelWithParams(map<string,double> params, string path, string filename, string suffix, bool stopAtNetGen=false, bool onlyActions=false, bool netAndBngl=false, bool usePipe=false, bool isNetFile=false) {
+void Model::outputModelWithParams(map<string, double> params, string path, string filename, string suffix, bool stopAtNetGen=false, bool onlyActions=false, bool netAndBngl=false, bool usePipe=false, bool isNetFile=false) {
 
 	if (netAndBngl) {
 		// First output the .bngl file (containing only action commands)
 		outputModelWithParams(params, path, filename, suffix, false, true, false, false, false);
-		filename = regex_replace(filename, regex("bngl$"), "net");
+		filename = boost::regex_replace(filename, boost::regex("bngl$"), string("net"));
 		// Then output the .net file
 		outputModelWithParams(params, path, filename, "", false, false, false, false, true);
 
 		return;
 	}
 
+	// Erase file if it already exists
+	string fullPath = path + "/" + filename;
+	if (checkIfFileExists(fullPath)) {
+		unlink(fullPath.c_str());
+	}
+
 	if (!usePipe) {
-		string fullPath = path + "/" + filename;
 		unlink(fullPath.c_str());
 
 		ofstream outFile;
 		outFile.open(fullPath);
-		smatch matches;
+		boost::smatch matches;
 
 		if (outFile.is_open()) {
 			if (isNetFile) {
 				bool inParameterBlock = true;
 				int numParamsToReplace = params.size();
 				int numReplacedParams = 0;
-				for (string line : netContents_){
-					if (line == "end parameters" || numReplacedParams == numParamsToReplace) {
+
+				for (auto line = netContents_.begin(); line != netContents_.end(); ++line) {
+					if (*line == "end parameters" || numReplacedParams == numParamsToReplace) {
 						inParameterBlock = false;
 					}
 					else if (inParameterBlock) {
 						// Replace free param with generated param
 						//double tt = 0;
-						for (auto p : params) { // TODO: Is there a faster way to do this than loop through params over and over? It's still too slow.
+						//for (auto p : params) { // TODO: Is there a faster way to do this than loop through params over and over? It's still too slow.
+						for (map<string, double>::iterator p = params.begin(); p != params.end(); ++p) {
 							//cout << "p is " << p.first << endl;
 							//Timer tmr;
-							if(regex_match(line, matches, regex("\\s+\\d+\\s+(\\w+)\\s+(.+)\\s+"))) {
+							if(boost::regex_match(*line, matches, boost::regex("\\s+\\d+\\s+(\\w+)\\s+(.+)\\s+"))) {
 								//double t = tmr.elapsed();
 								//cout << "Match took " << t << " seconds" << endl;
 								//tt += t;
-								if (matches[1] == p.first) {
-									string match = p.first + "\\s+.+";
-									string replacement = p.first + " " + to_string(p.second);
-									line = regex_replace(line, regex(match), replacement);
+								if (matches[1] == p->first) {
+									string match = p->first + "\\s+.+";
+									string replacement = p->first + " " + to_string(static_cast<long double>(abs(p->second))) + "\n";
+									*line = boost::regex_replace(*line, boost::regex(match), replacement);
 									numReplacedParams++;
 								}
 							}
 						}
 						//cout << "matches took " << tt << " seconds" << endl;
 					}
-					//cout << line;
-					outFile << line;
+					outFile << *line;
 				}
 			}
 			else {
 				if (onlyActions) {
-					filename = regex_replace(filename, regex("bngl$"), "net");
-					string line = "readFile({file=>\"" + path + "/" + filename + "\"})\n";
+					filename = boost::regex_replace(filename, boost::regex("bngl$"), string("net"));
+					string line = "readFile({file=>\"" + path + filename + "\"})\n";
 					outFile << line;
 				}
-				for (string line : fullContents_){
+
+				for (auto line = fullContents_.begin(); line != fullContents_.end(); ++line) {
 					if (onlyActions) {
-						if (regex_search(line, regex("^simulate|^simulate_nf|^simulate_ode|^simulate_ssa|^simulate_pla|^parameter_scan|^setConcentration|^addConcentration|^saveConcentration|^resetConcentrations|^setParameter|^saveParameters|^resetParameters|^quit|^substanceUnits|^version|^setOption"))) {
+						string actionLine = *line;
+						if (boost::regex_search(*line, boost::regex("^\\s*simulate|^\\s*simulate_nf|^\\s*simulate_ode|^\\s*simulate_ssa|^\\s*simulate_pla|^\\s*parameter_scan|^\\s*setConcentration|^\\s*addConcentration|^\\s*saveConcentration|^\\s*resetConcentrations|^\\s*setParameter|^\\s*saveParameters|^\\s*resetParameters|^\\s*quit|^\\s*substanceUnits|^\\s*version|^\\s*setOption"))) {
 							if (!suffix.empty()) {
 								string suffixLine = ",suffix=>\"" + suffix + "\"})";
-								line = regex_replace(line, regex("\\}\\)"), suffixLine);
+								actionLine = boost::regex_replace(actionLine, boost::regex("\\}\\)"), suffixLine);
 							}
 						}
 						else {
 							continue;
 						}
-						outFile << line;
+						outFile << actionLine;
 					}
 					else {
+						string newLine = *line;
+
+						bool inParameterBlock = true;
+						int numReplacedParams = 0;
+						int numParamsToReplace = params.size();
 						// Skip line if it's empty or if it is a comment
-						if (regex_search(line,regex("^\\s*$")) || regex_search(line,regex("^#"))) {
+						if (boost::regex_match(*line, boost::regex("^\\s*$")) || boost::regex_match(*line, boost::regex("^#"))) {
 							continue;
 						}
-						// Replace free param with generated param
-						if (regex_search(line,matches,regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
+						// TODO: Next line is never working. Same as above for .net file?
+						if (*line == "end parameters" || numReplacedParams == numParamsToReplace) {
+							inParameterBlock = false;
+							//cout << "out of parameter block" << endl;
+						}
 
-							line = regex_replace(line, regex("\\w+__FREE__"), to_string(params[matches[2]]));
+						//cout << *line << endl;
+						if (inParameterBlock) {
+							// Replace free param with generated param
+							if (boost::regex_search(*line, matches, boost::regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
+								// Older version of C++ don't support double overload to to_string, so we have to cast to long double
+								//cout << "found a FP: " << matches[2] << endl;
+								newLine = boost::regex_replace(*line, boost::regex("\\w+__FREE__"), to_string(static_cast<long double>(params[matches[2]])));
+								//cout << "replacing with: " << params[matches[2]] << endl;
+								++numReplacedParams;
+							}
 						}
 						// Add in the unique suffix
 						if (!suffix.empty()) {
-							if (regex_search(line, regex("^simulate|^simulate_nf|^simulate_ode|^simulate_ssa|^simulate_pla|^parameter_scan"))) {
+							if (boost::regex_search(*line, boost::regex("^\\s*simulate|^\\s*simulate_nf|^\\s*simulate_ode|^\\s*simulate_ssa|^\\s*simulate_pla|^\\s*parameter_scan"))) {
 								string suffixLine = ",suffix=>\"" + suffix + "\"})";
-								line = regex_replace(line, regex("\\}\\)"), suffixLine);
+								newLine = boost::regex_replace(*line, boost::regex("\\}\\)"), suffixLine);
+								newLine = newLine + "\n";
 							}
 						}
-						outFile << line;
+
+						outFile << newLine;
 						if (stopAtNetGen) {
-							if (regex_search(line,matches,regex("^generate_network"))) {
+							if (boost::regex_search(*line,matches,boost::regex("^generate_network"))) {
 								break;
 							}
 						}
@@ -248,8 +287,7 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 			outFile.close();
 		}
 		else {
-			string errMsg = "Couldn't open file '" + fullPath + "' for output";
-			outputError(errMsg);
+			swarm_->outputError("Couldn't open file '" + fullPath + "' for output");
 		}
 	}
 	else {
@@ -257,8 +295,7 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 
 		int fifo_status = mkfifo(fifo, 0666);
 		if (fifo_status) {
-			string errMsg = "Couldn't create pipe '" + path + "' for output";
-			outputError(errMsg);
+			swarm_->outputError("Couldn't create pipe '" + path + "' for output");
 		}
 
 		int fd = open(fifo, O_RDONLY);
@@ -266,9 +303,9 @@ void Model::outputModelWithParams(map<string,double> params, string path, string
 			cout << "Couldn't open " << fifo << endl;
 		}
 
-		for (auto line : fullContents_) {
-
-			write(fd,line.c_str(),line.size());
+		//for (auto line : fullContents_) {
+		for (vector<string>::iterator line = fullContents_.begin(); line != fullContents_.end(); ++line) {
+			write(fd,line->c_str(),line->size());
 		}
 		close(fd);
 	}

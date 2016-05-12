@@ -8,20 +8,15 @@
 #ifndef DATA_HH_
 #define DATA_HH_
 
-#include <iostream>
-#include <fstream>
-#include <map>
-
 #include "Utils.hh"
 #include "Swarm.hh"
-
-#define NaN 123456789
 
 class Swarm;
 class Data {
 
 public:
 	Data(std::string path, Swarm * swarm, bool isExp);
+	Data(std::map<std::string, std::map<double, double>> &dataSet);
 	Data();
 
 	void parseData();
@@ -32,9 +27,10 @@ public:
 	void getColumnAverages();
 	void logTransformData();
 
-	std::map<std::string,std::map<double,double> > * dataCurrent; // This points to the most recently modified version of the data
-	std::map<std::string,std::map<double,double> > standardDeviations;
-	std::map<std::string,double> colAverages;
+	// Column->timepoint, value
+	std::map<std::string, std::map<double, double>> * dataCurrent; // This points to the most recently modified version of the data
+	std::map<std::string, std::map<double, double>> standardDeviations;
+	std::map<std::string, double> colAverages;
 
 private:
 	friend class boost::serialization::access;
@@ -51,7 +47,7 @@ private:
 
 	template<typename Archive>
 	void serialize(Archive& ar, const unsigned version) {
-		std::cout << "serializing data" << std::endl;
+		//std::cout << "serializing data" << std::endl;
 
 		ar & standardDeviations;
 		ar & colAverages;

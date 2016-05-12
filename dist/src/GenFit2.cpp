@@ -6,18 +6,6 @@
 // Description :
 //============================================================================
 
-#include <iostream>
-
-//#include <mpi.h>
-//#include <sys/shm.h>
-//#include <sys/types.h>
-//#include <fcntl.h>
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <sys/stat.h>
-//#include <sys/wait.h>
-//#include <unistd.h>
-
 #include "GenFit2.hh"
 
 using namespace std;
@@ -66,6 +54,7 @@ int main(int argc, char *argv[]) {
 	// Output help if we have too too few or too many arguments
 	else {
 		outputHelp();
+		return 0;
 	}
 
 	// Default action is to 'run'
@@ -77,17 +66,23 @@ int main(int argc, char *argv[]) {
 		type = "master";
 
 	// Be sure action and type are valid
-	if (action != "run") {
+	if (action != "run" && action != "cluster" && action != "load" && action != "results" && action != "resume") {
 		outputError("Error: Couldn't find a valid 'action' in your arguments.");
 	}
 	if (type != "master" && type != "particle") {
 		outputError("Error: Couldn't find a valid 'type' in your arguments.");
 	}
 
+	/*
+	cout << "type: " << type << endl;
+	cout << "action: " << action << endl;
+	cout << "config: " << configFile << endl;
+	cout << "pID: " << pID << endl;
+	cout << "generation: " << generation << endl;
+	*/
+
 	// Regardless of type or action, we need to set up the Swarm
 	//Timer tmr;
-
-	Config myconfig(configFile);
 
 	//double t = tmr.elapsed();
 	//cout << "Adding .conf took " << t << " seconds" << endl;
@@ -96,57 +91,216 @@ int main(int argc, char *argv[]) {
 
 	Swarm *s;
 	if (type == "master") {
-		s = myconfig.createSwarmFromConfig((type=="master") ? true : false);
+		Config myconfig(configFile);
+		if (action != "load" && action != "resume") {
+			s = myconfig.createSwarmFromConfig();
 
-		//t = tmr.elapsed();
-		//cout << "Processing .conf took " << t << " seconds" << endl;
-		s->setType(type);
-		s->setExePath(argv[0]);
-		s->initComm();
+			if (s->options.useCluster) {
+				action = "cluster";
+			}
 
-		if (generation) {
-			cout << "setting gen to " << generation << endl;
-			s->currentGeneration = generation;
+			//t = tmr.elapsed();
+			//cout << "Processing .conf took " << t << " seconds" << endl;
+
+			s->currentGeneration = 1;
+			s->setExePath(convertToAbsPath(argv[0]));
+			s->isMaster = true;
+			s->initComm();
+			s->isMaster = false;
 		}
 
-		cout << "trying to serialize swarm class" << endl;
+		if (action == "cluster" || action == "run") {
+			int randNum = rand();
+			string serializedSwarmPath = to_string(static_cast<long long int>(randNum)) + ".sconf";
 
-		std::ofstream ofs("swarm.txt");
-		if (ofs.is_open()) {
-			boost::archive::text_oarchive ar(ofs);
-			ar & s;
-			ofs.close();
+			std::ofstream ofs(serializedSwarmPath);
+			if (ofs.is_open()) {
+				s->setsConf(convertToAbsPath(serializedSwarmPath));
+
+				boost::archive::binary_oarchive ar(ofs);
+				ar & s;
+				ofs.close();
+			}
+
+			s->isMaster = true;
 		}
 
-		s->setIsMaster(true);
-		s->doSwarm();
+		if (action == "cluster") {
+			string runCmd = s->getClusterCommand(string(convertToAbsPath(argv[0])));
+			//string runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
+
+			if (s->options.saveClusterOutput) {
+				string outputPath = s->options.outputDir + "/" + s->options.jobName + "_cluster_output";
+				//cout << "string: " << outputPath << endl;
+				if (!checkIfFileExists(outputPath)) {
+					string makeClusterOutputDirCmd = "mkdir " + outputPath;
+					if (runCommand(makeClusterOutputDirCmd) != 0) {
+						cout << "Warning: Couldn't create cluster output directory with command: " << makeClusterOutputDirCmd << ". Turning off save_cluster_output" << endl;
+						s->options.saveClusterOutput = false;
+						runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
+					}
+				}
+			}
+
+			cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
+
+			if(runCommand(runCmd) != 0) {
+				outputError("Error: Couldn't launch BioNetFit on cluster with command: " + runCmd + ". Quitting.");
+			}
+
+			return 0;
+		}
+		else if (action == "load") {
+			std::ifstream ifs(configFile);
+
+			if (ifs.is_open()) {
+				boost::archive::binary_iarchive ar(ifs);
+
+				// Load data
+				ar & s;
+				ifs.close();
+			}
+			else {
+				outputError("Error: Couldn't load config file: " + configFile + ".");
+			}
+
+			if (s->options.useCluster) {
+				setenv("OMPI_MCA_mpi_warn_on_fork","0",1);
+			}
+
+			s->isMaster = true;
+			s->setExePath(convertToAbsPath(argv[0]));
+			s->initComm();
+		}
+		else if (action == "resume") {
+			string swarmState = configFile + "/swarmState.sconf";
+			std::ifstream ifs(swarmState);
+
+			if (ifs.is_open()) {
+				cout << "trying to load swarm..." << endl;
+				boost::archive::binary_iarchive ar(ifs);
+
+				// Load data
+				ar & s;
+				ifs.close();
+			}
+			else {
+				outputError("Error: Couldn't load swarm state: " + swarmState + ".");
+			}
+
+			cout << "loaded" << endl;
+
+			s->resumingSavedSwarm = true;
+
+			if (s->options.useCluster) {
+				setenv("OMPI_MCA_mpi_warn_on_fork","0", 0);
+				int randNum = rand();
+				string serializedSwarmPath = to_string(static_cast<long long int>(randNum)) + ".sconf";
+
+				std::ofstream ofs(serializedSwarmPath);
+				if (ofs.is_open()) {
+					s->setsConf(convertToAbsPath(serializedSwarmPath));
+					//cout << "Path is: " << s->getsConf() << endl;
+
+					boost::archive::binary_oarchive ar(ofs);
+					ar & s;
+					ofs.close();
+				}
+
+				s->isMaster = true;
+				string runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
+
+				if (s->options.saveClusterOutput) {
+					string outputPath = s->options.outputDir + "/" + s->options.jobName + "_cluster_output";
+					if (!checkIfFileExists(outputPath)) {
+						string makeClusterOutputDirCmd = "mkdir " + outputPath;
+						if (runCommand(makeClusterOutputDirCmd) != 0) {
+							cout << "Warning: Couldn't create cluster output directory with command: " << makeClusterOutputDirCmd << ". Turning off save_cluster_output" << endl;
+							s->options.saveClusterOutput = false;
+							runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
+						}
+					}
+				}
+
+				cout << "Running BioNetFit on cluster with command: " << runCmd << endl;
+
+				if(runCommand(runCmd) != 0) {
+					outputError("Error: Couldn't launch BioNetFit on cluster with command: " + runCmd + ". Quitting.");
+				}
+			}
+			else {
+				s->initComm();
+				s->initRNGS(s->options.seed);
+				s->isMaster = true;
+				s->doSwarm();
+			}
+
+			return 0;
+		}
+
+		if (action != "results") {
+			s->doSwarm();
+		}
+		else {
+			string messageFilePath = s->options.jobOutputDir + ".req";
+
+			ofstream outFile;
+			outFile.open(messageFilePath);
+
+			if (outFile.is_open()) {
+				outFile << "output results";
+				outFile.close();
+			}
+			else {
+				string errMsg = "Error: Couldn't open file " + messageFilePath + " to request results from the swarm master.";
+				outputError(errMsg);
+			}
+		}
 	}
 
 	// We are a particle
 	else if (type == "particle"){
+		// Try to open the serialized swarm
+		while(1) {
+			// Create and input archive
+			std::ifstream ifs(configFile);
 
-		// Create and input archive
-		std::ifstream ifs("swarm.txt");
-		if (ifs.is_open()) {
-			boost::archive::text_iarchive ar(ifs);
+			if (ifs.is_open()) {
+				boost::archive::binary_iarchive ar(ifs);
 
-			cout << "particle trying to load swarm";
-			// Load data
-			ar & s;
-			ifs.close();
+				// Load data
+				ar & s;
+				ifs.close();
+				break;
+			}
 		}
 
-		s->setIsMaster(false);
-		s->setExePath(argv[0]);
+		s->isMaster = false;
+		s->setExePath(convertToAbsPath(argv[0]));
+
 		s->initComm();
+
+		if (pID == 0) {
+			pID = s->swarmComm->getRank();
+		}
+
+		s->initRNGS(s->options.seed + pID);
+
 		Particle *p = s->createParticle(pID);
-		p->setModel(s->getModel());
+		p->setModel(s->options.model);
 
 		if (s->currentGeneration == 1) {
 			p->generateParams();
 		}
+
+		if (s->options.useCluster) {
+			setenv("OMPI_MCA_mpi_warn_on_fork","0",1);
+		}
+
 		p->doParticle();
 	}
+
+	s->swarmComm->~Pheromones();
 
 	return 0;
 }
