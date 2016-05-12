@@ -1,6 +1,0 @@
-bin is build directory
-boost_1.59.0.perfect is a perfect set of files needed for the boost build
-include constains boost headers. should be empty on distribution.
-lib contains boost libraries. should be empty on distribution.
-src contains BioNetFit source
-boost archive is an archive of the perfect set
