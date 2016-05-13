@@ -384,7 +384,7 @@ bool Swarm::checkStopCriteria() {
 	}
 	else if ((options.fitType == "ga" || options.fitType == "de") && options.synchronicity) {
 		if (options.verbosity >= 3) {
-			cout << "Checking if we've reached max generation. Current is " << currentGeneration << " and max is " << options.maxGenerations << endl;
+			cout << "Checking if we've reached max generation. Current is " << (currentGeneration - 1) << " and max is " << options.maxGenerations << endl;
 		}
 		if (options.maxGenerations && currentGeneration > options.maxGenerations) {
 			return true;
@@ -1455,17 +1455,17 @@ void Swarm::finishFit() {
 		// Reset variables
 		resetVariables();
 
-		cout << "counter: " << bootstrapCounter << " bootstrap " << options.bootstrap << endl;
 		if ((bootstrapCounter + 1) < options.bootstrap) {
 			cout << "Deleting last fitting run and beginning next fit.." << endl;
 
-			string command = "cd " + options.jobOutputDir + " && find -mindepth 1 -maxdepth 1 -type d -exec rm -r {} \\";
+			string command = "cd " + options.jobOutputDir + " && find -mindepth 1 -maxdepth 1 -type d -exec rm -r {} \\;";
 			runCommand(command);
 
 			killAllParticles(NEW_BOOTSTRAP);
 		}
 		else {
 			killAllParticles(FIT_FINISHED);
+			exit(EXIT_SUCCESS);
 		}
 	}
 	else {

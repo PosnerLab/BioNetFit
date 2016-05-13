@@ -150,6 +150,8 @@ void Particle::doParticle() {
 			swarm_->swarmComm->univMessageReceiver.clear();
 		}
 
+		cout << "cg is " << currentGeneration_ << endl;
+
 		if (doRunModel) {
 			for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 				runModel(i);
@@ -200,13 +202,16 @@ void Particle::runModel(int iteration, bool localSearch) {
 
 	// Only need to generate files if we're in the first generation. In subsequent generations
 	// the model generation is handled by breeding parents
-	if (currentGeneration_ == 1 && swarm_->bootstrapCounter == 0 && !localSearch) {
+	if (currentGeneration_ == 1 && !localSearch) {
 		if (swarm_->options.model->getHasGenerateNetwork()){
-			string netFilename = "base.net";
-			string netFullPath = swarm_->options.jobOutputDir + netFilename;
 
-			if (iteration == 1) {
-				swarm_->options.model->parseNet(netFullPath);
+			if (swarm_->bootstrapCounter == 0) {
+				string netFilename = "base.net";
+				string netFullPath = swarm_->options.jobOutputDir + netFilename;
+
+				if (iteration == 1) {
+					swarm_->options.model->parseNet(netFullPath);
+				}
 			}
 			model_->outputModelWithParams(simParams_, path, bnglFilename, suffix, false, false, true, false, false);
 		}
@@ -455,7 +460,7 @@ void Particle::checkMessagesPSO() {
 				}
 
 				++swarm_->bootstrapCounter;
-				currentGeneration_ = 0;
+				currentGeneration_ = 1;
 
 				swarm_->swarmComm->univMessageReceiver.clear();
 				return;
@@ -559,7 +564,7 @@ bool Particle::checkMessagesDE() {
 				}
 
 				++swarm_->bootstrapCounter;
-				currentGeneration_ = 0;
+				currentGeneration_ = 1;
 
 				swarm_->swarmComm->univMessageReceiver.clear();
 				return true;

@@ -73,6 +73,10 @@ int main(int argc, char *argv[]) {
 		outputError("Error: Couldn't find a valid 'type' in your arguments.");
 	}
 
+	configFile = convertToAbsPath(configFile);
+
+	chdir("../");
+
 	/*
 	cout << "type: " << type << endl;
 	cout << "action: " << action << endl;
@@ -103,6 +107,7 @@ int main(int argc, char *argv[]) {
 			//cout << "Processing .conf took " << t << " seconds" << endl;
 
 			s->currentGeneration = 1;
+			chdir("bin/");
 			s->setExePath(convertToAbsPath(argv[0]));
 			s->isMaster = true;
 			s->initComm();
@@ -127,7 +132,6 @@ int main(int argc, char *argv[]) {
 
 		if (action == "cluster") {
 			string runCmd = s->getClusterCommand(string(convertToAbsPath(argv[0])));
-			//string runCmd = s->generateSlurmMultiProgCmd(string(convertToAbsPath(argv[0])));
 
 			if (s->options.saveClusterOutput) {
 				string outputPath = s->options.outputDir + "/" + s->options.jobName + "_cluster_output";
@@ -169,6 +173,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			s->isMaster = true;
+			chdir("bin/");
 			s->setExePath(convertToAbsPath(argv[0]));
 			s->initComm();
 		}
@@ -275,6 +280,8 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
+		chdir("bin/");
+
 		s->isMaster = false;
 		s->setExePath(convertToAbsPath(argv[0]));
 
@@ -297,6 +304,7 @@ int main(int argc, char *argv[]) {
 			setenv("OMPI_MCA_mpi_warn_on_fork","0",1);
 		}
 
+		chdir("bin");
 		p->doParticle();
 	}
 

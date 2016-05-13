@@ -88,7 +88,7 @@ Swarm * Config::createSwarmFromConfig () {
 	// Update the sim path
 	if(pairs.find("bng_command") != pairs.end()) {
 		//cout << "Processing bng command" << endl;
-		swarm_->options.bngCommand = pairs.find("bng_command")->second;
+		swarm_->options.bngCommand = convertToAbsPath(pairs.find("bng_command")->second);
 		if (!checkIfFileExists(swarm_->options.bngCommand)) {
 			swarm_->outputError("Error: The specified bng command: " + swarm_->options.bngCommand + " does not exist. Quitting.");
 		}
