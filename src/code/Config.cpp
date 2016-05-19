@@ -74,9 +74,9 @@ Swarm * Config::createSwarmFromConfig () {
 	}
 
 	// Update the swarm size
-	if(pairs.find("swarm_size") != pairs.end()) {
+	if(pairs.find("population_size") != pairs.end()) {
 		//cout << "Processing swarm size" << endl;
-		int swarmSize = stoi(pairs.find("swarm_size")->second);
+		int swarmSize = stoi(pairs.find("population_size")->second);
 
 		// If the swarm size isn't even, make it even by adding a particle
 		//if (swarmSize % 2 != 0 && swarm_->options.fitType == "genetic") {
@@ -157,8 +157,8 @@ Swarm * Config::createSwarmFromConfig () {
 	}
 
 	if(pairs.find("cluster_queue") != pairs.end()) {
-			swarm_->options.clusterQueue = pairs.find("cluster_queue")->second;
-		}
+		swarm_->options.clusterQueue = pairs.find("cluster_queue")->second;
+	}
 
 	if(pairs.find("hostfile") != pairs.end()) {
 		//cout << "Processing use cluster" << endl;
@@ -244,7 +244,7 @@ Swarm * Config::createSwarmFromConfig () {
 	// Update the maximum number of parallel threads (non-cluster only)
 	if(pairs.find("parallel_count") != pairs.end()) {
 		if (stoi(pairs.find("parallel_count")->second) > swarm_->options.swarmSize) {
-			outputError("Error: Parallel_count is set higher than swarm_size.");
+			outputError("Error: Parallel_count is set higher than population_size.");
 		}
 		if (swarm_->options.useCluster) {
 			swarm_->options.parallelCount = swarm_->options.swarmSize;
@@ -490,7 +490,7 @@ Swarm * Config::createSwarmFromConfig () {
 		}
 		else { // Have a prefix but no .exp file
 			cout << "Warning: The model file specifies an action with the prefix '" << i->first << "' but there isn't a matching .exp file specified in your .conf file. We will ignore this action command." << endl;
-			i = swarm_->options.model->actions.erase(++i);
+			swarm_->options.model->actions.erase(++i);
 		}
 	}
 
@@ -536,36 +536,19 @@ string Config::getLocation () {
 
 void Config::checkConsistency() {
 	/*
-	 *	All Requires:
-	 *	1. fit_type
-	 *	2. job_name
-	 *	3. model
-	 *	4. exp
-	 *	5. output_dir
-	 *	6. bng_command
-	 *	7. swarm_size
-	 *
-	 *	Enhanced stop requires:
-	 *	1. nmax
-	 *
-	 *	Enhanced inertia requires:
-	 *	1. Enhanced stop
-	 *
-	 *	In DE, different mutate types require different numbers of minimum particles in each island
-	 *
 	 * Make sure we have SOME sort of stop criteria
-	 * QPSO requires maxNumSimulations to update beta_. the max num of iterations should be close to the expected. would be nice if the user had to guess. is there an adaptive beta_ algorithm like enhancedInertia?
-	 * In SA, make sure swarm size is n+1 for simplex creation
-	 * SA cannot be synchronous
 	 */
 
 	if (swarm_->options.fitType.empty()) {
 		swarm_->outputError("Error: You didn't specify a fit_type in your .conf file. Refer to the documentation with help on setting this option. Quitting.");
 	}
 
-	// TODO: This doesn't work!!
 	if (swarm_->options.jobName.empty()) {
-		swarm_->outputError("Error: You didn't specify a job_name in your .conf file. Refer to the documentation with help on setting this option. Quitting.");
+		swarm_->outputError("Error: You didn't specify a job_name. Quitting.");
+	}
+
+	if (swarm_->options.fitType != "ga" || swarm_->options.fitType != "sa" || swarm_->options.fitType != "de" || swarm_->options.fitType != "pso") {
+		swarm_->outputError("Error: Unrecognized fit_type. Quitting.");
 	}
 
 	if (swarm_->options.model == 0) {
@@ -585,16 +568,16 @@ void Config::checkConsistency() {
 	}
 
 	if (swarm_->options.swarmSize == 0) {
-		swarm_->outputError("Error: You didn't specify a swarm_size in your .conf file. Refer to the documentation with help on setting this option. Quitting.");
+		swarm_->outputError("Error: You didn't specify a population_size in your .conf file. Refer to the documentation with help on setting this option. Quitting.");
 	}
 
-	if (swarm_->options.enhancedInertia) {
+	if (swarm_->options.enhancedInertia && swarm_->options.fitType == "pso") {
 		if (!swarm_->options.enhancedStop) {
 			swarm_->outputError("Error: You set enhanced_inertia to true, but enhanced_stop to false. Enhanced inertia requires enhanced_stop to be set to true. Quitting.");
 		}
 	}
 
-	if (swarm_->options.enhancedStop) {
+	if (swarm_->options.enhancedStop  && swarm_->options.fitType == "pso") {
 		if (swarm_->options.nmax == 0) {
 			swarm_->outputError("Error: You set enhanced_stop to true, but did not set a maximum permance value (nmax) in your .conf file. Quitting.");
 		}
@@ -602,5 +585,55 @@ void Config::checkConsistency() {
 
 	if (swarm_->options.useCluster && swarm_->options.emailWhenFinished && swarm_->options.emailAddress.empty()) {
 		swarm_->outputError("Error: You set email_when_finished to true, but did not specify an email address. Quitting.");
+	}
+
+	if (swarm_->options.useCluster && !swarm_->options.clusterSoftware.empty() && (swarm_->options.clusterSoftware != "mpi" || swarm_->options.clusterSoftware != "slurm" || swarm_->options.clusterSoftware != "torque")) {
+		swarm_->outputError("Error: You set cluster_software to an invalid option. Quitting.");
+	}
+
+	if (swarm_->options.fitType == "de") {
+		if (swarm_->options.mutateType == 1 && (swarm_->options.swarmSize / swarm_->options.numIslands) <= 2 ) {
+			swarm_->outputError("Error: mutate_type=1 requires at least 2 members per island. Quitting.");
+		}
+
+		if (swarm_->options.mutateType == 2 && (swarm_->options.swarmSize / swarm_->options.numIslands) <= 4 ) {
+			swarm_->outputError("Error: mutate_type=2 requires at least 4 members per island. Quitting.");
+		}
+
+		if (swarm_->options.mutateType == 3 && (swarm_->options.swarmSize / swarm_->options.numIslands) <= 3 ) {
+			swarm_->outputError("Error: mutate_type=3 requires at least 3 members per island. Quitting.");
+		}
+
+		if (swarm_->options.mutateType == 4 && (swarm_->options.swarmSize / swarm_->options.numIslands) <= 5 ) {
+			swarm_->outputError("Error: mutate_type=4 requires at least 5 members per island. Quitting.");
+		}
+
+		if (swarm_->options.numIslands == 0) {
+			swarm_->outputError("Error: You are running a differential evolution fit, but didn't specify the number of islands to use. Quitting.");
+		}
+	}
+
+	if (swarm_->options.fitType == "pso") {
+		if (swarm_->options.fitType == "qpso") {
+			if (!swarm_->options.maxNumSimulations) {
+				swarm_->outputError("Error: You are using qpso, but didn't set max_num_simulations. Quitting.");
+			}
+		}
+	}
+
+	if (swarm_->options.fitType == "sa") {
+		if (swarm_->options.swarmSize < (swarm_->options.model->getNumFreeParams() + 1)) {
+			swarm_->outputError("Error: You are using simulated annealing but your swarm size is less than N+1, where N is the number of free parameters in your model. Quitting.");
+		}
+
+		if (swarm_->options.synchronicity) {
+			swarm_->outputError("Error: Simulated annealing does not support synchronous fitting. Quitting.");
+		}
+	}
+
+	if (swarm_->options.fitType == "ga") {
+		if (swarm_->options.synchronicity && swarm_->options.maxGenerations == 0) {
+			swarm_->outputError("Error: You are running a synchronous ga fit, but didn't specify max_generations. Quitting.");
+		}
 	}
 }

@@ -20,6 +20,7 @@ Swarm::Swarm() {
 	swarmComm = 0;
 	fitCompareTolerance = 1e-6;
 	bootstrapCounter = 0;
+	commInit = false;
 
 	options.jobName = "";
 	options.fitType = "";
@@ -79,6 +80,8 @@ Swarm::Swarm() {
 
 	options.enhancedStop = false; // true
 	options.enhancedInertia = false; // true
+
+	options.numIslands = 0;
 
 	options.minTemp = pow(10, -10);
 	options.minRadius = pow(10, -6);
@@ -2453,11 +2456,13 @@ void Swarm::initPSOswarm(bool resumeFit) {
 void Swarm::outputError(string errorMessage) {
 	cout << errorMessage << endl;
 
-	// Tell all particles to die
-	killAllParticles(FIT_FINISHED);
+	if (commInit) {
+		// Tell all particles to die
+		killAllParticles(FIT_FINISHED);
 
-	// Deconstruct our communicator
-	swarmComm->~Pheromones();
+		// Deconstruct our communicator
+		swarmComm->~Pheromones();
+	}
 
 	exit (EXIT_FAILURE);
 }

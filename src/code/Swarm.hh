@@ -118,6 +118,7 @@ public:
 	bool resumingSavedSwarm;
 	bool hasMutate;
 	float fitCompareTolerance;
+	bool commInit;
 
 	struct SwarmOpts {
 		std::string jobName;	// name of the job

@@ -60,6 +60,8 @@ void Pheromones::init(Swarm *s) {
 			}
 		}
 	}
+
+	swarm_->commInit = true;
 }
 
 void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool block, std::vector<std::string> &message, int messageID) {
