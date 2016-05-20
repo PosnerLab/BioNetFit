@@ -155,3 +155,23 @@ void outputError(string errorMessage) {
 
 	exit (1);
 }
+
+string toString(unsigned int theNumber) {
+	return to_string(static_cast<long long int>(theNumber));
+}
+
+string toString(int theNumber) {
+	return to_string(static_cast<long long int>(theNumber));
+}
+
+string toString(double theNumber) {
+	return to_string(static_cast<long double>(theNumber));
+}
+
+string toString(float theNumber) {
+	return to_string(static_cast<long double>(theNumber));
+}
+
+string toString(unsigned long theNumber) {
+	return to_string(static_cast<long double>(theNumber));
+}

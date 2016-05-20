@@ -831,8 +831,8 @@ void Swarm::processParticlesPSO(vector<unsigned int> particles, bool newFlight) 
 		// Convert positions to string so they can be sent to the particle
 		vector<string> nextPositionsStr;
 		for (auto param = particleCurrParamSets_.at(*particle).begin(); param != particleCurrParamSets_.at(*particle).end(); ++param) {
-			//nextPositionsStr.push_back(to_string(static_cast<long double>(*param)));
-			nextPositionsStr.push_back(to_string(*param));
+			//nextPositionsStr.push_back(toString(static_cast<long double>(*param)));
+			nextPositionsStr.push_back(toString(*param));
 			//cout << *param << endl;
 		}
 
@@ -1107,7 +1107,7 @@ void Swarm::launchParticle(unsigned int pID, bool nextGen) {
 	if (currentGeneration == 1 && !options.useCluster && !nextGen && bootstrapCounter == 0) {
 
 		// Construct command needed to run the particle
-		string command = exePath_ + " particle " + to_string(pID) + " run " + to_string(currentGeneration) + " " + sConf_;
+		string command = exePath_ + " particle " + toString(pID) + " run " + toString(currentGeneration) + " " + sConf_;
 		command = command + " >> pOUT 2>&1";
 		command = command + " &";
 
@@ -1211,12 +1211,12 @@ void Swarm::breedGenerationGA(vector<unsigned int> children) {
 	std::map<unsigned int, std::vector<double>> particleNewParamSets;
 
 	// Create the output directory for the next generation
-	if (!checkIfFileExists(options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)))) {
-		string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
+	if (!checkIfFileExists(options.jobOutputDir + toString(currentGeneration))) {
+		string createDirCmd = "mkdir " + options.jobOutputDir + toString(currentGeneration);
 		int retryCounter = 0;
-		while (runCommand(createDirCmd) != 0 && !checkIfFileExists(options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)))) {
+		while (runCommand(createDirCmd) != 0 && !checkIfFileExists(options.jobOutputDir + toString(currentGeneration))) {
 			if(++retryCounter >= 100) {
-				outputError("Error: Couldn't create " + options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)) + " to hold next generation's output.");
+				outputError("Error: Couldn't create " + options.jobOutputDir + toString(currentGeneration) + " to hold next generation's output.");
 			}
 			sleep(1);
 			cout << "Trying again to create dir" << endl;
@@ -1312,7 +1312,7 @@ void Swarm::breedGenerationGA(vector<unsigned int> children) {
 
 		// Quit if we try to many times to select suitable parents
 		//if (++maxFitCounter >= 10000) {
-		//	outputError("Error: Tried too many times to select parents that didn't exceed the specified max_fit value of " + to_string(static_cast<long double>(options.maxFit)) + ". Quitting.");
+		//	outputError("Error: Tried too many times to select parents that didn't exceed the specified max_fit value of " + toString(static_cast<long double>(options.maxFit)) + ". Quitting.");
 		//}
 		// Make sure we don't exceed max_fit
 		//} while (options.maxFit != 0 && particleBestFits_.at(p1) >= options.maxFit && particleBestFits_.at(p2) >= options.maxFit);
@@ -1452,7 +1452,7 @@ void Swarm::finishFit() {
 		outputBootstrapSummary();
 
 		// Output fit summary
-		string outputFilePath = outputDir + to_string(static_cast<long long int>(bootstrapCounter + 1)) + "_all_fits.txt";
+		string outputFilePath = outputDir + toString(bootstrapCounter + 1) + "_all_fits.txt";
 		outputRunSummary(outputFilePath);
 
 		// Reset variables
@@ -1703,13 +1703,13 @@ void Swarm::initFit () {
 		}
 
 		for (auto particle = particleIterationCounter_.begin(); particle != particleIterationCounter_.end(); ++particle) {
-			swarmComm->univMessageSender.push_back(to_string(static_cast<long long int>(currentGeneration - 1)));
+			swarmComm->univMessageSender.push_back(toString(currentGeneration - 1));
 			swarmComm->sendToSwarm(0, particle->first, SEND_NUMFLIGHTS_TO_PARTICLE, false, swarmComm->univMessageSender);
 			swarmComm->univMessageSender.clear();
 
 			for (auto param = particleCurrParamSets_.at(particle->first).begin(); param != particleCurrParamSets_.at(particle->first).end(); ++param) {
 				//cout << "Sending " << *param << " to " << particle->first << endl;
-				swarmComm->univMessageSender.push_back(to_string(static_cast<long double>(*param)));
+				swarmComm->univMessageSender.push_back(toString(*param));
 			}
 			swarmComm->sendToSwarm(0, particle->first, SEND_FINAL_PARAMS_TO_PARTICLE, false, swarmComm->univMessageSender);
 			swarmComm->univMessageSender.clear();
@@ -1826,7 +1826,7 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 
 		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_END);
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
-			int pID = sm->second.sender;
+			unsigned int pID = sm->second.sender;
 
 			if (options.verbosity >= 3) {
 				cout << "Particle " << pID << " finished simulation" << endl;
@@ -1836,7 +1836,7 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 			runningParticlesIterator_ = runningParticles_.find(pID);
 			// Then remove it
 			if (runningParticlesIterator_ == runningParticles_.end()) {
-				string errMsg = "Error: Couldn't remove particle " + to_string(static_cast<long long int>(pID)) + " from runningParticle list.";
+				string errMsg = "Error: Couldn't remove particle " + toString(pID) + " from runningParticle list.";
 				outputError(errMsg);
 			}
 			runningParticles_.erase(runningParticlesIterator_);
@@ -1849,10 +1849,10 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 			string paramsString;
 			if (options.synchronicity == 1) {
 				if (options.fitType == "ga") {
-					paramsString = "gen" + to_string(static_cast<long long int>(gen)) + "perm" + to_string(static_cast<long long int>(pID)) + " ";
+					paramsString = "gen" + toString(gen) + "perm" + toString(pID) + " ";
 				}
 				else if (options.fitType == "pso") {
-					paramsString = "flock" + to_string(static_cast<long long int>(gen)) + "particle" + to_string(static_cast<long long int>(pID)) + " ";
+					paramsString = "flock" + toString(gen) + "particle" + toString(pID) + " ";
 				}
 
 			}
@@ -1863,11 +1863,11 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 				// TODO: This run summary contains 1 less particle than it should.
 				// Output a run summary every outputEvery flights
 				if (flightCounter_ % options.outputEvery == 0) {
-					string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(flightCounter_)) + "_summary.txt";
+					string outputPath = options.jobOutputDir + toString(flightCounter_) + "_summary.txt";
 					outputRunSummary(outputPath);
 				}
 
-				paramsString = to_string(static_cast<long long int>(flightCounter_)) + " ";
+				paramsString = toString(flightCounter_) + " ";
 			}
 
 			// Store the parameters given to us by the particle
@@ -1897,14 +1897,14 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_FAIL);
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 
-			int pID = sm->second.sender;
+			unsigned int pID = sm->second.sender;
 
 			// Get an iterator to the particle in our list of running particles
 			runningParticlesIterator_ = runningParticles_.find(pID);
 
 			// Then remove it
 			if (runningParticlesIterator_ == runningParticles_.end()) {
-				string errMsg = "Error: Couldn't remove particle " + to_string(static_cast<long long int>(pID)) + " from runningParticle list.";
+				string errMsg = "Error: Couldn't remove particle " + toString(pID) + " from runningParticle list.";
 				outputError(errMsg);
 			}
 			// Increment our finished counter
@@ -1922,7 +1922,7 @@ vector<unsigned int> Swarm::checkMasterMessages() {
 			vector<string> intParts;
 			//for (auto i: runningParticles_) {
 			for (auto i = runningParticles_.begin(); i != runningParticles_.end(); ++i) {
-				intParts.push_back(to_string(static_cast<long long int>(*i)));
+				intParts.push_back(toString(*i));
 			}
 			swarmComm->sendToSwarm(0, sm->second.sender, SEND_RUNNING_PARTICLES, true, intParts);
 		}
@@ -1957,7 +1957,7 @@ unordered_map<unsigned int, vector<double>> Swarm::checkMasterMessagesDE() {
 
 		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_END);
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
-			int pID = sm->second.sender;
+			unsigned int pID = sm->second.sender;
 
 			if (options.verbosity >= 3) {
 				//cout << "Particle " << pID << " finished simulation" << endl;
@@ -1967,7 +1967,7 @@ unordered_map<unsigned int, vector<double>> Swarm::checkMasterMessagesDE() {
 			runningParticlesIterator_ = runningParticles_.find(pID);
 			// Then remove it
 			if (runningParticlesIterator_ == runningParticles_.end()) {
-				string errMsg = "Error: Couldn't remove particle " + to_string(static_cast<long long int>(pID)) + " from runningParticle list.";
+				string errMsg = "Error: Couldn't remove particle " + toString(pID) + " from runningParticle list.";
 				outputError(errMsg);
 			}
 			runningParticles_.erase(runningParticlesIterator_);
@@ -1986,17 +1986,17 @@ unordered_map<unsigned int, vector<double>> Swarm::checkMasterMessagesDE() {
 			string paramsString;
 			// Only output a run summary after a trial set has finished
 			if (options.synchronicity == 1 && trial == true) {
-				paramsString = "gen" + to_string(static_cast<long long int>(gen)) + "perm" + to_string(static_cast<long long int>(pID)) + " ";
+				paramsString = "gen" + toString(static_cast<long long int>(gen)) + "perm" + toString(static_cast<long long int>(pID)) + " ";
 			}
 			else if (options.synchronicity == 0 && trial == true) {
 				// TODO: This run summary contains 1 less particle than it should.
 				// Output a run summary every outputEvery flights
 				if (flightCounter_ % options.outputEvery == 0) {
-					string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(flightCounter_)) + "_summary.txt";
+					string outputPath = options.jobOutputDir + toString(static_cast<long long int>(flightCounter_)) + "_summary.txt";
 					outputRunSummary(outputPath);
 				}
 
-				paramsString = to_string(static_cast<long long int>(flightCounter_)) + " ";
+				paramsString = toString(static_cast<long long int>(flightCounter_)) + " ";
 			}
 			 */
 
@@ -2032,7 +2032,7 @@ unordered_map<unsigned int, vector<double>> Swarm::checkMasterMessagesDE() {
 					paramsString += *m + " ";
 				}
 				else if (trial) {
-					paramsString += to_string(static_cast<long double>(particleCurrParamSets_[pID][i])) + " ";
+					paramsString += toString(static_cast<long double>(particleCurrParamSets_[pID][i])) + " ";
 				}
 				 */
 
@@ -2054,14 +2054,14 @@ unordered_map<unsigned int, vector<double>> Swarm::checkMasterMessagesDE() {
 		smhRange = swarmComm->univMessageReceiver.equal_range(SIMULATION_FAIL);
 		for (Pheromones::swarmMsgHolderIt sm = smhRange.first; sm != smhRange.second; ++sm) {
 
-			int pID = sm->second.sender;
+			unsigned int pID = sm->second.sender;
 
 			// Get an iterator to the particle in our list of running particles
 			runningParticlesIterator_ = runningParticles_.find(pID);
 
 			// Then remove it
 			if (runningParticlesIterator_ == runningParticles_.end()) {
-				string errMsg = "Error: Couldn't remove particle " + to_string(static_cast<long long int>(pID)) + " from runningParticle list.";
+				string errMsg = "Error: Couldn't remove particle " + toString(pID) + " from runningParticle list.";
 				outputError(errMsg);
 			}
 			// Increment our finished counter
@@ -2141,7 +2141,7 @@ string Swarm::generateMPICommand(string cmd) {
 	if (options.hostfile.size()) {
 		newCmd += "-hostfile " + options.hostfile + " ";
 	}
-	newCmd += "-tag-output -np " + to_string(static_cast<long long int>(options.swarmSize)) + " " + cmd + " particle 0 run " + sConf_;
+	newCmd += "-tag-output -np " + toString(options.swarmSize) + " " + cmd + " particle 0 run " + sConf_;
 
 	if (options.saveClusterOutput) {
 		newCmd += " > " + options.outputDir + "/" + options.jobName + "_cluster_output/" + options.jobName + " 2>&1";
@@ -2156,7 +2156,7 @@ string Swarm::generateSlurmMultiProgCmd(string runCmd) {
 	if (multiprog.is_open()) {
 		multiprog << "0 " << runCmd << " load " << sConf_ << endl;
 		for (unsigned int id = 1; id <= options.swarmSize; ++id) {
-			multiprog << to_string(static_cast<long long int>(id)) + " " << runCmd << " particle " << to_string(static_cast<long long int>(id)) << " run " << sConf_ << endl;
+			multiprog << toString(id) + " " << runCmd << " particle " << toString(id) << " run " << sConf_ << endl;
 		}
 		multiprog.close();
 	}
@@ -2193,7 +2193,7 @@ string Swarm::generateTorqueBatchScript(string cmd) {
 		batchScript << "#PBS -l procs=" << options.swarmSize + 1 << ",";
 
 		if (options.maxFitTime != MAX_LONG) {
-			batchScript << " walltime=00:00:" << to_string(static_cast<long long int>(options.maxFitTime)) << ",";
+			batchScript << " walltime=00:00:" << toString(options.maxFitTime) << ",";
 		}
 
 		batchScript << endl << endl;
@@ -2206,7 +2206,7 @@ string Swarm::generateTorqueBatchScript(string cmd) {
 	return cmd;
 }
 
-string Swarm::generateSlurmCommand(string cmd, bool multiProg, int nCPU) {
+string Swarm::generateSlurmCommand(string cmd, bool multiProg, unsigned int nCPU) {
 	string command;
 
 	//TODO: Need to display terminal output from cluster jobs
@@ -2231,7 +2231,7 @@ string Swarm::generateSlurmCommand(string cmd, bool multiProg, int nCPU) {
 	}
 
 	if (options.maxFitTime != MAX_LONG) {
-		command += " -t 00:00:" + to_string(static_cast<long long int>(options.maxFitTime));
+		command += " -t 00:00:" + toString(options.maxFitTime);
 	}
 
 	// Specify output directory if needed
@@ -2243,10 +2243,10 @@ string Swarm::generateSlurmCommand(string cmd, bool multiProg, int nCPU) {
 	}
 
 	if (nCPU == 0) {
-		command += " -n" + to_string(static_cast<long long int>(options.parallelCount) + 1);
+		command += " -n" + toString(options.parallelCount + 1);
 	}
 	else {
-		command += " -n" + to_string(static_cast<long long int>(nCPU));
+		command += " -n" + toString(nCPU);
 	}
 
 	command += " -l";
@@ -2291,7 +2291,7 @@ string Swarm::generateSlurmBatchFile(string runCmd) {
 			sbatch << "#SBATCH -o /dev/null" << endl;
 		}
 
-		sbatch << "#SBATCH -n" + to_string(static_cast<long long int>(options.parallelCount) + 1) << endl;
+		sbatch << "#SBATCH -n" + toString(options.parallelCount + 1) << endl;
 
 		sbatch << endl;
 
@@ -2388,7 +2388,7 @@ string Swarm::mutateParamGA(FreeParam* fp, double paramValue) {
 	}
 	//double t = tmr.elapsed();
 	//cout << "Mutate took " << t << " seconds" << endl;
-	return to_string(static_cast<long double>(paramValue));
+	return toString(paramValue);
 }
 
 void Swarm::saveSwarmState() {
@@ -2876,7 +2876,7 @@ void Swarm::recvMigrationSetDE(unsigned int island, map<unsigned int, vector<vec
 				// Insert parameter to the currentParamSets tracker
 				cout << "param: " << *param << endl;
 				particleCurrParamSets_.at(*recvIt)[i] = *param;
-				paramStr.push_back(to_string(static_cast<long double>(*param)));
+				paramStr.push_back(toString(*param));
 				++i;
 			}
 			// Send the parameters to the particle
@@ -2911,13 +2911,13 @@ void Swarm::runSGA() {
 		stopCriteria = checkStopCriteria();
 		saveSwarmState();
 
-		string currentDirectory = options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
+		string currentDirectory = options.jobOutputDir + toString(currentGeneration);
 		if (options.deleteOldFiles) {
 			cleanupFiles(currentDirectory.c_str());
 		}
 
 		if (!stopCriteria) {
-			string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration - 1 )) + "_summary.txt";
+			string outputPath = options.jobOutputDir + toString(currentGeneration - 1 ) + "_summary.txt";
 			outputRunSummary(outputPath);
 			breedGenerationGA();
 		}
@@ -2976,7 +2976,7 @@ void Swarm::runSPSO() {
 		stopCriteria = checkStopCriteria();
 
 		if (!stopCriteria) {
-			string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)) + "_summary.txt";
+			string outputPath = options.jobOutputDir + toString(currentGeneration) + "_summary.txt";
 			outputRunSummary(outputPath);
 			++currentGeneration;
 		}
@@ -2995,8 +2995,8 @@ void Swarm::runSDE() {
 	}
 
 	// Create an output directory for each island
-	if (!checkIfFileExists(options.jobOutputDir + to_string(static_cast<long long int>(1)))) {
-		string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(1));
+	if (!checkIfFileExists(options.jobOutputDir + toString(1))) {
+		string createDirCmd = "mkdir " + options.jobOutputDir + toString(1);
 		runCommand(createDirCmd);
 	}
 
@@ -3064,7 +3064,7 @@ void Swarm::runSDE() {
 			// If we're in a trial loop..
 			if (trialLoop && particle->second.size()) {
 				// Create the beginning of our param string for use in summary and result outputs
-				string paramsString = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(particle->first)) + " ";
+				string paramsString = "gen" + toString(currentGeneration) + "perm" + toString(particle->first) + " ";
 
 				// Increment the flight counter only at the end of a trial
 				++flightCounter_;
@@ -3090,13 +3090,13 @@ void Swarm::runSDE() {
 						// Store the parameter in the global param set and
 						// concatenate the param string for output
 						particleCurrParamSets_[particle->first][i] = *param;
-						paramsString += to_string(static_cast<long double>(*param)) + " ";
+						paramsString += toString(*param) + " ";
 						//cout << "added " << paramsString << endl;
 					}
 					// Otherwise, do nothing except use the current/old param
 					// set in the output
 					else {
-						paramsString += to_string(static_cast<long double>(particleCurrParamSets_[particle->first][i])) + " ";
+						paramsString += toString(particleCurrParamSets_[particle->first][i]) + " ";
 						//cout << "added: " << paramsString << endl;
 					}
 					++i;
@@ -3154,7 +3154,7 @@ void Swarm::runSDE() {
 					// Convert our param set to string for sending
 					vector<string> paramVecStr;
 					for (auto param = newParamSet.begin(); param != newParamSet.end(); ++param) {
-						paramVecStr.push_back(to_string(static_cast<long double>(*param)));
+						paramVecStr.push_back(toString(*param));
 					}
 
 					// Send new param sets to particles for next generation
@@ -3188,7 +3188,7 @@ void Swarm::runSDE() {
 					}
 				}
 
-				string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration)) + "_summary.txt";
+				string outputPath = options.jobOutputDir + toString(currentGeneration) + "_summary.txt";
 				outputRunSummary(outputPath);
 				++currentGeneration;
 				cout << "Switching to main loop" << endl;
@@ -3238,7 +3238,7 @@ void Swarm::runAGA() {
 		stopCriteria = checkStopCriteria();
 
 		// Cleanup old files if needed
-		string currentDirectory = options.jobOutputDir + to_string(static_cast<long long int>(currentGeneration));
+		string currentDirectory = options.jobOutputDir + toString(currentGeneration);
 		if (options.deleteOldFiles) {
 			cleanupFiles(currentDirectory.c_str());
 		}
@@ -3330,8 +3330,8 @@ void Swarm::runADE() {
 	}
 
 	// Create an output directory for each island
-	if (!checkIfFileExists(options.jobOutputDir + to_string(static_cast<long long int>(1)))) {
-		string createDirCmd = "mkdir " + options.jobOutputDir + to_string(static_cast<long long int>(1));
+	if (!checkIfFileExists(options.jobOutputDir + toString(1))) {
+		string createDirCmd = "mkdir " + options.jobOutputDir + toString(1);
 		runCommand(createDirCmd);
 	}
 
@@ -3387,17 +3387,17 @@ void Swarm::runADE() {
 
 				// Let's process params and update any fit values
 				string paramsString;
-				paramsString = "gen" + to_string(static_cast<long long int>(currentGeneration)) + "perm" + to_string(static_cast<long long int>(particle->first)) + " ";
+				paramsString = "gen" + toString(currentGeneration) + "perm" + toString(particle->first) + " ";
 				if (islandIsTrial[particleToIsland_[particle->first]]) {
 
 					if (flightCounter_ && flightCounter_ % options.outputEvery == 0) {
-						string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(flightCounter_)) + "_summary.txt";
+						string outputPath = options.jobOutputDir + toString(flightCounter_) + "_summary.txt";
 						outputRunSummary(outputPath);
 					}
 
 					++flightCounter_;
 
-					paramsString = to_string(static_cast<long long int>(flightCounter_)) + " ";
+					paramsString = toString(flightCounter_) + " ";
 
 					bool replaceParams = false;
 
@@ -3413,10 +3413,10 @@ void Swarm::runADE() {
 						if (replaceParams) {
 							//cout << "stored " << stod(*m) << " for particle " << pID << " as " << particleCurrParamSets_[pID][i] << endl;
 							particleCurrParamSets_[particle->first][i] = *param;
-							paramsString += to_string(static_cast<long double>(*param)) + " ";
+							paramsString += toString(*param) + " ";
 						}
 						else {
-							paramsString += to_string(static_cast<long double>(particleCurrParamSets_[particle->first][i])) + " ";
+							paramsString += toString(particleCurrParamSets_[particle->first][i]) + " ";
 						}
 						++i;
 					}
@@ -3460,7 +3460,7 @@ void Swarm::runADE() {
 						vector<string> paramVecStr;
 						//for (auto param : particleCurrParamSets_.at(*particle)) {
 						for (auto param = newParamSet.begin(); param != newParamSet.end(); ++param) {
-							paramVecStr.push_back(to_string(static_cast<long double>(*param)));
+							paramVecStr.push_back(toString(*param));
 						}
 
 						// Send new param sets to particles for next generation
@@ -3541,14 +3541,14 @@ void Swarm::runASA() {
 		for (auto particle = initFinishedParticles.begin(); particle != initFinishedParticles.end(); ++particle) {
 			//++flightCounter_;
 			cout << "particle " << cpuToParticle[particle->first] << " on cpu " << particle->first << " finished" << endl;
-			string paramString = to_string(static_cast<long long int>(flightCounter_)) + " ";
+			string paramString = toString(flightCounter_) + " ";
 
 			// Update parameter values
 			unsigned int i = 0;
 			for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
 				particleCurrParamSets_[cpuToParticle[particle->first]][i++] = *param;
 				cout << "updating particle " << cpuToParticle[particle->first] << " to " << *param << " at " << i << endl;
-				paramString += to_string(static_cast<long double>(*param)) + " ";
+				paramString += toString(*param) + " ";
 			}
 
 			// Update fit calcs
@@ -3581,7 +3581,7 @@ void Swarm::runASA() {
 		for (auto particle = finishedParticles.begin(); particle != finishedParticles.end(); ++particle) {
 			cout << "particle " << cpuToParticle[particle->first] << " on cpu " << particle->first << " finished" << endl;
 
-			string paramString = to_string(static_cast<long long int>(flightCounter_ + 1)) + " ";
+			string paramString = toString(flightCounter_ + 1) + " ";
 
 			// If the particle finished their local search
 			if (isLocal[particle->first]) {
@@ -3596,7 +3596,7 @@ void Swarm::runASA() {
 				for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
 					particleCurrParamSets_[cpuToParticle[particle->first]][i++] = *param;
 					cout << "updating particle " << cpuToParticle[particle->first] << " to " << *param << " at " << i << endl;
-					paramString += to_string(static_cast<long double>(*param)) + " ";
+					paramString += toString(*param) + " ";
 				}
 
 				particleFs[cpuToParticle[particle->first]] = trialParams[cpuToParticle[particle->first]][0];
@@ -3616,7 +3616,7 @@ void Swarm::runASA() {
 					for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
 						particleCurrParamSets_[cpuToParticle[particle->first]][i++] = *param;
 						cout << "updating particle " << cpuToParticle[particle->first] << " to " << *param << " at " << i << endl;
-						paramString += to_string(static_cast<long double>(*param)) + " ";
+						paramString += toString(*param) + " ";
 					}
 
 					// Update fitness
@@ -3631,7 +3631,7 @@ void Swarm::runASA() {
 				}
 				else {
 					for (auto param = particle->second.begin() + 1; param != particle->second.end(); ++param) {
-						paramString += to_string(static_cast<long double>(*param)) + " ";
+						paramString += toString(*param) + " ";
 					}
 				}
 
@@ -3648,7 +3648,7 @@ void Swarm::runASA() {
 			}
 
 			if (++flightCounter_ && flightCounter_ % options.outputEvery == 0) {
-				string outputPath = options.jobOutputDir + to_string(static_cast<long long int>(flightCounter_)) + "_summary.txt";
+				string outputPath = options.jobOutputDir + toString(flightCounter_) + "_summary.txt";
 				outputRunSummary(outputPath);
 				//cout << "fc is " << flightCounter_ << ", outputting" << endl;
 			}
@@ -3677,7 +3677,7 @@ void Swarm::runASA() {
 				// Save new params for sending to particle
 				vector<string> newParamsStr;
 				for (auto param = newParams.begin(); param != newParams.end(); ++param) {
-					newParamsStr.push_back(to_string(static_cast<long double>(*param)));
+					newParamsStr.push_back(toString(*param));
 				}
 
 				cout << "running " << cpuToParticle[particle->first] << " with new params on cpu " << particle->first << endl;

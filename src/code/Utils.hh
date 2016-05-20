@@ -33,5 +33,10 @@ bool isFloat(std::string number);
 double mutateParamGA(FreeParam* fp, double paramValue);
 int runCommand(std::string cmd, std::string &result);
 int runCommand(std::string cmd);
+std::string toString (unsigned int theNumber);
+std::string toString (int theNumber);
+std::string toString (float theNumber);
+std::string toString (double theNumber);
+std::string toString (unsigned long theNumber);
 
 #endif /* UTILS_HH_ */

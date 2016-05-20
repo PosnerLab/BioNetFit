@@ -46,17 +46,17 @@ void Pheromones::init(Swarm *s) {
 		//std::cout << "init ipc" << std::endl;
 		if (s->isMaster) {
 			for (unsigned int i = 0; i <= swarm_->options.swarmSize; ++i) {
-				//std::cout << "creating: " << std::to_string(static_cast<long long int>(i)) << std::endl;
-				message_queue::remove(std::to_string(static_cast<long long int>(i)).c_str());
-				message_queue *smq = new message_queue(create_only, std::to_string(static_cast<long long int>(i)).c_str(), 100, 1000);
+				//std::cout << "creating: " << std::toString(static_cast<long long int>(i)) << std::endl;
+
+				message_queue *smq = new message_queue(create_only, toString(i).c_str(), 100, 1000);
 				smq_.push_back(smq);
 			}
 		}
 		else {
 			for (unsigned int i = 0; i <= swarm_->options.swarmSize; ++i) {
-				message_queue *smq = new message_queue(open_only, std::to_string(static_cast<long long int>(i)).c_str());
+				message_queue *smq = new message_queue(open_only, toString(i).c_str());
 				smq_.push_back(smq);
-				//std::cout << "opening: " << std::to_string(static_cast<long long int>(i)) << " with max size of " << smq_[i]->get_max_msg() << std::endl;
+				//std::cout << "opening: " << std::toString(static_cast<long long int>(i)) << " with max size of " << smq_[i]->get_max_msg() << std::endl;
 			}
 		}
 	}
@@ -78,7 +78,7 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			//std::cout << "sending to entire swarm because receiver is -1" << std::endl;
 
 			// TODO: Replace this exchange with a world_->sendrecv()
-			smessage.tag = std::to_string(static_cast<long long int>(GET_RUNNING_PARTICLES));
+			smessage.tag = toString(GET_RUNNING_PARTICLES);
 			//std::cout << "trying to get list of running particles.." << std::endl;
 			// First we need to get a list of all running particles from the master
 
@@ -104,7 +104,7 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			receivers.push_back(receiverID);
 		}
 
-		smessage.tag = std::to_string(static_cast<long long int>(tag));
+		smessage.tag = toString(tag);
 
 		//for (auto m: mpiMessage) {
 		for (auto m = message.begin(); m != message.end(); ++m) {
@@ -150,7 +150,7 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 			// First we need to get a list of all running particles from the master
 
 			// Set tag to tell master we need a list of running particles
-			smessage.tag = std::to_string(static_cast<long long int>(GET_RUNNING_PARTICLES));
+			smessage.tag = toString(GET_RUNNING_PARTICLES);
 			//std::cout << "trying to get list of running particles.." << std::endl;
 
 			// Serialize the message
@@ -190,7 +190,7 @@ void Pheromones::sendToSwarm(int senderID, signed int receiverID, int tag, bool 
 		}
 
 		// Set the message tag as specified by the sender
-		smessage.tag = std::to_string(static_cast<long long int>(tag));
+		smessage.tag = toString(tag);
 
 		// Add the message array to the swarmMessage
 		//for (auto m: mpiMessage) {

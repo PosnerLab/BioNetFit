@@ -100,7 +100,7 @@ public:
 	void getClusterInformation();
 	std::string getClusterCommand(std::string cmd);
 	std::string generateTorqueBatchScript(std::string cmd);
-	std::string generateSlurmCommand(std::string cmd, bool multiProg = true, int nCPU = 0);
+	std::string generateSlurmCommand(std::string cmd, bool multiProg = true, unsigned int nCPU = 0);
 	std::string generateSlurmMultiProgCmd(std::string runCmd);
 	std::string generateSlurmBatchFile(std::string runCmd);
 	std::string generateMPICommand(std::string runCmd);
@@ -354,11 +354,11 @@ private:
 
 	void insertKeyByValue(std::multimap<double, unsigned int> &theMap, double key, unsigned int value);
 
-	std::set<int> runningParticles_;
-	std::set<int>::iterator runningParticlesIterator_;
+	std::set<unsigned int> runningParticles_;
+	std::set<unsigned int>::iterator runningParticlesIterator_;
 
-	std::set<int> failedParticles_;
-	std::set<int>::iterator failedParticlesIterator_;
+	std::set<unsigned int> failedParticles_;
+	std::set<unsigned int>::iterator failedParticlesIterator_;
 
 	std::string exePath_;
 	std::string configPath_;

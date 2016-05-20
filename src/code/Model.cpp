@@ -207,7 +207,7 @@ void Model::outputModelWithParams(map<string, double> params, string path, strin
 								//tt += t;
 								if (matches[1] == p->first) {
 									string match = p->first + "\\s+.+";
-									string replacement = p->first + " " + to_string(static_cast<long double>(abs(p->second))) + "\n";
+									string replacement = p->first + " " + toString(abs(p->second)) + "\n";
 									*line = boost::regex_replace(*line, boost::regex(match), replacement);
 									numReplacedParams++;
 								}
@@ -259,9 +259,9 @@ void Model::outputModelWithParams(map<string, double> params, string path, strin
 						if (inParameterBlock) {
 							// Replace free param with generated param
 							if (boost::regex_search(*line, matches, boost::regex("(\\s+|=\\s*)(\\w+)__FREE__"))) {
-								// Older version of C++ don't support double overload to to_string, so we have to cast to long double
+								// Older version of C++ don't support double overload to toString, so we have to cast to long double
 								//cout << "found a FP: " << matches[2] << endl;
-								newLine = boost::regex_replace(*line, boost::regex("\\w+__FREE__"), to_string(static_cast<long double>(params[matches[2]])));
+								newLine = boost::regex_replace(*line, boost::regex("\\w+__FREE__"), toString(params[matches[2]]));
 								//cout << "replacing with: " << params[matches[2]] << endl;
 								++numReplacedParams;
 							}

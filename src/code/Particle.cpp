@@ -187,16 +187,16 @@ void Particle::doParticle() {
 	}
 }
 
-void Particle::runModel(int iteration, bool localSearch) {
+void Particle::runModel(unsigned int iteration, bool localSearch) {
 
 	// First get our path and filename variables set up for use in model generation, sim command, etc
-	string bnglFilename = to_string(id_) + "_" + to_string(iteration) + ".bngl";
-	string path = swarm_->options.jobOutputDir + to_string(currentGeneration_) + "/";
+	string bnglFilename = toString(id_) + "_" + toString(iteration) + ".bngl";
+	string path = swarm_->options.jobOutputDir + toString(currentGeneration_) + "/";
 
 	string bnglFullPath = path + bnglFilename;
 	cout << "path is " << path << endl;
 
-	string suffix = to_string(id_) + "_" + to_string(iteration);
+	string suffix = toString(id_) + "_" + toString(iteration);
 
 	string pipePath;
 
@@ -244,14 +244,14 @@ void Particle::runModel(int iteration, bool localSearch) {
 				outputSuffix = ".gdat";
 			}
 
-			pipePath = path + i->first + "_" + to_string(id_) + "_" + to_string(iteration) + outputSuffix;
+			pipePath = path + i->first + "_" + toString(id_) + "_" + toString(iteration) + outputSuffix;
 			cout << "pp is: " << pipePath << endl;
 			createParticlePipe(pipePath.c_str());
 		}
 	}
 
 	// Construct our simulation command
-	string command = swarm_->options.bngCommand + " --outdir " + path + " " + bnglFullPath + " >> " + path + to_string(id_) + ".BNG_OUT 2>&1";
+	string command = swarm_->options.bngCommand + " --outdir " + path + " " + bnglFullPath + " >> " + path + toString(id_) + ".BNG_OUT 2>&1";
 	if (swarm_->options.usePipes) {
 		command += " &";
 	}
@@ -276,7 +276,7 @@ void Particle::runModel(int iteration, bool localSearch) {
 			else {
 				outputSuffix = ".gdat";
 			}
-			string dataPath = path + action->first + "_" + to_string(id_) + "_" + to_string(iteration) + outputSuffix;
+			string dataPath = path + action->first + "_" + toString(id_) + "_" + toString(iteration) + outputSuffix;
 			dataFiles_[action->first].insert(pair<int, Data*>(iteration, new Data(dataPath, swarm_, false)));
 		}
 	}
@@ -311,7 +311,7 @@ void Particle::checkMessagesGenetic() {
 					++messageIndex;
 				}
 
-				string path = swarm_->options.jobOutputDir + to_string(currentGeneration_ + 1) + "/";
+				string path = swarm_->options.jobOutputDir + toString(currentGeneration_ + 1) + "/";
 
 				if (!checkIfFileExists(path)) {
 					runCommand("mkdir " + path);
@@ -319,9 +319,9 @@ void Particle::checkMessagesGenetic() {
 
 				for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 					// Construct our filenames
-					string bnglFilename = to_string(id_) + "_" + to_string(i) + ".bngl";
+					string bnglFilename = toString(id_) + "_" + toString(i) + ".bngl";
 					string bnglFullPath = path + bnglFilename;
-					string suffix = to_string(id_) + "_" + to_string(i);
+					string suffix = toString(id_) + "_" + toString(i);
 
 					// And generate our models
 					if (swarm_->options.model->getHasGenerateNetwork()){
@@ -418,10 +418,10 @@ void Particle::checkMessagesPSO() {
 					for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 
 						// Construct our filenames
-						string bnglFilename = to_string(id_) + "_" + to_string(i) + ".bngl";
-						string path = swarm_->options.jobOutputDir + to_string(currentGeneration_ + 1) + "/";
+						string bnglFilename = toString(id_) + "_" + toString(i) + ".bngl";
+						string path = swarm_->options.jobOutputDir + toString(currentGeneration_ + 1) + "/";
 						string bnglFullPath = path + bnglFilename;
-						string suffix = to_string(id_) + "_" + to_string(i);
+						string suffix = toString(id_) + "_" + toString(i);
 
 						if (!checkIfFileExists(path)) {
 							runCommand("mkdir " + path);
@@ -522,10 +522,10 @@ bool Particle::checkMessagesDE() {
 					for (unsigned int i = 1; i <= swarm_->options.smoothing; ++i) {
 
 						// Construct our filenames
-						string bnglFilename = to_string(id_) + "_" + to_string(i) + ".bngl";
-						string path = swarm_->options.jobOutputDir + to_string(currentGeneration_ + 1) + "/";
+						string bnglFilename = toString(id_) + "_" + toString(i) + ".bngl";
+						string path = swarm_->options.jobOutputDir + toString(currentGeneration_ + 1) + "/";
 						string bnglFullPath = path + bnglFilename;
-						string suffix = to_string(id_) + "_" + to_string(i);
+						string suffix = toString(id_) + "_" + toString(i);
 
 						if (!checkIfFileExists(path)) {
 							runCommand("mkdir " + path);
@@ -587,9 +587,9 @@ bool Particle::checkMessagesDE() {
 				runNelderMead(simplex);
 				cout << "nelder mead finished. old calc: " << simplex.begin()->first << " new calc: " << fitCalcs[-1] << endl;
 				vector<string> paramsStr;
-				paramsStr.push_back(to_string(fitCalcs[-1]));
+				paramsStr.push_back(toString(fitCalcs[-1]));
 				for (auto p = simParams_.begin(); p != simParams_.end(); ++p) {
-					paramsStr.push_back(to_string(p->second));
+					paramsStr.push_back(toString(p->second));
 					cout << "new param: " << p->second << endl;
 				}
 				swarm_->swarmComm->sendToSwarm(id_, 0, SIMULATION_END, false, paramsStr);
@@ -763,13 +763,13 @@ void Particle::finalizeSim() {
 	calculateFit();
 
 	// Put our fit calc into the message vector
-	swarm_->swarmComm->univMessageSender.push_back(to_string(fitCalcs.at(currentGeneration_)));
+	swarm_->swarmComm->univMessageSender.push_back(toString(fitCalcs.at(currentGeneration_)));
 	//cout << "stored fit calc of " << fitCalcs.at(currentGeneration_) << " as " << swarm_->swarmComm->univMessageSender[0] << endl;
 
 	// Put our simulation params into the message vector
 	for (map<string,double>::iterator i = simParams_.begin(); i != simParams_.end(); ++i){
 		//cout << "stored param of " << i->second << endl;
-		swarm_->swarmComm->univMessageSender.push_back(to_string(i->second));
+		swarm_->swarmComm->univMessageSender.push_back(toString(i->second));
 	}
 
 	// Tell the swarm master that we're finished
