@@ -47,8 +47,14 @@ void Pheromones::init(Swarm *s) {
 		if (s->isMaster) {
 			for (unsigned int i = 0; i <= swarm_->options.swarmSize; ++i) {
 				//std::cout << "creating: " << std::toString(static_cast<long long int>(i)) << std::endl;
+				message_queue *smq;
 
-				message_queue *smq = new message_queue(create_only, toString(i).c_str(), 100, 1000);
+				try {
+					smq = new message_queue(create_only, toString(i).c_str(), 100, 1000);
+				} catch (boost::interprocess::interprocess_exception e) {
+					message_queue::remove(toString(i).c_str());
+					smq = new message_queue(create_only, toString(i).c_str(), 100, 1000);
+				}
 				smq_.push_back(smq);
 			}
 		}
