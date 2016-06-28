@@ -547,7 +547,7 @@ void Config::checkConsistency() {
 		swarm_->outputError("Error: You didn't specify a job_name. Quitting.");
 	}
 
-	if (swarm_->options.fitType != "ga" || swarm_->options.fitType != "sa" || swarm_->options.fitType != "de" || swarm_->options.fitType != "pso") {
+	if (swarm_->options.fitType != "ga" && swarm_->options.fitType != "sa" && swarm_->options.fitType != "de" && swarm_->options.fitType != "pso") {
 		swarm_->outputError("Error: Unrecognized fit_type. Quitting.");
 	}
 
