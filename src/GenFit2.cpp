@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 	string action;
 	string configFile;
 	string type;
-	int pID;
+	int pID = 0;
 
 	// GenFit2 [conf_file]
 	if (argc == 2) {
