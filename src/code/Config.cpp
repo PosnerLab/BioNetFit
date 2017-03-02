@@ -8,6 +8,8 @@
 #include <unordered_map>
 
 #include "Config.hh"
+#include <iostream>
+#include <boost/filesystem.hpp>
 
 using namespace std;
 
@@ -206,6 +208,12 @@ Swarm * Config::createSwarmFromConfig () {
 
 	// Set output directory
 	if(pairs.find("output_dir") != pairs.end()) {
+		if (!(checkIfFileExists("output_dir"))) {
+                	boost::filesystem::path dir("output_dir");
+                	if (boost::filesystem::create_directory("output")) {
+                        	std::cout << "created output dir" << "\n";
+                	}
+       		}
 		swarm_->options.outputDir = convertToAbsPath(pairs.find("output_dir")->second);
 	}
 
@@ -547,7 +555,7 @@ void Config::checkConsistency() {
 		swarm_->outputError("Error: You didn't specify a job_name. Quitting.");
 	}
 
-	if (swarm_->options.fitType != "ga" || swarm_->options.fitType != "sa" || swarm_->options.fitType != "de" || swarm_->options.fitType != "pso") {
+	if (swarm_->options.fitType != "ga" && swarm_->options.fitType != "sa" && swarm_->options.fitType != "de" && swarm_->options.fitType != "pso") {
 		swarm_->outputError("Error: Unrecognized fit_type. Quitting.");
 	}
 

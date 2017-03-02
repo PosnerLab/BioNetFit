@@ -18,8 +18,9 @@ int main(int argc, char *argv[]) {
 	string action;
 	string configFile;
 	string type;
-	int pID;
-
+	int pID = 0;
+	int ret = 0;  //chdir error var
+	
 	// GenFit2 [conf_file]
 	if (argc == 2) {
 		configFile = argv[1];
@@ -72,11 +73,14 @@ int main(int argc, char *argv[]) {
 	if (type != "master" && type != "particle") {
 		outputError("Error: Couldn't find a valid 'type' in your arguments.");
 	}
-
+	if (!(checkIfFileExists(configFile))) {
+		cout << configFile;
+	}
 	configFile = convertToAbsPath(configFile);
-
-	chdir("../");
-
+	ret = chdir("../");
+	
+	if (ret == -1)
+		cout << "chdir(\"../\") failed\n";
 	/*
 	cout << "type: " << type << endl;
 	cout << "action: " << action << endl;
@@ -107,7 +111,11 @@ int main(int argc, char *argv[]) {
 			//cout << "Processing .conf took " << t << " seconds" << endl;
 
 			s->currentGeneration = 1;
-			chdir("bin/");
+			
+			ret = chdir("bin/");
+			//use return value
+			if (ret == -1)
+				cout << "chdir(\"bin/\")  failed (line 116)\n"; 
 			s->setExePath(convertToAbsPath(argv[0]));
 			s->isMaster = true;
 			s->initComm();
@@ -173,7 +181,10 @@ int main(int argc, char *argv[]) {
 			}
 
 			s->isMaster = true;
-			chdir("bin/");
+			ret = chdir("bin/");
+			//use return value
+			if (ret == -1)
+				cout << "chdir(\"bin/\") failed (line 185)\n";	
 			s->setExePath(convertToAbsPath(argv[0]));
 			s->initComm();
 		}
@@ -280,7 +291,10 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		chdir("bin/");
+		ret = chdir("bin/");
+		
+		if (ret == -1)
+			cout << "chdir(\"bin/\") failed (line 295)\n"; 
 
 		s->isMaster = false;
 		s->setExePath(convertToAbsPath(argv[0]));
@@ -304,7 +318,9 @@ int main(int argc, char *argv[]) {
 			setenv("OMPI_MCA_mpi_warn_on_fork","0",1);
 		}
 
-		chdir("bin");
+		ret = chdir("bin/");
+		if (ret == -1)
+			cout << "chdir(\"bin/\") failed (line 321)\n";
 		p->doParticle();
 	}
 

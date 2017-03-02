@@ -59,12 +59,15 @@ void Particle::generateParams() {
 
 		// Generate a number on a linear scale
 		if (genType == "random_var"){
-			//TODO: Replace the random number generators here with c++11 generators
 			// Store our min and max values
 			double min = i->second->getGenMin();
 			double max = i->second->getGenMax();
 
-			float myrand = min + static_cast<double> (rand()) /(static_cast<double> (RAND_MAX/(max-min)));
+			std::random_device rd;
+			std::mt19937 mt(rd());
+			std::uniform_real_distribution<double> dist(min, max);
+			
+			float myrand = dist(mt);
 
 			pair<string,double> paramPair = make_pair(paramName, myrand);
 			setParam(paramPair);

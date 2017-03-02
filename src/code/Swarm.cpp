@@ -432,7 +432,7 @@ void Swarm::updateEnhancedStop() {
 double Swarm::getEuclidianNorm(double y, unsigned int n) {
 
 	// Eq 10 in Moraes at al
-	double sum;
+	double sum = 0;
 	for (unsigned int i = 1; i <= n; ++i) {
 		sum += pow(y, 2);
 	}
@@ -504,7 +504,7 @@ double Swarm::calcParticleWeight(unsigned int particle) {
 	double numerator = 1 / getEuclidianNorm( (particleBestFits_[particle] - particleBestFitsByFit_.begin()->first), options.model->getNumFreeParams());
 
 	// Eq 8 in Moraes et al
-	double sum;
+	double sum = 0;
 	for (unsigned int i = 1; i <= options.swarmSize; ++i) {
 		// Make sure we're not using the particle with the best fit -- it will
 		// result in a div_by_0
@@ -2129,6 +2129,9 @@ string Swarm::getClusterCommand(string runCmd) {
 	else if (options.clusterSoftware == "mpi") {
 		return generateMPICommand(runCmd);
 	}
+	else {
+		return 0;
+	}
 }
 
 string Swarm::generateMPICommand(string cmd) {
@@ -2474,8 +2477,8 @@ vector<double> Swarm::mutateParticleDE(unsigned int particle, float mutateFactor
 	}
 
 	vector<double> mutatedParams;
-	unsigned int currIsland;;
-	unsigned int particlesPerIsland;
+	unsigned int currIsland = 0;
+	unsigned int particlesPerIsland = 0;
 
 	if (options.fitType == "de") {
 		currIsland = particleToIsland_.at(particle);
